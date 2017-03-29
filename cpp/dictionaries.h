@@ -49,7 +49,6 @@ enum SearchMode {
 	NEXT_DICT = 3,
 };
 
-SearchResult word_search(const char* word, bool names_dictionary, int max = -1);
 SearchResult search(const char* text, SearchMode search_mode);
 
 bool dictionaries_init(const char* filename, const char* content, uint32_t length);

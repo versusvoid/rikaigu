@@ -209,6 +209,7 @@ def prepare_names():
 			offset += len(l) + 1
 
 		for combined_entry in combined_entries.values():
+			combined_entry.readings[0] = combined_entry.readings[0]._replace(kanjis=range(len(combined_entry.kanjis)))
 			entry_index_keys = index_keys(combined_entry, variate=False)
 			for key in entry_index_keys:
 				index.setdefault(key, set()).add(offset)

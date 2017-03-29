@@ -47,9 +47,6 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 		'<tr><td>Y</td><td>Move popup location down</td></tr>' +
 		'<tr><td>D</td><td>Hide/show definitions</td></tr>' +
 		'<tr><td>Shift/Enter&nbsp;&nbsp;</td><td>Switch dictionaries</td></tr>' +
-		'<tr><td>B</td><td>Previous character</td></tr>' +
-		'<tr><td>M</td><td>Next character</td></tr>' +
-		'<tr><td>N</td><td>Next word</td></tr>' +
 		'<tr><td colspan="2">&nbsp;</td></tr>' +
 		'<tr><td colspan="2">Hold Shift to search only kanji</td></tr>' +
 		'</table>';
@@ -143,9 +140,8 @@ function rikaiguEnable(tab) {
 		onRuntimeInitialized: function() {
 			updateCppConfig();
 			Promise.all([
-					/* names.dat and dict.dat are stored
-					 * compressed in virtual file system
-					 * of asm.js.
+					/* names.dat, dict.dat, and kanji.dat are stored
+					 * compressed in virtual file system of asm.js.
 					 */
 					loadFile('data/model.bin'),
 					loadFile('data/radicals.dat'),
@@ -184,74 +180,55 @@ function rikaiguDisable() {
 function search(request) {
 	var matchLengthPtr = Module._malloc(4);
 	var prefixLengthPtr = Module._malloc(4);
-	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number'],
+	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number', 'number'],
 			[request.text, request.prefix, request.dictOption, matchLengthPtr, prefixLengthPtr]);
-	var matchLen = Module.getValue(matchLengthPtr, 'i32');
+	var matchLength = Module.getValue(matchLengthPtr, 'i32');
 	var prefixLength = Module.getValue(prefixLengthPtr, 'i32');
 	Module._free(matchLengthPtr);
 	Module._free(prefixLengthPtr);
-	return {html, matchLen, prefixLength};
-}
-
-var translateCache = {__count__: 0};
-function translate(title) {
-	if (title in translateCache) {
-		var res = translateCache[title];
-		res.lastAccess = new Date().getTime();
-		return res.html;
-	} else {
-		var html = Module.ccall('rikaigu_translate', 'string', ['string'], [title]);
-		if (title.length < 1000) {
-			translateCache[title] = {
-				html,
-				lastAccess: new Date().getTime()
-			};
-			translateCache.__count__ += 1;
-			while (translateCache.__count__ > 10) {
-				var min = translateCache[title].lastAccess, argmin = title;
-				for (var k in translateCache) {
-					if (translateCache[k].lastAccess && min > translateCache[k].lastAccess) {
-						min = translateCache[k].lastAccess;
-						argmin = k;
-					}
-				}
-				delete translateCache[argmin];
-				translateCache.__count__ -= 1;
-			}
-		}
-		return html;
-	}
-}
-
-function onTabActivated(activeInfo) {
-	if (rikaiguEnabled) {
-		chrome.tabs.sendMessage(activeInfo.tabId, {
-			"type": "enable",
-			"config": makeTabConfig()
-		});
-	}
+	return [html, {matchLength, prefixLength}];
 }
 
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
-			console.log('enable?');
-			onTabActivated({tabId: sender.tab.id});
+			response(sender.frameId);
+			if (rikaiguEnabled) {
+				chrome.tabs.sendMessage(sender.tab.id, {
+					"type": "enable",
+					"config": makeTabConfig()
+				}, {frameId: sender.frameId});
+			}
 			break;
+
 		case 'xsearch':
-			console.log('xsearch');
-			var result = search(request);
+			var [html, result]  = search(request);
 			result.type = request.type;
 			response(result);
-			//Module.ccall('rikaigu_dump_profile_info', null, []);
+			if (html) {
+				chrome.tabs.sendMessage(sender.tab.id, {
+					"type": "show",
+					"html": html,
+					"match": request.prefix.substring(request.prefix.length - result.prefixLength)
+						+ request.text.substring(0, result.matchLength),
+					"screenX": request.screenX,
+					"screenY": request.screenY
+				});
+			}
+
 			break;
-		case 'translate':
-			console.log('translate');
-			var html = translate(request.title);
-			response({type: request.type, html});
+		case 'close':
+			chrome.tabs.sendMessage(sender.tab.id, request);
 			break;
+
+		case 'changeActiveFrame':
+			chrome.tabs.sendMessage(sender.tab.id, request);
+			break;
+		case 'keyboardEventForActiveFrame':
+			chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
+			break;
+
 		case 'switchOnlyReading':
-			console.log('switchOnlyReading');
 			if (localStorage['onlyReadings'] === 'true')
 				localStorage['onlyReadings'] = 'false';
 			else
@@ -265,5 +242,4 @@ function onMessage(request, sender, response) {
 
 clearState();
 chrome.browserAction.onClicked.addListener(rikaiguEnable);
-chrome.tabs.onActivated.addListener(onTabActivated);
 chrome.runtime.onMessage.addListener(onMessage);

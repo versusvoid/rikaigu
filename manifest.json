@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 
-	"name": "rikaigu",
+	"name": "rikaigu-devel",
 	"version": "1.0.0",
 
 	"description": "Rikaikun enhanced. Translate Japanese by hovering over words.",
@@ -12,7 +12,7 @@
 
 	"permissions": [
 		"tabs",
-		"clipboardWrite"
+		"webNavigation"
 	],
 
 	"background": {
@@ -27,8 +27,9 @@
 	"options_page": "html/options.html",
 
 	"content_scripts": [{
-		"matches": ["http://*/*", "https://*/*", "ftp://*/*", "file:///*"],
-		"js": ["js/rikaicontent.js"],
+		"matches": ["<all_urls>"],
+		"match_about_blank": true,
+		"js": ["js/selection.js", "js/highlight.js", "js/rikaicontent.js"],
 		"all_frames": true
 	}],
 

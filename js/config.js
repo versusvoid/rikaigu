@@ -8,13 +8,15 @@ if (localStorage["v0.9.4"]) {
 	for (var oldNew of [
 			["popupcolor", "popupColor"],
 			["highlight", "matchHighlight"],
-			["textboxhl", "textboxHighlight"],
+			["textboxhl"],
 			["onlyreading", "onlyReadings"],
 			["minihelp", "showMiniHelp"],
 			["disablekeys", "disableKeys"],
 			["kanjicomponents", "showKanjiComponents"]]) {
 
-		localStorage[oldNew[1]] = localStorage[oldNew[0]];
+		if (oldNew.length > 1) {
+			localStorage[oldNew[1]] = localStorage[oldNew[0]];
+		}
 		localStorage.removeItem(oldNew[0]);
 	}
 
@@ -46,7 +48,6 @@ function initOption(name, defaultValue) {
 
 initOption("popupColor", "blue");
 initOption("matchHighlight", true);
-initOption("textboxHighlight", false);
 initOption("onlyReadings", false);
 initOption("showMiniHelp", "true");
 initOption("disableKeys", "false");
@@ -73,8 +74,7 @@ function makeTabConfig() {
 		disableKeys: localStorage['disableKeys'] === 'true',
 		matchHighlight: localStorage['matchHighlight'] === 'true',
 		popupDelay: parseInt(localStorage['popupDelay']),
-		showOnKey: localStorage['showOnKey'],
-		textboxHighlight: localStorage['textboxHighlight'] === 'true'
+		showOnKey: localStorage['showOnKey']
 	};
 }
 

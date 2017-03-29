@@ -11,14 +11,21 @@ EMCCFLAGS = -s TOTAL_MEMORY=32MB \
 	    --preload-file ../data/kanji.dat@/kanji.dat \
 	    $(DEBUG_FLAGS)
 
-rikai.asm.js: ../crfpp/js/libcrfpp.bc \
-		../data/dict.dat ../data/names.dat \
-		api.bc crf.bc deinflector.bc dentry.bc dictionaries.bc html_render.bc word_types.bc utils.bc
-	emcc $(CXXFLAGS) $(EMCCFLAGS) $(^:%.dat=) -o rikai.asm.js
+OBJECTS = api.bc crf.bc deinflector.bc dentry.bc dictionaries.bc html_render.bc word_types.bc utils.bc
+
+rikai.asm.js: ../crfpp/js/libcrfpp.bc $(OBJECTS) \
+		../data/dict.dat ../data/names.dat ../data/kanji.dat
+	emcc $(CXXFLAGS) $(EMCCFLAGS) $(^:%.dat=) -o $@
+
+%.d : %.cpp
+	emcc $(CXXFLAGS) -MM $< -MT $(<:%.cpp=%.bc) -o $@
+	sed 's/^\($(<:%.cpp=%.bc)\)/\1 $@/g' -i $@
+
+include $(OBJECTS:%.bc=%.d)
 
 %.bc : %.cpp
 	emcc $(CXXFLAGS) $< -o $@
 
 clean:
-	rm -rf *.bc
-	rm -f rikai.asm.js
+	rm -rf *.bc *.d
+	rm -f rikai.asm.js rikai.asm.js.data rikai.asm.js.mem rikai.asm.js.map

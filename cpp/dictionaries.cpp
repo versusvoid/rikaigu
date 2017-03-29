@@ -193,7 +193,7 @@ struct KanaConvertor
 std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 {
 	PROFILE
-//	std::cout << "find( " << word << " )" << std::endl;
+	std::cout << "find( " << word << " )" << std::endl;
 
 	const char* beg = index->index_start;
 	const char* end = index->index_end;
@@ -262,7 +262,7 @@ static bool compare(WordResult& a, WordResult& b)
 static size_t line_buffer_size = 0;
 static char* line = nullptr;
 
-SearchResult word_search(const char* word, bool names_dictionary, int max)
+SearchResult word_search(const char* word, bool names_dictionary)
 {
 	PROFILE
 //	std::cout << "word_search( " << word << " )" << std::endl;
@@ -283,7 +283,7 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 	{
 		dict = fopen("names.dat", "r");
 		index = &names_index;
-		maxTrim = 20;
+		maxTrim = 7;
 		result.names = true;
 //		std::cout << "doNames" << std::endl;
 	}
@@ -291,7 +291,7 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 	{
 		dict = fopen("dict.dat", "r");
 		index = &dictionary_index;
-		maxTrim = 7;
+		maxTrim = 5;
 	}
 
 	if (line == nullptr)
@@ -300,7 +300,6 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 		line = reinterpret_cast<char*>(malloc(line_buffer_size));
 	}
 
-	if (max > 0) maxTrim = max;
 	size_t max_length = 0;
 	std::map<std::string, std::vector<uint32_t>> cache;
 	std::set<size_t> have;
@@ -339,6 +338,7 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 					std::cerr << "Too bad" << std::endl;
 					continue;
 				}
+//				std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
 
 				DEntry dentry(std::string(line, line_length - 1), names_dictionary);
 
@@ -346,10 +346,13 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 				// Each type has associated bit. If bit-and gives 0
 				// than deinflected word does not match this dentry.
 				if (candidate_it != trys.begin() && (dentry.all_pos() & u.type) == 0) {
+//					std::cout << "Mismatch: "
+//						<< std::bitset<32>(dentry.all_pos()).to_string() << " and "
+//						<< std::bitset<32>(u.type).to_string() << std::endl;
 					continue;
 				}
 				// TODO confugirable number of entries
-				if (count >= 5) {
+				if (count >= maxTrim) {
 					result.more = true;
 					if (names_dictionary) break;
 				}
@@ -368,7 +371,7 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 					u.expression});
 			} // for j < ix.length
 		} // for i < trys.length
-		if (count >= maxTrim || count >= 5) break;
+		if (count >= maxTrim) break;
 
 		convertor.drop_last();
 		convertor.shrink();

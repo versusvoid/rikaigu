@@ -37,7 +37,7 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix, int s
 		if (extended_text.size() > 0)
 		{
 			SearchResult res2 = search(extended_text.c_str(), SearchMode(search_mode));
-			if (res2.max_match_symbols_length - *prefix_symbols_length >= res.max_match_symbols_length)
+			if (res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length)
 			{
 				res = res2;
 			}
@@ -51,39 +51,6 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix, int s
 			assert(*prefix_symbols_length == 0);
 		}
 	}
-	*match_symbols_length = int32_t(res.max_match_symbols_length);
+	*match_symbols_length = int32_t(res.max_match_symbols_length) - *prefix_symbols_length;
 	return  make_html(res);
-}
-
-const char* rikaigu_translate(const char* utf8_text)
-{
-	std::string text(utf8_text);
-	SearchResult res;
-	res.title = text;
-
-        while (text.length() > 0)
-	{
-		auto partial_res = word_search(text.c_str(), false, 1);
-		if (partial_res.max_match_symbols_length > 0)
-		{
-			if (res.data.size() >= 7)
-			{
-				res.more = true;
-				break;
-			}
-			res.data.push_back(partial_res.data.at(0));
-			text = text.substr(partial_res.data.at(0).match_bytes_length);
-		}
-		else
-		{
-			text = text.substr(mbrlen(text.c_str(), text.length(), nullptr));
-		}
-        }
-
-	if (text.length() > 0)
-	{
-		res.title.resize(res.title.length() - text.length());
-		res.title += "...";
-	}
-        return make_html(res);
 }
