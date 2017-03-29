@@ -54,38 +54,6 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 		'<tr><td colspan="2">Hold Shift to search only kanji</td></tr>' +
 		'</table>';
 
-function loadFile(filename) {
-	return new Promise(function(resolve, reject) {
-		/*
-		 * Modified version of emscripten_async_wget_data() which
-		 * does not free allocated buffer after callback return.
-		 * We don't have to copy file's content anymore (and we have
-		 * large files like names.idx > 21MB). This leads to reduced
-		 * TOTAL_MEMORY.
-		 */
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', chrome.extension.getURL(filename), true);
-		xhr.responseType = 'arraybuffer';
-		xhr.onload = function xhr_onload() {
-			if (xhr.status == 200) {
-				var byteArray = new Uint8Array(xhr.response);
-				var buffer = Module._malloc(byteArray.length);
-				HEAPU8.set(byteArray, buffer);
-				if (Module.ccall('rikaigu_set_file', 'number',
-						['string', 'number', 'number'],
-						[filename, buffer, byteArray.length])) {
-					resolve();
-				} else {
-					reject('asm.js is a shit');
-				}
-			} else {
-				reject(xhr.status);
-			}
-		};
-		xhr.onerror = reject;
-		xhr.send(null);
-	});
-}
 
 var rikaiguEnabled = false;
 function onLoaded(tabId) {
@@ -130,6 +98,39 @@ function clearState() {
 	});
 }
 
+function loadFile(filename) {
+	return new Promise(function(resolve, reject) {
+		/*
+		 * Modified version of emscripten_async_wget_data() which
+		 * does not free allocated buffer after callback return.
+		 * We don't have to copy file's content anymore (and we have
+		 * large files like names.idx > 20MB). This leads to reduced
+		 * TOTAL_MEMORY.
+		 */
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', chrome.extension.getURL(filename), true);
+		xhr.responseType = 'arraybuffer';
+		xhr.onload = function xhr_onload() {
+			if (xhr.status == 200) {
+				var byteArray = new Uint8Array(xhr.response);
+				var buffer = Module._malloc(byteArray.length);
+				HEAPU8.set(byteArray, buffer);
+				if (Module.ccall('rikaigu_set_file', 'number',
+						['string', 'number', 'number'],
+						[filename, buffer, byteArray.length])) {
+					resolve();
+				} else {
+					reject('asm.js is a shit');
+				}
+			} else {
+				reject(xhr.status);
+			}
+		};
+		xhr.onerror = reject;
+		xhr.send(null);
+	});
+}
+
 function rikaiguEnable(tab) {
 	if (!!window.Module) {
 		console.error("Double enable");
@@ -150,7 +151,7 @@ function rikaiguEnable(tab) {
 					loadFile('data/radicals.dat'),
 					loadFile('data/dict.idx'),
 					loadFile('data/names.idx'),
-					loadFile('data/kanji.dat'),
+					loadFile('data/kanji.idx'),
 					loadFile('data/deinflect.dat'),
 					loadFile('data/expressions.dat')
 				]).then(onLoaded.bind(null, tab.id), onLoadError);

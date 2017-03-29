@@ -241,6 +241,25 @@ def prepare_dict(process_expressions):
 
 	write_index(index, 'dict')
 
+def index_kanji():
+	index = []
+	offset = 0
+
+	entry_no = 0
+	with open('data/kanji.dat', 'r') as f:
+		for l in f:
+			entry_no += 1
+			if entry_no % 1000 == 0:
+				print('kanji', entry_no)
+			index.append((ord(l[0]), offset))
+			offset += len(l.encode('utf-8'))
+
+	index.sort()
+	with open('data/kanji.idx', 'wb') as of:
+		for kanji_code_point, offset in index:
+			of.write(struct.pack('<II', kanji_code_point, offset))
 
 prepare_dict(False)
 prepare_names()
+# TODO generate kanji.dat
+index_kanji()

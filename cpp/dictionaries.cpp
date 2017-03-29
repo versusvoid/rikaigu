@@ -62,7 +62,18 @@ static IndexFile dictionary_index;
 
 static IndexFile names_index;
 
-static string_view kanji_file;
+struct KanjiIndexEntry
+{
+	uint32_t kanji_code_point;
+	uint32_t offset;
+
+	operator uint32_t() const
+	{
+		return kanji_code_point;
+	}
+};
+static const KanjiIndexEntry* kanji_index = nullptr;
+static uint32_t kanji_index_length = 0;
 
 static string_view deinflect;
 static string_view expressions;
@@ -376,36 +387,22 @@ SearchResult word_search(const char* word, bool names_dictionary, int max)
 	return result;
 }
 
-std::string find_kanji(const std::string& kanji)
+std::string find_kanji(const uint32_t kanji_code_point)
 {
-//	std::cout << "find_kanji( " << kanji << " )" << std::endl;
-	const char* beg = kanji_file.data;
-	const char* end = beg + kanji_file.length;
+	auto entry = std::lower_bound(kanji_index, kanji_index + kanji_index_length, kanji_code_point);
+	if (entry == kanji_index + kanji_index_length) return "";
 
-	while (beg < end) {
-		const char* mi = reinterpret_cast<const char*>((intptr_t(beg) + intptr_t(end)) >> 1);
-		const char* p = std::find(
-			std::make_reverse_iterator(mi),
-			std::make_reverse_iterator(beg),
-			'\n'
-		).base();
-		const char* kanji_end = std::find(p, end, '|');
-
-		int order = kanji.compare(0, kanji.length(), p, size_t(kanji_end - p));
-		if (order < 0)
-		{
-			end = p;
-		}
-		else if (order > 0)
-		{
-			beg = std::find(kanji_end, end, '\n') + 1;
-		}
-		else
-		{
-			return std::string(p, std::find(kanji_end, end, '\n'));
-		}
+	FILE* kanji_dict = fopen("kanji.dat", "r");
+	fseek(kanji_dict, entry->offset, SEEK_SET);
+	ssize_t line_length = getline(&line, &line_buffer_size, kanji_dict);
+	if (line_length == -1)
+	{
+		std::cerr << "Tooo bad" << std::endl;
+		return "";
 	}
-	return "";
+	std::string result(line, line_length - 1);
+	fclose(kanji_dict);
+	return result;
 }
 
 static const char* hex = "0123456789ABCDEF";
@@ -430,7 +427,7 @@ KanjiResult kanji_search(const char* kanji)
 		return result;
 	}
 
-	std::string kanji_definition = find_kanji(kanji_str);
+	std::string kanji_definition = find_kanji(uint32_t(kanji_code));
 	if (kanji_definition.empty())
 	{
 		return result;
@@ -548,9 +545,12 @@ bool dictionaries_init(const char* filename, const char* content, uint32_t lengt
 	{
 		names_index.assign(content, length);
 	}
-	else if (0 == strcmp(filename, "data/kanji.dat"))
+	else if (0 == strcmp(filename, "data/kanji.idx"))
 	{
-		kanji_file.assign(content, length);
+		static_assert(sizeof(KanjiIndexEntry) == 8, "Expected KanjiIndexEntry to take 8 bytes");
+		static_assert(alignof(KanjiIndexEntry) == 4, "Expected KanjiIndexEntry to align at 4 bytes");
+		kanji_index = reinterpret_cast<const KanjiIndexEntry*>(content);
+		kanji_index_length = length / sizeof (KanjiIndexEntry);
 	}
 	else if (0 == strcmp(filename, "data/deinflect.dat"))
 	{

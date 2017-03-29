@@ -3,6 +3,7 @@ dist
 *.csv
 data/dict.*
 data/names.*
+data/*.idx
 data/model.bin
 cpp/rikai.asm.*
 *.swp
