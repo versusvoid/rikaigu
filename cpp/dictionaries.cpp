@@ -15,16 +15,16 @@ struct IndexFile
 	const char* content;
 	uint32_t length;
 
-	const uint32_t* indices_start;
-	const uint32_t* indices_end;
+	const uint32_t* offsets_start;
+	const uint32_t* offsets_end;
 	const char* index_start;
 	const char* index_end;
 
 	IndexFile()
 		: content(nullptr)
 		, length(0)
-		, indices_start(nullptr)
-		, indices_end(nullptr)
+		, offsets_start(nullptr)
+		, offsets_end(nullptr)
 		, index_start(nullptr)
 		, index_end(nullptr)
 	{}
@@ -38,7 +38,7 @@ struct IndexFile
 		content = nullptr;
 		length = 0;
 		index_end = index_start = nullptr;
-		indices_start = indices_end = nullptr;
+		offsets_start = offsets_end = nullptr;
 	}
 
 	void assign(const char* content, uint32_t length)
@@ -49,8 +49,8 @@ struct IndexFile
 		this->length = length;
 
 		uint32_t indices_length = *reinterpret_cast<const uint32_t*>(this->content);
-		indices_start = reinterpret_cast<const uint32_t*>(this->content) + 1;
-		indices_end = reinterpret_cast<const uint32_t*>(this->content + indices_length);
+		offsets_start = reinterpret_cast<const uint32_t*>(this->content) + 1;
+		offsets_end = reinterpret_cast<const uint32_t*>(this->content + indices_length);
 
 		index_start = this->content + indices_length;
 		index_end = this->content + this->length;
@@ -126,6 +126,8 @@ struct KanaConvertor
 
 	bool operator() (const size_t i, wchar_t u, const char*, const size_t)
 	{
+		// Half & full-width katakana to hiragana conversion.
+		// Note: katakana `vu` is never converted to hiragana
 		wchar_t v = u;
 
 		if (u <= 0x3000) return false;
@@ -215,19 +217,18 @@ std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 		return std::vector<uint32_t>();
 	}
 
-	const uint32_t* indices_start = index->indices_start + indices_offset;
-	const uint32_t* indices_end = index->indices_end;
+	const uint32_t* offsets_start = index->offsets_start + indices_offset;
+	const uint32_t* offsets_end = index->offsets_end;
 
 	if (beg < index->index_end)
 	{
-		// wtf? why do i need to cast? is std::find even safe?
 		const char* next_word_end = std::find(beg, index->index_end, char(0b11111000));
-		indices_end = index->indices_start + (
+		offsets_end = index->offsets_start + (
 			next_word_end[1] | (next_word_end[2] << 7) | (next_word_end[3] << 14)
 		);
 	}
 
-	return std::vector<uint32_t>(indices_start, indices_end);
+	return std::vector<uint32_t>(offsets_start, offsets_end);
 }
 
 static bool compare(WordResult& a, WordResult& b)
@@ -248,14 +249,12 @@ static bool compare(WordResult& a, WordResult& b)
 }
 
 static size_t line_buffer_size = 0;
-char* line = nullptr;
+static char* line = nullptr;
 
 SearchResult word_search(const char* word, bool names_dictionary, int max)
 {
 	PROFILE
 //	std::cout << "word_search( " << word << " )" << std::endl;
-	// Half & full-width katakana to hiragana conversion.
-	// Note: katakana `vu` is never converted to hiragana
 	KanaConvertor convertor;
 	SearchResult result;
 	if (!stream_utf8_convertor(word, convertor))

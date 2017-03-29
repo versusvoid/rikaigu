@@ -75,9 +75,9 @@ def format_entry(entry):
 			for ki in r.kanjis:
 				kanji_index_to_readings.setdefault(ki, []).append(ri)
 
-		grouped_readings_to_kanji_indices = {}
-		for ki, reading_indices in kanji_index_to_readings.items():
-			grouped_readings_to_kanji_indices.setdefault(','.join(map(str, reading_indices)), []).append(ki)
+		grouped_readings_to_kanji_offsets = {}
+		for ki, reading_offsets in kanji_index_to_readings.items():
+			grouped_readings_to_kanji_offsets.setdefault(','.join(map(str, reading_offsets)), []).append(ki)
 		del kanji_index_to_readings
 
 		'''
@@ -85,17 +85,17 @@ def format_entry(entry):
 		'''
 		groups = []
 		seen = set()
-		for readings, kanji_indices in grouped_readings_to_kanji_indices.items():
-			for i, ki in enumerate(kanji_indices):
+		for readings, kanji_offsets in grouped_readings_to_kanji_offsets.items():
+			for i, ki in enumerate(kanji_offsets):
 				seen.add(ki)
 				k = entry.kanjis[ki]
 				assert control_kanji_symbols.search(k.text) is None
 				freq = min(freq, get_frequency(k.text))
-				kanji_indices[i] = k.text
+				kanji_offsets[i] = k.text
 				if any_common_kanji and not k.common:
-					kanji_indices[i] += '|U'
+					kanji_offsets[i] += '|U'
 
-			groups.append(','.join(kanji_indices))
+			groups.append(','.join(kanji_offsets))
 			if len(readings) != len(entry.readings)*2 - 1:
 				groups[-1] += '#' + readings
 
@@ -151,34 +151,34 @@ def write_index(index, label):
 	index = list(index.items())
 	index.sort()
 	words_bytes = bytearray()
-	indices_bytes = bytearray()
+	offsets_bytes = bytearray()
 	weightw = 0
 	weighti = 0
 	weightw2 = 0
 	weighti2 = 0
-	indices_index = 0
-	for w, indices in index:
+	offsets_index = 0
+	for w, offsets in index:
 		w_utf8 = w.encode('utf-8')
 		assert w_utf8.find(0b11111000) == -1, w
 		weightw += len(w.encode('utf-16')) + 4
-		weighti += 4*len(indices)
+		weighti += 4*len(offsets)
 		weightw2 += len(w_utf8) + 4
-		weighti2 += 4*len(indices)
+		weighti2 += 4*len(offsets)
 
 		words_bytes.extend(w_utf8)
-		assert indices_index < 2**21
+		assert offsets_index < 2**21
 		# 0b11111000 is forbidden in current UTF-8
 		words_bytes.extend(struct.pack('BBBB', 0b11111000,
-			0b01111111 & indices_index,
-			0b01111111 & (indices_index >> 7),
-			0b01111111 & (indices_index >> 14)
+			0b01111111 & offsets_index,
+			0b01111111 & (offsets_index >> 7),
+			0b01111111 & (offsets_index >> 14)
 		))
-		indices_index += len(indices)
-		indices_bytes.extend(struct.pack('<' + 'I' * len(indices), *indices))
+		offsets_index += len(offsets)
+		offsets_bytes.extend(struct.pack('<' + 'I' * len(offsets), *offsets))
 
 	with open(f'data/{label}.idx', 'wb') as of:
-		of.write(struct.pack('<I', 4 + len(indices_bytes)))
-		of.write(indices_bytes)
+		of.write(struct.pack('<I', 4 + len(offsets_bytes)))
+		of.write(offsets_bytes)
 		of.write(words_bytes)
 
 	print(weightw / 2**20, '+', weighti / 2**20)

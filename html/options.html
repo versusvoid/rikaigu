@@ -12,26 +12,36 @@
 				<div id="gencon" class="tabContent">
 					<h1>General</h1>
 					<p>Popup color:
-						<select class="config inputfield" id="popupcolor" name="popupcolor">
+						<select class="config inputfield" id="popupColor" name="popupColor" bind>
 								<option value="blue">Blue</option>
 								<option value="lightblue">Light Blue</option>
 								<option value="black">Black</option>
 								<option value="yellow">Yellow</option>
 							</select>
 						<br />
-						<input class="config" type="checkbox" id="highlighttext" name="highlighttext"> Highlight text
+						<input class="config" type="checkbox" id="matchHighlight" name="matchHighlight" bind>
+							Highlight matched text
+						</input>
 						<br />
-						<input class="config" type="checkbox" id="textboxhl" name="textboxhl"> Highlight text inside of text boxes
+						<input class="config" type="checkbox" id="textboxHighlight" name="textboxHighlight" bind>
+							Highlight text inside of text boxes
+						</input>
 						<br />
-						<input class="config" type="checkbox" id="onlyreading" name="onlyreading"> Hide definitions and show only reading
+						<input class="config" type="checkbox" id="onlyReadings" name="onlyReadings" bind>
+							Hide definitions and show only reading
+						</input>
 						<br />
-						<input class="config" type="checkbox" id="minihelp" name="minihelp"> Show mini help
+						<input class="config" type="checkbox" id="showMiniHelp" name="showMiniHelp" bind>
+							Show mini help
+						</input>
 						<br />
 						<br /> Show popup with delay:
-						<input class="config" type="number" id="popupDelay" name="popupDelay" min="1"> milliseconds
+						<input class="config" type="number" id="popupDelay" name="popupDelay" min="1" max="1000" bind>
+							milliseconds
+						</input>
 						<br />
 						<br /> Default dictionary:
-						<select class="config inputfield" id="defaultDict" name="defaultDict">
+						<select class="config inputfield" id="defaultDict" name="defaultDict" bind>
 								<option value="words">Words</option>
 								<option value="kanji">Kanji</option>
 								<option value="names">Names</option>
@@ -42,10 +52,22 @@
 				<div id="keycon" class="tabContent">
 					<h1>Keyboard</h1>
 					Show popup only on pressed key:<br />
-					<input class="config" type="radio" name="showOnKey" value="">Not used<br />
-					<input class="config" type="radio" name="showOnKey" value="Alt">Alt<br />
-					<input class="config" type="radio" name="showOnKey" value="Ctrl">Ctrl<br />
-					<input class="config" type="radio" name="showOnKey" value="Alt+Ctrl">Alt+Ctrl<br />
+					<input class="config" type="radio" name="showOnKey" value="None">
+						Not used
+					</input>
+					<br />
+					<input class="config" type="radio" name="showOnKey" value="Alt">
+						Alt
+					</input>
+					<br />
+					<input class="config" type="radio" name="showOnKey" value="Ctrl">
+						Ctrl
+					</input>
+					<br />
+					<input class="config" type="radio" name="showOnKey" value="Alt+Ctrl">
+						Alt+Ctrl
+					</input>
+					<br />
 					<br />
 					<strong>Keys when popup is visible</strong><br><br>
 					<table cellspacing=5>
@@ -56,10 +78,6 @@
 						<tr>
 							<td>Y</td>
 							<td>Move popup location down</td>
-						</tr>
-						<tr>
-							<td>C</td>
-							<td>Copy to clipboard</td>
 						</tr>
 						<tr>
 							<td>D</td>
@@ -83,67 +101,41 @@
 						</tr>
 					</table>
 					<br />
-					<input class="config" type="checkbox" id="disablekeys" name="disablekeys"> Disable these keys
+					<input class="config" type="checkbox" id="disablekeys" name="disablekeys" bind>
+						Disable these keys
+					</input>
 				</div>
 				<div id="kanjicon" class="tabContent">
 					<h1>Kanji Dictionary</h1>
 					<p>
 						<strong>Displayed information:</strong><br><br>
-						<input class="config" type="checkbox" id="kanjicomponents" name="kanjicomponents"> Kanji Components
+						<input class="config" type="checkbox" id="showKanjiComponents" name="showKanjiComponents"
+								bind>
+							Kanji Components
+						</input>
 						<br />
-						<input class="config" type="checkbox" id="H" name="H"> Halpern
+						<input class="config" type="checkbox" id="H" name="H"> Halpern </input>
 						<br />
-						<input class="config" type="checkbox" id="L" name="L"> Heisig
+						<input class="config" type="checkbox" id="L" name="L"> Heisig </input>
 						<br />
-						<input class="config" type="checkbox" id="E" name="E"> Henshall
+						<input class="config" type="checkbox" id="E" name="E"> Henshall </input>
 						<br />
-						<input class="config" type="checkbox" id="DK" name="DK"> Kanji Learners Dictionary
+						<input class="config" type="checkbox" id="DK" name="DK"> Kanji Learners Dictionary </input>
 						<br />
-						<input class="config" type="checkbox" id="N" name="N"> Nelson
+						<input class="config" type="checkbox" id="N" name="N"> Nelson </input>
 						<br />
-						<input class="config" type="checkbox" id="V" name="V"> New Nelson
+						<input class="config" type="checkbox" id="V" name="V"> New Nelson </input>
 						<br />
-						<input class="config" type="checkbox" id="Y" name="Y"> PinYin
+						<input class="config" type="checkbox" id="Y" name="Y"> PinYin </input>
 						<br />
-						<input class="config" type="checkbox" id="P" name="P"> Skip Pattern
+						<input class="config" type="checkbox" id="P" name="P"> Skip Pattern </input>
 						<br />
-						<input class="config" type="checkbox" id="IN" name="IN"> Tuttle Kanji &amp; Kana
+						<input class="config" type="checkbox" id="IN" name="IN"> Tuttle Kanji &amp; Kana </input>
 						<br />
-						<input class="config" type="checkbox" id="I" name="I"> Tuttle Kanji Dictionary
+						<input class="config" type="checkbox" id="I" name="I"> Tuttle Kanji Dictionary </input>
 						<br />
-						<input class="config" type="checkbox" id="U" name="U"> Unicode
+						<input class="config" type="checkbox" id="U" name="U"> Unicode </input>
 						<br />
-					</p>
-				</div>
-				<div id="clipcon" class="tabContent">
-					<h1>Copy to Clipboard</h1>
-					<p>
-						<table cellspacing=5>
-							<tr>
-								<td>Line ending:</td>
-								<td>
-									<select class="config" id="lineEnding" name="lineEnding">
-										<option value="n">Unix (\n)</option>
-										<option value="rn">Windows (\r\n)</option>
-										<option value="r">Mac (\r)</option>
-									</select>
-								</td>
-							</tr>
-							<tr>
-								<td>Field separator:</td>
-								<td>
-									<select class="config" id="copySeparator" name="copySeparator">
-										<option value="tab">Tab</option>
-										<option value="comma">Comma</option>
-										<option value="space">Space</option>
-									</select>
-								</td>
-							</tr>
-							<tr>
-								<td>Maximum entries:</td>
-								<td><input class="config" type="number" id="maxClipCopyEntries" name="maxClipCopyEntries" min="1"></td>
-							</tr>
-						</table>
 					</p>
 				</div>
 			</div>

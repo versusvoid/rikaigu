@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	divs[0].onmouseover = hovering;
 
 	divs[1].onclick = function() {
-		chrome.extension.getBackgroundPage().rcxMain.inlineDisable();
+		chrome.extension.getBackgroundPage().rikaiguDisable();
 		window.close();
 	};
 	divs[1].onmouseover = hovering;

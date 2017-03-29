@@ -72,7 +72,7 @@ void render_kanji(const KanjiResult& kanji)
 		{
 			buffer += "general<br/>use";
 		}
-		else if (it->second == "8")
+		else if (it->second == "9")
 		{
 			buffer += "name<br/>use";
 		}

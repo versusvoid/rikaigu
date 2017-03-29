@@ -13,7 +13,7 @@ void EMSCRIPTEN_KEEPALIVE rikaigu_set_config(
 bool EMSCRIPTEN_KEEPALIVE rikaigu_set_file(const char* filename, const char* data, uint32_t length);
 
 const char* EMSCRIPTEN_KEEPALIVE rikaigu_search(const char* utf8_text, const char* utf8_prefix, int mode,
-	int32_t* match_length, int32_t* prefix_length);
+	int32_t* match_symbols_length, int32_t* prefix_symbols_length);
 
 const char* EMSCRIPTEN_KEEPALIVE rikaigu_translate(const char* utf8_text);
 }

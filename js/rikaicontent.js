@@ -304,7 +304,7 @@ var rcxContent = {
 		rcxContent._onKeyDown(ev)
 	},
 	_onKeyDown: function(ev) {
-		if (window.rikaigu.config.showOnKey !== "" && (ev.altKey || ev.ctrlKey || ev.key == "AltGraph")) {
+		if (window.rikaigu.config.showOnKey !== "None" && (ev.altKey || ev.ctrlKey || ev.key == "AltGraph")) {
 			if (this.lastTarget !== null) {
 				var myEv = {
 					clientX: this.lastPos.x,
@@ -325,7 +325,7 @@ var rcxContent = {
 		if (this.keysDown[ev.keyCode]) return;
 		if (!this.isVisible()) return;
 		console.log(2);
-		if (window.rikaigu.config.disablekeys == 'true' && (ev.keyCode != 16)) return;
+		if (window.rikaigu.config.disableKeys && (ev.keyCode != 16)) return;
 
 		var i;
 		console.log(2);
@@ -557,7 +557,8 @@ var rcxContent = {
 
 		var xpathExpr = rangeParent.ownerDocument.createExpression(this.textNodeExpr, null);
 
-		if (rangeParent.ownerDocument.evaluate(this.startElementExpr, rangeParent, null, XPathResult.BOOLEAN_TYPE, null).booleanValue)
+		if (rangeParent.ownerDocument.evaluate(this.startElementExpr, rangeParent, null,
+				XPathResult.BOOLEAN_TYPE, null).booleanValue)
 			return '';
 
 		if (rangeParent.nodeType != Node.TEXT_NODE)
@@ -571,7 +572,8 @@ var rcxContent = {
 		});
 
 		var nextNode = rangeParent;
-		while (((nextNode = this.getNext(nextNode)) != null) && (this.isInline(nextNode)) && (text.length < maxLength))
+		while (((nextNode = this.getNext(nextNode)) != null) && (this.isInline(nextNode))
+				&& (text.length < maxLength))
 			text += this.getInlineText(nextNode, selEndList, maxLength - text.length, xpathExpr);
 
 		return text;
@@ -665,8 +667,8 @@ var rcxContent = {
 
 		rp = tdata.prevRangeNode;
 		// Don't try to highlight form elements
-		if ((rp) && ((tdata.config.highlight == 'true' && !this.mDown && !('form' in tdata.prevTarget)) ||
-				(('form' in tdata.prevTarget) && tdata.config.textboxhl == 'true'))) {
+		if ((rp) && ((tdata.config.matchHighlight && !this.mDown && !('form' in tdata.prevTarget)) ||
+				(('form' in tdata.prevTarget) && tdata.config.textboxHighlight))) {
 			var doc = rp.ownerDocument;
 			if (!doc) {
 				rcxContent.clearHi();
@@ -938,7 +940,8 @@ var rcxContent = {
 			tdata.popY = ev.clientY;
 			tdata.timer = setTimeout(
 				function(rangeNode, rangeOffset) {
-					if (!window.rikaigu || rangeNode != window.rikaigu.prevRangeNode || ro != window.rikaigu.prevRangeOfs) {
+					if (!window.rikaigu || rangeNode != window.rikaigu.prevRangeNode
+							|| ro != window.rikaigu.prevRangeOfs) {
 						return;
 					}
 					rcxContent.show(tdata, rcxContent.forceKanji ? rcxContent.forceKanji : rcxContent.defaultDict);
@@ -990,15 +993,18 @@ chrome.runtime.onMessage.addListener(
 			case 'enable':
 				rcxContent.enableTab();
 				window.rikaigu.config = request.config;
+				if (request.popup && !document.hidden) {
+					rcxContent.showPopup(request.popup);
+				}
+				break;
+			case 'config':
+				window.rikaigu.config = request.config;
 				break;
 			case 'disable':
 				rcxContent.disableTab();
 				break;
-			case 'showPopup':
-				rcxContent.showPopup(request.text);
-				break;
 			default:
-				console.log(request);
+				console.error('Unknown request type:', request);
 		}
 	}
 );
