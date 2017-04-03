@@ -1,34 +1,33 @@
 var kanjiInfoKeys = ["H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"];
 
 function loadValues() {
-	for (var input of document.querySelectorAll('[bind]')) {
-		if (input.getAttribute('type') === 'checkbox') {
-			input.checked = localStorage[input.id] === 'true';
-		} else if (localStorage[input.id]) {
-			input.value = localStorage[input.id];
+	chrome.storage.local.get(null, function(config) {
+		for (var input of document.querySelectorAll('[bind]')) {
+			if (input.getAttribute('type') === 'checkbox') {
+				input.checked = config[input.id];
+			} else {
+				 input.value = config[input.id];
+			}
 		}
-	}
 
-	document.optform.showOnKey.value = localStorage['showOnKey'] || "None";
-
-	for (var k of kanjiInfoKeys) {
-		document.getElementById(k).checked = false;
-	}
-	for (var k of localStorage['kanjiInfo'].split(' ').filter(s => s.length > 0)) {
-		document.getElementById(k).checked = true;
-	}
+		for (var k of kanjiInfoKeys) {
+			document.getElementById(k).checked = false;
+		}
+		for (var k of config['kanjiInfo'].split(' ').filter(s => s.length > 0)) {
+			document.getElementById(k).checked = true;
+		}
+	});
 }
 
 function saveValues() {
+	var newConfig = {}
 	for (var input of document.querySelectorAll('[bind]')) {
 		if (input.getAttribute('type') === 'checkbox') {
-			localStorage[input.id] = input.checked;
-		} else if (localStorage[input.id]) {
-			 localStorage[input.id] = input.value;
+			newConfig[input.id] = input.checked;
+		} else {
+			 newConfig[input.id] = input.value;
 		}
 	}
-
-	localStorage['showOnKey'] = document.optform.showOnKey.value;
 
 	var kanjiinfoarray = []
 	for (var k of kanjiInfoKeys) {
@@ -36,9 +35,9 @@ function saveValues() {
 			kanjiinfoarray.push(k);
 		}
 	}
-	localStorage['kanjiinfo'] = kanjiinfoarray.join(' ');
+	newConfig['kanjiInfo'] = kanjiinfoarray.join(' ');
 
-	chrome.extension.getBackgroundPage().updateConfig();
+	chrome.storage.local.set(newConfig);
 }
 
 window.onload = loadValues;
@@ -50,3 +49,4 @@ for (var i = 0; i < inputs.length; ++i) {
 		inputs[i].addEventListener('input', saveValues);
 	}
 }
+chrome.storage.onChanged.addListener(loadValues);

@@ -1,27 +1,25 @@
-if (localStorage["v0.9.4"]) {
+if (localStorage.length > 0) {
 	// Update from old config
 	// TODO remove after couple of months/versions
-	localStorage.removeItem('copySeparator');
-	localStorage.removeItem('maxClipCopyEntries');
-	localStorage.removeItem('lineEnding');
 
+	var newConfig = {
+		popupColor: localStorage["popupcolor"],
+		enableKeys: localStorage["disablekeys"] !== 'true',
+		popupDelay: parseInt(localStorage['popupDelay']) || 150,
+		defaultDict: localStorage["defaultDict"]
+	};
 	for (var oldNew of [
-			["popupcolor", "popupColor"],
 			["highlight", "matchHighlight"],
-			["textboxhl"],
 			["onlyreading", "onlyReadings"],
 			["minihelp", "showMiniHelp"],
-			["disablekeys", "disableKeys"],
 			["kanjicomponents", "showKanjiComponents"]]) {
 
-		if (oldNew.length > 1) {
-			localStorage[oldNew[1]] = localStorage[oldNew[0]];
-		}
-		localStorage.removeItem(oldNew[0]);
+		newConfig[oldNew[1]] = (localStorage[oldNew[0]] === "true");
 	}
 
-	if (!localStorage['showOnKey']) {
-		localStorage['showOnKey'] = 'None';
+	newConfig.showOnKey = localStorage['showOnKey'];
+	if (!newConfig.showOnKey) {
+		newConfig.showOnKey = "None";
 	}
 
 	var kanjiInfo = [];
@@ -29,74 +27,57 @@ if (localStorage["v0.9.4"]) {
 		if (localStorage[k] === 'true') {
 			kanjiInfo.push(k);
 		}
-		localStorage.removeItem(k);
 	}
-	localStorage['kanjiInfo'] = kanjiInfo.join(' ');
+	newConfig.kanjiInfo = kanjiInfo.join(' ');
 
 	for (var k in localStorage) {
-		if (k.startsWith('v0')) {
-			localStorage.removeItem(k);
-		}
+		localStorage.removeItem(k);
 	}
+
+	chrome.storage.local.set(newConfig);
 }
 
 function initOption(name, defaultValue) {
-	if (localStorage.getItem(name) === null) {
-		localStorage[name] = defaultValue;
-	}
+	chrome.storage.local.get(name, function(config) {
+		if (!(name in config)) {
+			config = {};
+			config[name] = defaultValue;
+			chrome.storage.local.set(config);
+		}
+	});
 }
 
 initOption("popupColor", "blue");
 initOption("matchHighlight", true);
 initOption("onlyReadings", false);
-initOption("showMiniHelp", "true");
-initOption("disableKeys", "false");
-initOption("showKanjiComponents", "true");
-initOption("popupDelay", "150");
+initOption("showMiniHelp", true);
+initOption("enableKeys", true);
+initOption("showKanjiComponents", true);
+initOption("popupDelay", 150);
 initOption("showOnKey", "None");
 initOption("defaultDict", "words");
 initOption('kanjiInfo', 'H L E DK N V Y P IN I U');
 initOption('configVersion', 'v1.0.0');
 
+var config = null;
+var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
 	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'string', 'string'],
-		[ localStorage['onlyReadings'] === 'true'
-		, localStorage['showKanjiComponents'] === 'true'
-		, localStorage['defaultDict']
-		, localStorage['kanjiInfo']
-		]);
+		cppConfig.map(key => config[key]));
 }
 
-function makeTabConfig() {
-	return {
-		css: localStorage['popupColor'],
-		disableKeys: localStorage['disableKeys'] === 'true',
-		matchHighlight: localStorage['matchHighlight'] === 'true',
-		popupDelay: parseInt(localStorage['popupDelay']),
-		showOnKey: localStorage['showOnKey']
-	};
-}
-
-function updateConfig() {
-	console.log('updateConfig()');
-
-	var tabConfig = makeTabConfig();
-
-	var windows = chrome.windows.getAll({
-			"populate": true
-		},
-		function(windows) {
-			for (var i = 0; i < windows.length; ++i) {
-				var tabs = windows[i].tabs;
-				for (var j = 0; j < tabs.length; ++j) {
-					chrome.tabs.sendMessage(tabs[j].id, {
-						type: "config",
-						config: tabConfig
-					});
-				}
+function onConfigChange(configChange) {
+	chrome.storage.local.get(null, function(config) {
+		window.config = config;
+		for (var key of cppConfig) {
+			if (key in configChange) {
+				updateCppConfig();
+				return;
 			}
-		});
-
-	updateCppConfig();
+		}
+	});
 }
+
+onConfigChange({});
+chrome.storage.onChanged.addListener(onConfigChange);

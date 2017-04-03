@@ -6,137 +6,166 @@
 </head>
 
 <body>
-	<div id="rikaigu_options">
-		<form id="optform" name="optform">
-			<div id="options">
-				<div id="gencon" class="tabContent">
-					<h1>General</h1>
-					<p>Popup color:
-						<select class="config inputfield" id="popupColor" name="popupColor" bind>
-								<option value="blue">Blue</option>
-								<option value="lightblue">Light Blue</option>
-								<option value="black">Black</option>
-								<option value="yellow">Yellow</option>
-							</select>
-						<br />
-						<input class="config" type="checkbox" id="matchHighlight" name="matchHighlight" bind>
-							Highlight matched text
-						</input>
-						<br />
-						<input class="config" type="checkbox" id="onlyReadings" name="onlyReadings" bind>
-							Hide definitions and show only reading
-						</input>
-						<br />
-						<input class="config" type="checkbox" id="showMiniHelp" name="showMiniHelp" bind>
-							Show mini help
-						</input>
-						<br />
-						<br /> Show popup with delay:
-						<input class="config" type="number" id="popupDelay" name="popupDelay" min="1" max="1000" bind>
-							milliseconds
-						</input>
-						<br />
-						<br /> Default dictionary:
-						<select class="config inputfield" id="defaultDict" name="defaultDict" bind>
-								<option value="words">Words</option>
-								<option value="kanji">Kanji</option>
-								<option value="names">Names</option>
-						</select>
-
-					</p>
-				</div>
-				<div id="keycon" class="tabContent">
-					<h1>Keyboard</h1>
-					Show popup only on pressed key:<br />
-					<input class="config" type="radio" name="showOnKey" value="None">
-						Not used
-					</input>
-					<br />
-					<input class="config" type="radio" name="showOnKey" value="Alt">
-						Alt
-					</input>
-					<br />
-					<input class="config" type="radio" name="showOnKey" value="Ctrl">
-						Ctrl
-					</input>
-					<br />
-					<input class="config" type="radio" name="showOnKey" value="Alt+Ctrl">
-						Alt+Ctrl
-					</input>
-					<br />
-					<br />
-					<strong>Keys when popup is visible</strong><br><br>
-					<table cellspacing=5>
-						<tr>
-							<td>A</td>
-							<td>Alternate popup location</td>
-						</tr>
-						<tr>
-							<td>Y</td>
-							<td>Move popup location down</td>
-						</tr>
-						<tr>
-							<td>D</td>
-							<td>Hide/show definitions</td>
-						</tr>
-						<tr>
-							<td>Shift/Enter&nbsp;&nbsp;</td>
-							<td>Switch dictionaries</td>
-						</tr>
-						<tr>
-							<td>B</td>
-							<td>Previous character</td>
-						</tr>
-						<tr>
-							<td>M</td>
-							<td>Next character</td>
-						</tr>
-						<tr>
-							<td>N</td>
-							<td>Next word</td>
-						</tr>
-					</table>
-					<br />
-					<input class="config" type="checkbox" id="disablekeys" name="disablekeys" bind>
-						Disable these keys
-					</input>
-				</div>
-				<div id="kanjicon" class="tabContent">
-					<h1>Kanji Dictionary</h1>
-					<p>
-						<strong>Displayed information:</strong><br><br>
-						<input class="config" type="checkbox" id="showKanjiComponents" name="showKanjiComponents"
-								bind>
-							Kanji Components
-						</input>
-						<br />
-						<input class="config" type="checkbox" id="H" name="H"> Halpern </input>
-						<br />
-						<input class="config" type="checkbox" id="L" name="L"> Heisig </input>
-						<br />
-						<input class="config" type="checkbox" id="E" name="E"> Henshall </input>
-						<br />
-						<input class="config" type="checkbox" id="DK" name="DK"> Kanji Learners Dictionary </input>
-						<br />
-						<input class="config" type="checkbox" id="N" name="N"> Nelson </input>
-						<br />
-						<input class="config" type="checkbox" id="V" name="V"> New Nelson </input>
-						<br />
-						<input class="config" type="checkbox" id="Y" name="Y"> PinYin </input>
-						<br />
-						<input class="config" type="checkbox" id="P" name="P"> Skip Pattern </input>
-						<br />
-						<input class="config" type="checkbox" id="IN" name="IN"> Tuttle Kanji &amp; Kana </input>
-						<br />
-						<input class="config" type="checkbox" id="I" name="I"> Tuttle Kanji Dictionary </input>
-						<br />
-						<input class="config" type="checkbox" id="U" name="U"> Unicode </input>
-						<br />
-					</p>
-				</div>
+	<section>
+		<h3>General</h3>
+		<div>
+			<div class="select">
+				<label>
+					<span>Popup color:</span>
+					<select class="config inputfield" id="popupColor" bind>
+						<option value="blue">Blue</option>
+						<option value="lightblue">Light Blue</option>
+						<option value="black">Black</option>
+						<option value="yellow">Yellow</option>
+					</select>
+				</label>
 			</div>
-		</form>
-	</div>
+			<div class="select">
+				<label>
+					<span>Default dictionary:</span>
+					<select class="config inputfield" id="defaultDict" bind>
+							<option value="words">Words</option>
+							<option value="kanji">Kanji</option>
+							<option value="names">Names</option>
+					</select>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="matchHighlight" bind></input>
+					<span>Highlight matched text</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="onlyReadings" bind></input>
+					<span>Hide definitions and show only reading</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="showMiniHelp" bind></input>
+					<span>Show mini help</span>
+				</label>
+			</div>
+			<div class="settings-row">
+				<label>
+					<span>Show popup with delay:</span>
+					<input class="config" type="number" id="popupDelay" min="1" max="1000" bind></input>
+					<span>milliseconds</span>
+				</label>
+			</div>
+		</div>
+	</section>
+	<section>
+		<h3>Keyboard</h3>
+		<div>
+			<div class="settings-row">
+				<label>
+					<span>Show popup only on pressed key:</span>
+					<select class="config inputfield" id="showOnKey" bind>
+							<option value="None">Not used</option>
+							<option value="Alt">Alt</option>
+							<option value="Ctrl">Ctrl</option>
+							<option value="Alt+Ctrl">Alt+Ctrl</option>
+					</select>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="enableKeys" bind></input>
+					<span>Use special keys when popup is visible:</span>
+				</label>
+				<ul>
+					<li><span class="key">A</span>Alternate popup location</li>
+					<li><span class="key">Y</span>Move popup location down</li>
+					<li><span class="key">D</span>Hide/show definitions</li>
+					<li><span class="key">Shift/Enter</span>Switch dictionaries</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+	<section>
+		<h3>Kanji Dictionary</h3>
+		<div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="showKanjiComponents" bind></input>
+					<span>Show kanji components</span>
+				</label>
+			</div>
+			<div class="settings-row">
+				<strong>Displayed numbers:</strong>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="H"></input>
+					<span>Halpern</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="L"></input>
+					<span>Heisig</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="E"></input>
+					<span>Henshall</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="DK"></input>
+					<span>Kanji Learners Dictionary</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="N"></input>
+					<span>Nelson</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="V"></input>
+					<span>New Nelson</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="Y"></input>
+					<span>PinYin</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="P"></input>
+					<span>Skip Pattern</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="IN"></input>
+					<span>Tuttle Kanji &amp; Kana</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="I"></input>
+					<span>Tuttle Kanji Dictionary</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="U"></input>
+					<span>Unicode</span>
+				</label>
+			</div>
+			</p>
+		</div>
+	</section>
 </body>
 <script src="/js/options.js"></script>
 

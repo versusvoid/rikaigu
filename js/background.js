@@ -57,9 +57,23 @@ function onLoaded(tabId) {
 	rikaiguEnabled = true;
 	chrome.tabs.sendMessage(tabId, {
 		"type": "enable",
-		"config": makeTabConfig(),
-		"popup": (localStorage['showMiniHelp'] === 'true' ? miniHelp : 'Rikaigu enabled!')
+		"popup": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
 	});
+
+	var windows = chrome.windows.getAll({
+			"populate": true
+		},
+		function(windows) {
+			for (var browserWindow of windows) {
+				for (var tab of browserWindow.tabs) {
+					if (tab.id === tabId) continue;
+					chrome.tabs.sendMessage(tab.id, {
+						"type": "enable"
+					});
+				}
+			}
+		});
+
 
 	chrome.browserAction.setBadgeBackgroundColor({
 		"color": [255, 0, 0, 255]
@@ -192,13 +206,7 @@ function search(request) {
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
-			response(sender.frameId);
-			if (rikaiguEnabled) {
-				chrome.tabs.sendMessage(sender.tab.id, {
-					"type": "enable",
-					"config": makeTabConfig()
-				}, {frameId: sender.frameId});
-			}
+			response(rikaiguEnabled, sender.frameId);
 			break;
 
 		case 'xsearch':
@@ -229,11 +237,7 @@ function onMessage(request, sender, response) {
 			break;
 
 		case 'switchOnlyReading':
-			if (localStorage['onlyReadings'] === 'true')
-				localStorage['onlyReadings'] = 'false';
-			else
-				localStorage['onlyReadings'] = 'true';
-			updateCppConfig();
+			chrome.storage.local.set({onlyReadings: !config.onlyReadings});
 			break;
 		default:
 			console.error('Unknown request type:', request);

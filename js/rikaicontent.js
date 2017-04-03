@@ -45,7 +45,15 @@
 var rikaigu = null;
 var frameId = null;
 
-function enableTab(frameId) {
+function updateConfig() {
+	if (rikaigu !== null) {
+		chrome.storage.local.get(null, function(config) {
+			rikaigu.config = config;
+		});
+	}
+}
+
+function enableTab(config, popup) {
 	if (rikaigu === null) {
 		rikaigu = {
 			altView: 0,
@@ -55,26 +63,36 @@ function enableTab(frameId) {
 			nextDict: 3,
 			keysDown: {},
 			lastPos: {
-				clientX: NaN,
-				clientY: NaN,
-				screenX: NaN,
-				screenY: NaN
+				clientX: 0,
+				clientY: 0,
+				screenX: 0,
+				screenY: 0
 			},
 			lastTarget: null,
-			mDown: false,
+			mousePressed: false,
 			isVisible: false,
 			shownMatch: null,
 			screenX: 0,
 			screenY: 0,
 			activeFrame: 0,
 			lastRangeNode: "some object that won't be equal neither any node nor null",
-			lastRangeOffset: -1
+			lastRangeOffset: -1,
+			config: config
 		};
 		window.addEventListener('mousemove', onMouseMove, false);
 		window.addEventListener('keydown', onKeyDown, true);
 		window.addEventListener('keyup', onKeyUp, true);
 		window.addEventListener('mousedown', onMouseDown, false);
 		window.addEventListener('mouseup', onMouseUp, false);
+
+		if (popup) {
+			if (!document.hidden && window.self === window.top) {
+				rikaigu.altView = 1;
+				showPopup(popup);
+				rikaigu.altView = 0;
+			}
+			rikaigu.isVisible = true;
+		}
 	}
 }
 
@@ -112,7 +130,7 @@ function showPopup(text, x, y) {
 		var css = document.createElementNS('http://www.w3.org/1999/xhtml', 'link');
 		css.setAttribute('rel', 'stylesheet');
 		css.setAttribute('type', 'text/css');
-		css.setAttribute('href', chrome.extension.getURL('css/popup-' + rikaigu.config.css + '.css'));
+		css.setAttribute('href', chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css'));
 		css.setAttribute('id', 'rikaigu-css');
 		document.getElementsByTagName('head')[0].appendChild(css);
 
@@ -126,7 +144,7 @@ function showPopup(text, x, y) {
 				ev.stopPropagation();
 			}, true);
 	} else {
-		var href = chrome.extension.getURL('css/popup-' + rikaigu.config.css + '.css');
+		var href = chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css');
 		var css = document.getElementById('rikaigu-css');
 		if (css.getAttribute('href') !== href) {
 			css.setAttribute('href', href);
@@ -268,7 +286,7 @@ function onKeyDown(ev) {
 	if (ev.shiftKey && ev.key !== 'Shift') return;
 	if (!!rikaigu.keysDown[ev.code]) return;
 	if (!rikaigu.isVisible) return;
-	if (rikaigu.config.disableKeys && ev.key !== 'Shift') return;
+	if (!rikaigu.config.enableKeys && ev.key !== 'Shift') return;
 
 	switch (ev.code) {
 		case 'ShiftRight':
@@ -306,13 +324,13 @@ function onMouseDown(ev) {
 		return;
 	if (rikaigu.isVisible)
 		clearHighlight();
-	rikaigu.mDown = true;
+	rikaigu.mousePressed = true;
 }
 
 function onMouseUp(ev) {
 	if (ev.button != 0)
 		return;
-	rikaigu.mDown = false;
+	rikaigu.mousePressed = false;
 }
 
 function onKeyUp(ev) {
@@ -462,19 +480,7 @@ chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
 		switch (request.type) {
 			case 'enable':
-				enableTab();
-				rikaigu.config = request.config;
-				if (request.popup) {
-					if (!document.hidden && window.self === window.top) {
-						rikaigu.altView = 1;
-						showPopup(request.popup);
-						rikaigu.altView = 0;
-					}
-					rikaigu.isVisible = true;
-				}
-				break;
-			case 'config':
-				rikaigu.config = request.config;
+				chrome.storage.local.get(null, config => enableTab(config, request.popup));
 				break;
 			case 'disable':
 				disableTab();
@@ -533,6 +539,11 @@ chrome.runtime.onMessage.addListener(
  */
 chrome.runtime.sendMessage({
 	"type": "enable?"
-}, function(frameId) {
+}, function(enabled, frameId) {
 	window.frameId = frameId;
+	if (enabled) {
+		chrome.storage.local.get(null, enableTab);
+	}
 });
+
+chrome.storage.onChanged.addListener(updateConfig);

@@ -36,7 +36,7 @@ function isHighlightableInput(input) {
 }
 
 function highlightMatch(matchLength, prefixLength, selectionRange, prefixSelectionRange) {
-	if (!rikaigu.config.matchHighlight || rikaigu.mDown) return true;
+	if (!rikaigu.config.matchHighlight || rikaigu.mousePressed) return true;
 
 	if (selectionRange.constructor === Array) {
 		return highlightRange(matchLength, prefixLength, selectionRange, prefixSelectionRange);
