@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 def is_kanji(c):
 	code = ord(c)
-	return code >= 0x4e00 and code <= 0x9fa5
+	return (code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff
 
 def is_hiragana(c):
 	code = ord(c)
@@ -68,7 +68,7 @@ class SenseGroup(namedtuple('SenseGroup', 'pos, senses')):
 		return '\n'.join(res)
 
 
-class Entry(namedtuple('Entry', 'kanjis, readings, sense_groups')):
+class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 
 	def _format(self, indent=0):
 		res = ['\t'*indent + 'Entry(']
@@ -100,7 +100,7 @@ class Entry(namedtuple('Entry', 'kanjis, readings, sense_groups')):
 
 Name = namedtuple('Name', 'kanjis, readings, transes')
 def make_entry(elem, entities):
-	entry = Entry([], [], [])
+	entry = None
 	all_kanjis = {}
 	all_kanji_indexes = None
 	all_readings = {}
@@ -188,6 +188,7 @@ def make_entry(elem, entities):
 			entry.transes.append(Trans(types, glosses))
 		else:
 			assert child.tag == 'ent_seq'
+			entry = Entry(child.text, [], [], [])
 
 		last_tag = child.tag
 

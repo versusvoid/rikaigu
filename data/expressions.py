@@ -40,7 +40,7 @@ for filename in ('data/deinflect.dat', 'data/tanaka-deinflect.dat'):
 			deinflection_rules.setdefault(l[0], []).append(d)
 		del l
 
-def deinflect(w, targets):
+def deinflect(w, targets=None):
 	l = [(w, all_deinflection_types, [])]
 	if w[0] in ['お', 'ご'] and len(w) > 1:
 		l.append((w[1:], all_deinflection_types, []))
@@ -109,11 +109,11 @@ class ExpressionType(Enum):
 
 all_expressions = []
 
-Expression = namedtuple('Expression', 'entry, base_forms, etype, sense_group_indices, elem, offset, seen_forms')
+Expression = namedtuple('Expression', 'entry, base_forms, etype, sense_group_indices, elem, seen_forms')
 dictionary = {}
 # TODO sometimes s_inf is contained inside <gloss>
 s_inf_regex = re.compile(r'\b(after|follows|attaches)\b.*?\b(form|stem|noun)s?\b', re.IGNORECASE)
-def record_entry(entry, base_forms, elem, offset):
+def record_entry(entry, base_forms, elem):
 	if entry.readings[0].text.endswith('だ') or entry.readings[0].text.endswith('です'):
 		return
 
@@ -154,7 +154,7 @@ def record_entry(entry, base_forms, elem, offset):
 
 	if etype is None:
 		return
-	e = Expression(entry, base_forms, etype, sense_group_indices, ET.tostringlist(elem, encoding='unicode'), offset, {})
+	e = Expression(entry, base_forms, etype, sense_group_indices, ET.tostringlist(elem, encoding='unicode'), {})
 	all_expressions.append(e)
 
 	if e.etype == ExpressionType.PURE_EXP:
@@ -580,7 +580,7 @@ def dump_expressions():
 						error('Unknown s_inf:', s_inf)
 						print('#', s_inf, file=ofe)
 						s_inf = '?\t?'
-					print(k, s_inf, e.offset, '|'.join(v), sep='\t', file=ofe)
+					print(k, s_inf, e.entry.id, '|'.join(v), sep='\t', file=ofe)
 					print('# --------------------------------------------------------------', file=ofe)
 			elif e.etype == ExpressionType.S_INF_EXP:
 				for i, j in e.sense_group_indices:
@@ -611,7 +611,7 @@ def dump_expressions():
 					if len(all_writings) == 0:
 						continue
 
-					print('\n'.join(all_writings), pos, s_inf, e.offset, '{},{}'.format(i, j), sep='\t', file=ofe)
+					print('\n'.join(all_writings), pos, s_inf, e.entry.id, '{},{}'.format(i, j), sep='\t', file=ofe)
 				print('# --------------------------------------------------------------', file=ofe)
 			else:
 				all_senses = []
@@ -622,7 +622,7 @@ def dump_expressions():
 
 				for form, pos in e.seen_forms.items():
 					if form not in old:
-						print(form, '|'.join(pos), '?', '?', e.offset, all_senses, sep='\t', file=ofe)
+						print(form, '|'.join(pos), '?', '?', e.entry.id, all_senses, sep='\t', file=ofe)
 
 			for line in e.elem:
 				if line.startswith('<'):

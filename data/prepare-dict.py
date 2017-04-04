@@ -230,7 +230,7 @@ def prepare_dict(process_expressions):
 			for key in entry_index_keys:
 				index.setdefault(key, set()).add(offset)
 			if process_expressions:
-				expressions.record_entry(entry, entry_index_keys, elem, offset)
+				expressions.record_entry(entry, entry_index_keys, elem)
 
 			l = format_entry(entry).encode('utf-8')
 			of.write(l)

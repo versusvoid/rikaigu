@@ -58,12 +58,12 @@ struct Candidate
 
 	Candidate(const std::string& word, uint32_t type,
 			const std::string& expression, const std::vector<const Rule*>& expressions, const Rule* new_expression,
-			const std::set<std::string>& exprected_forms)
+			const std::set<std::string>& expected_forms)
 		: word(word)
 		, type(type)
 		, expression(expression)
 		, expressions(expressions)
-		, expected_forms(exprected_forms)
+		, expected_forms(expected_forms)
 	{
 		this->expressions.push_back(new_expression);
 	}

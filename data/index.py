@@ -190,7 +190,7 @@ def compute_variations(w, reading):
 		yield res
 
 		for j in occurances:
-			if j + 1 == len(w) or not is_hiragana(w[j + 1]): continue
+			if j + 2 >= len(w) or not is_hiragana(w[j + 1]): continue
 			# Writing variation, where kanji devours part of okurigana.
 			# Currently - single letter only
 			kanji_reading = reading[anchors[j]:anchors[j+1]]
@@ -223,12 +223,13 @@ def is_variable_word(w):
 	return True
 
 
-def index_keys(entry, variate=True):
+def index_keys(entry, variate=True, convert_to_hiragana=True):
+	transform = kata_to_hira if convert_to_hiragana else (lambda x: x)
 	res = set()
 	for k in entry.kanjis:
-		res.add(kata_to_hira(k.text))
+		res.add(transform(k.text))
 	for r in entry.readings:
-		res.add(kata_to_hira(r.text))
+		res.add(transform(r.text))
 		if variate:
 			for ki in r.kanjis:
 				k = entry.kanjis[ki]
