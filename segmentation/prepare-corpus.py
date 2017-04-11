@@ -11,26 +11,29 @@ from index import index_keys
 from utils import *
 
 def char_class(c):
-       if is_kanji(c):
-               return 'K'
-       elif is_hiragana(c):
-               return 'h'
-       elif is_katakana(c):
-               return 'k'
-       else:
-               return 'm'
+	if is_kanji(c):
+		return 'K'
+	elif is_hiragana(c):
+		return 'h'
+	elif is_katakana(c):
+		return 'k'
+	else:
+		return 'm'
 
 # Right (suffix) samples
 rsamples = []
 # Left (prefix) samples (each sample in reverse direction)
 lsamples = []
 def record_samples(sentence):
-	sentence = ' ' + ' '.join(sentence)
-	if any([ord(c) > 0xffff for c in sentence]): return
+	split_sentence = []
+	for form in sentence:
+		# Start-character of a word
+		split_sentence.append('\t'.join((form[0], char_class(form[0]), 'S')))
+		# middle-character of a word
+		split_sentence.extend(map(lambda c: '\t'.join((c, char_class(c), 'M')), form[1:]))
 
-	for i in range(1, len(sentence)):
-		if sentence[i] == ' ': continue
-		lsamples.append(sentence[max(i - 14, 0):i + 1][::-1])
+	for i in range(2, len(split_sentence)):
+		lsamples.append('\n'.join(split_sentence[max(i - 14, 0):i][::-1]))
 
 Inflection = namedtuple('Inflection', 'to, source_type, target_type, reason')
 inflection_rules = {}
@@ -206,24 +209,15 @@ del all_forms
 random.shuffle(rsamples)
 random.shuffle(lsamples)
 
-def make_crfpp_sample(sample):
-	res = []
-	for c in sample:
-		if c == ' ':
-			res[-1] = res[-1][:-1] + 'S'
-		else:
-			res.append(f'{c}\t{char_class(c)}\tM')
-	return '\n'.join(res)
-
 # For now we only use left samples
 for direction, samples in [('l', lsamples)]:
-	with open(f'segmentation/{direction}-all.csv', 'w', encoding='utf-16') as f:
-			print(*samples, sep='\n', end='', file=f)
-	with open(f'segmentation/{direction}-train.csv', 'w', encoding='utf-16') as f:
-			print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
-	with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
-			print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
-	with open(f'segmentation/crfpp-{direction}-cv.csv', 'w') as f:
-			print(*map(make_crfpp_sample, samples[int(0.6*len(samples)):int(0.8*len(samples))]), sep='\n\n', end='', file=f)
-	with open(f'segmentation/{direction}-test.csv', 'w', encoding='utf-16') as f:
-			print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
+	with open(f'segmentation/{direction}-all.csv', 'w') as f:
+			print(*samples, sep='\n\n', end='', file=f)
+	with open(f'segmentation/{direction}-train.csv', 'w') as f:
+			print(*samples[0:int(0.7*len(samples))], sep='\n\n', end='', file=f)
+	with open(f'segmentation/{direction}-cv-train.csv', 'w') as f:
+			print(*samples[0:int(0.1*len(samples))], sep='\n\n', end='', file=f)
+	with open(f'segmentation/{direction}-cv.csv', 'w') as f:
+			print(*samples[int(0.7*len(samples)):int(0.8*len(samples))], sep='\n\n', end='', file=f)
+	with open(f'segmentation/{direction}-test.csv', 'w') as f:
+			print(*samples[int(0.8*len(samples)):], sep='\n\n', end='', file=f)
