@@ -11,7 +11,19 @@ struct WordResult
 	std::string reason;
 	size_t match_symbols_length;
 	size_t match_bytes_length;
-	std::string expression;
+	std::vector<DEntry> expressions;
+
+	WordResult(const DEntry& dentry,
+			const std::string& reason = "",
+			size_t match_symbols_length = 0,
+			size_t match_bytes_length = 0,
+			const std::vector<DEntry>& expressions = {})
+		: dentry(dentry)
+		, reason(reason)
+		, match_symbols_length(match_symbols_length)
+		, match_bytes_length(match_bytes_length)
+		, expressions(expressions)
+	{}
 };
 
 
@@ -30,7 +42,6 @@ struct KanjiResult
 struct SearchResult
 {
 	std::string source;
-	std::string title;
 	size_t max_match_symbols_length;
 	bool names;
 	bool more;

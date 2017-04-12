@@ -11,6 +11,7 @@ struct SenseGroup
 {
 	std::vector<std::string> types;
 	std::vector<std::string> senses;
+
 };
 
 struct Writing
@@ -50,6 +51,9 @@ public:
 
 	int freq();
 	uint32_t all_pos();
+
+	void filter_writings(const std::string& the_only_writing);
+	void filter_senses(const std::vector<std::pair<int, int>>& sense_indices);
 
 	const std::vector<SenseGroup>& sense_groups();
 	const std::vector<KanjiGroup>& kanji_groups();

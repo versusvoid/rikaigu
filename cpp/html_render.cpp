@@ -219,14 +219,8 @@ void render_kanji(const KanjiResult& kanji)
 	buffer += "</td></tr></table>";
 }
 
-void entry_to_html(WordResult& word, const std::string& partial)
+void entry_to_html(WordResult& word, const std::string& partial = "")
 {
-	if (!word.expression.empty())
-	{
-		buffer += "<span class=\"w-kanji\" style=\"float:right;\">+";
-		buffer += word.expression;
-		buffer += "</span>";
-	}
 	if (!word.dentry.readings().empty())
 	{
 		for (auto j = 0U; j < word.dentry.kanji_groups().size(); ++j)
@@ -349,27 +343,6 @@ void entry_to_html(WordResult& word, const std::string& partial)
 	}
 }
 
-struct TitleConvertor
-{
-	void reserve(size_t) {}
-
-	bool operator() (size_t, wchar_t character, const char* in, size_t character_length)
-	{
-		if (character >= 256)
-		{
-			buffer.append(in, character_length);
-		}
-		else
-		{
-			buffer += "&#";
-			buffer += std::to_string(int(character));
-			buffer += ";";
-		}
-		return true;
-	}
-};
-static TitleConvertor title_convertor;
-
 void render_entries(SearchResult& result)
 {
 	if (config.only_reading)
@@ -381,28 +354,33 @@ void render_entries(SearchResult& result)
 	{
 		buffer += "<div class=\"w-title\">Names Dictionary</div>";
 	}
-	else if (result.title.length() > 0)
-	{
-		buffer += "<div class=\"w-title\">";
-		stream_utf8_convertor(result.title.c_str(), title_convertor);
-		buffer += "</div>";
-	}
+	buffer += "<table>";
 
 	for (auto i = 0u; i < result.data.size(); ++i)
 	{
+		buffer += "<tr>";
 		std::string part;
 		if (result.data[i].match_symbols_length < result.max_match_symbols_length)
 		{
 			part = result.source.substr(0, result.data[i].match_bytes_length);
 		}
+
+		buffer += "<td>";
 		entry_to_html(result.data[i], part);
-
-		if (config.only_reading && i + 1 < result.data.size())
+		buffer += "</td>";
+		if (!result.data[i].expressions.empty())
 		{
-			buffer += "<hr>";
+			for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
+			{
+				buffer += "<td>+";
+				WordResult tmp_result(*it);
+				entry_to_html(tmp_result);
+				buffer += "</td>";
+			}
 		}
-
+		buffer += "</tr>";
 	}
+	buffer += "</table>";
 	if (result.more)
 	{
 		buffer += "...<br/>";

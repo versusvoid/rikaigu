@@ -52,6 +52,33 @@
 
 /* used for word definitions */
 
+#rikaigu-window table {
+	border-collapse: collapse;
+}
+
+#rikaigu-window tr:first-of-type td {
+	border-top: 0px none black !important;
+}
+#rikaigu-window tr td {
+	border-top: 2px solid black !important;
+	border-bottom: 2px solid black !important;
+}
+#rikaigu-window tr:last-of-type td {
+	border-bottom: 0px none black !important;
+}
+
+#rikaigu-window td:first-of-type {
+	border-left: 0px none black !important;
+	padding-left: 0px !important;
+}
+#rikaigu-window td {
+	vertical-align: top !important;
+	border-left: 2px solid black !important;
+	border-spacing: 10px !important;
+	padding-left: 4px !important;
+	max-width: 400px !important;
+}
+
 #rikaigu-window .w-kanji {
 	font-size: 18px !important;
 }

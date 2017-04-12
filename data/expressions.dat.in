@@ -1,4 +1,9 @@
 # vi: tabstop=30
+# * - means 'any'. You can see values like '*|negative stem' because 'negative stem' requires additional suffix after
+# removing expression suffix.
+# 'Sense group' - several senses with same pos (see utils.py)
+# 'ent_seq' gets replaced with offset when dictionary being generated (see prepare_dict() in prepare-dict.py)
+# expression suffix	expression's pos	after words with this pos	after words in this form	ent_seq from JM(ne)dict	sense group(s) and sense(s)
 いらっしゃる	v5aru	v	-te	1000940	1,0
 # --------------------------------------------------------------
 なら

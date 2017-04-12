@@ -222,6 +222,15 @@ def prepare_names():
 	write_index(index, 'names')
 
 def prepare_dict(process_expressions):
+
+	if not process_expressions:
+		expression_ids = {}
+		with open('data/expressions.dat.in') as f:
+			for l in f:
+				l = l.strip().split('\t')
+				if len(l) == 1 or len(l[0]) == 0 or l[0][0] == '#': continue
+				expression_ids[l[4]] = '?'
+
 	index = {}
 	offset = 0
 	with open(f'data/dict.dat', 'wb') as of:
@@ -231,6 +240,8 @@ def prepare_dict(process_expressions):
 				index.setdefault(key, set()).add(offset)
 			if process_expressions:
 				expressions.record_entry(entry, entry_index_keys, elem)
+			elif entry.id in expression_ids:
+				expression_ids[entry.id] = offset
 
 			l = format_entry(entry).encode('utf-8')
 			of.write(l)
@@ -239,6 +250,20 @@ def prepare_dict(process_expressions):
 
 	if process_expressions:
 		expressions.dump_expressions()
+	else:
+		with open('data/expressions.dat.in') as f, open('data/expressions.dat', 'w') as of:
+			for l in f:
+				l = l.strip()
+				if len(l) == 0 or l[0] == '#': continue
+				parts = l.split('\t')
+				if len(parts) == 1:
+					print(parts[0], file=of)
+					continue
+
+				offset = expression_ids.get(parts[4])
+				assert offset != '?', parts
+				parts[4] = offset
+				print(*parts, sep='\t', file=of)
 
 	write_index(index, 'dict')
 

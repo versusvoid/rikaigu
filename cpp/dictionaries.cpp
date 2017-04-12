@@ -252,9 +252,9 @@ static bool compare(WordResult& a, WordResult& b)
 	{
 		return a.reason.empty() > b.reason.empty();
 	}
-	if (a.expression.empty() != b.expression.empty())
+	if (a.expressions.empty() != b.expressions.empty())
 	{
-		return a.expression.empty() > b.expression.empty();
+		return a.expressions.empty() > b.expressions.empty();
 	}
 	return a.dentry.freq() < b.dentry.freq();
 }
@@ -366,11 +366,26 @@ SearchResult word_search(const char* word, bool names_dictionary)
 					max_length = true_length;
 				}
 
-				result.data.push_back({dentry, u.reason,
+				std::vector<DEntry> expressions;
+				for (auto i = 0U; i < u.expressions.size(); ++i)
+				{
+					fseek(dict, u.expressions[i]->offset, SEEK_SET);
+					ssize_t line_length = getline(&line, &line_buffer_size, dict);
+					if (line_length == -1)
+					{
+						std::cerr << "Too bad" << std::endl;
+						continue;
+					}
+					DEntry expression(std::string(line, line_length - 1), names_dictionary);
+					expression.filter_writings(u.expressions_forms[i]);
+					expression.filter_senses(u.expressions[i]->sense_indices);
+					expressions.emplace_back(expression);
+				}
+				result.data.emplace_back(dentry, u.reason,
 					true_length, convertor.out.length(),
-					u.expression});
-			} // for j < ix.length
-		} // for i < trys.length
+					expressions);
+			}
+		}
 		if (count >= maxTrim) break;
 
 		convertor.drop_last();

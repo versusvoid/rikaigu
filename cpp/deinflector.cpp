@@ -230,7 +230,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 					}
 					r.back().expressions = candidate.expressions;
-					r.back().expression = candidate.expression;
+					r.back().expressions_forms = candidate.expressions_forms;
 					have[new_word] = &r.back();
 
 				}
@@ -242,12 +242,6 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 							(candidate.expressions.back()->after_type & rule.source_type) == 0)
 					{
 						continue;
-					}
-
-					std::string new_expression = end;
-					if (!candidate.expression.empty())
-					{
-						new_expression += " + " + candidate.expression;
 					}
 
 					size_t numSpecials = 0;
@@ -266,7 +260,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 
 						r.emplace_back(new_special, INFLECTION_TYPES["adj-i"],
-							new_expression, candidate.expressions, &rule,
+							candidate.expressions_forms, end,
+							candidate.expressions, &rule,
 							std::set<std::string>{"negative", "masu stem"}
 						);
 						have[new_special] = &r.back();
@@ -283,7 +278,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 
 						r.emplace_back(new_special, INFLECTION_TYPES["raw"],
-							new_expression, candidate.expressions, &rule,
+							candidate.expressions_forms, end,
+							candidate.expressions, &rule,
 							std::set<std::string>{"-ba"}
 						);
 						have[new_special] = &r.back();
@@ -300,7 +296,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 
 						r.emplace_back(new_special, INFLECTION_TYPES["adj-i"],
-							new_expression, candidate.expressions, &rule,
+							candidate.expressions_forms, end,
+							candidate.expressions, &rule,
 							std::set<std::string>{"negative"}
 						);
 						have[new_special] = &r.back();
@@ -315,7 +312,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 
 						r.emplace_back(new_word, ANY_TYPE,
-							new_expression, candidate.expressions, &rule,
+							candidate.expressions_forms, end,
+							candidate.expressions, &rule,
 							rule.after_form
 						);
 						have[new_word] = &r.back();

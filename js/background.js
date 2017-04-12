@@ -192,6 +192,7 @@ function rikaiguDisable() {
 }
 
 function search(request) {
+	console.log('search');
 	var matchLengthPtr = Module._malloc(4);
 	var prefixLengthPtr = Module._malloc(4);
 	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number', 'number'],
@@ -236,9 +237,6 @@ function onMessage(request, sender, response) {
 			chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
 			break;
 
-		case 'switchOnlyReading':
-			chrome.storage.local.set({onlyReadings: !config.onlyReadings});
-			break;
 		default:
 			console.error('Unknown request type:', request);
 	}

@@ -63,6 +63,7 @@ var config = null;
 var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
+	console.log('rikaigu_set_config');
 	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'string', 'string'],
 		cppConfig.map(key => config[key]));
 }

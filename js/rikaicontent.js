@@ -57,8 +57,9 @@ function enableTab(config, popup) {
 	if (rikaigu === null) {
 		rikaigu = {
 			altView: 0,
+			forceKanji: false,
 			sameDict: 0,
-			forceKanji: 0,
+			kanjiDict: 1,
 			defaultDict: 2,
 			nextDict: 3,
 			keysDown: {},
@@ -302,11 +303,10 @@ function onKeyDown(ev) {
 			updatePopupPosition(rikaigu.shownX, rikaigu.shownY);
 			break;
 		case 'KeyD':
-			chrome.runtime.sendMessage({
-				"type": "switchOnlyReading"
+			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings}, function() {
+				rikaigu.shownMatch = null;
+				extractTextAndSearch(rikaigu.sameDict);
 			});
-			rikaigu.shownMatch = null;
-			extractTextAndSearch(rikaigu.sameDict);
 			break;
 		case 'KeyY':
 			rikaigu.altView = 0;
@@ -320,7 +320,7 @@ function onKeyDown(ev) {
 }
 
 function onMouseDown(ev) {
-	if (ev.button != 0)
+	if (ev.button !== 0)
 		return;
 	if (rikaigu.isVisible)
 		clearHighlight();
@@ -378,8 +378,6 @@ function isInput(node) {
 }
 
 function onMouseMove(ev) {
-	var dx = rikaigu.lastPos.screenX - ev.screenX;
-	var dy = rikaigu.lastPos.screenY - ev.screenY;
 	rikaigu.lastPos = {
 		clientX: ev.clientX,
 		clientY: ev.clientY,
@@ -434,11 +432,12 @@ function onMouseMove(ev) {
 			&& (rikaigu.isVisible || rikaigu.timer !== null)) {
 		return;
 	}
+
 	rikaigu.lastRangeNode = rangeNode;
 	rikaigu.lastRangeOffset = rangeOffset;
 
 	if (rikaigu.lastRangeNode && rikaigu.lastRangeOffset < rangeEnd) {
-		rikaigu.forceKanji = ev.shiftKey ? 1 : 0;
+		rikaigu.forceKanji = ev.shiftKey;
 		var delay = !!ev.noDelay ? 1 : rikaigu.config.popupDelay;
 		if (rikaigu.timer) {
 			clearTimeout(rikaigu.timer);
@@ -451,13 +450,12 @@ function onMouseMove(ev) {
 					return;
 				}
 				extractTextAndSearch(
-					rikaigu.forceKanji ? rikaigu.forceKanji : rikaigu.defaultDict,
+					rikaigu.forceKanji ? rikaigu.kanjiDict : rikaigu.defaultDict,
 					rangeNode, rangeOffset);
 			}, delay, rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
 		return;
 	}
 
-	// Skip check if popup is hidden
 	if (!rikaigu.isVisible) return;
 
 	if (rikaigu.selected && rikaigu.lastRangeNode) {
@@ -465,12 +463,17 @@ function onMouseMove(ev) {
 		// Check if cursor still in highlighted range.
 		// At this point updated request have already been sent. If match will change, we'll update
 		// (or close) popup. Otherwise no reason to close it.
-		if (highlightedRange.comparePoint(rikaigu.lastRangeNode, rikaigu.lastRangeOffset) === 0) return;
+		if (highlightedRange.comparePoint(rikaigu.lastRangeNode, rikaigu.lastRangeOffset) === 0) {
+			return;
+		}
 	}
 
 	// Don't close just because we moved from a valid popup slightly over to a place with nothing
+	var dx = rikaigu.shownX - ev.screenX;
+	var dy = rikaigu.shownY - ev.screenY;
 	var distance = Math.sqrt(dx * dx + dy * dy);
 	if (distance > 4) {
+		console.log('closing popup');
 		reset();
 	}
 }
@@ -486,6 +489,7 @@ chrome.runtime.onMessage.addListener(
 				disableTab();
 				break;
 			case 'show':
+				console.log('show');
 				if (window.self === window.top) {
 					if (request.match === rikaigu.shownMatch) {
 						updatePopupPosition(
@@ -493,6 +497,7 @@ chrome.runtime.onMessage.addListener(
 							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
 						);
 					} else {
+						console.log('reshowwing', request.html);
 						showPopup(request.html,
 							request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
 							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)

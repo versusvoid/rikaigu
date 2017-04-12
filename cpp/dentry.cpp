@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <cassert>
 
 DEntry::DEntry(const std::string& dictionary_line, bool name)
 	: name(name)
@@ -48,6 +49,83 @@ uint32_t DEntry::all_pos()
 		parse_sense_groups();
 	}
 	return _all_pos;
+}
+
+void DEntry::filter_writings(const std::string &the_only_writing)
+{
+	std::cout << "filter_writings(" << the_only_writing << "): " << kanji_string << " " << reading_string << std::endl;
+	parse_readings();
+	parse_kanji_groups();
+
+	for (auto i = 0U; i < _kanji_groups.size(); ++i)
+	{
+		for (auto j = 0U; j < _kanji_groups[i].kanjis.size(); ++j)
+		{
+			if (_kanji_groups[i].kanjis[j].text == the_only_writing)
+			{
+				if (_kanji_groups[i].readings.size() != _readings.size())
+				{
+					std::vector<Writing> new_readings;
+					std::vector<size_t> new_readings_indices;
+					for (auto& reading_index : _kanji_groups[i].readings)
+					{
+						new_readings.emplace_back(_readings[reading_index]);
+						new_readings_indices.push_back(new_readings_indices.size());
+					}
+					_readings = new_readings;
+					_kanji_groups[i].readings = new_readings_indices;
+				}
+
+				_kanji_groups[i].kanjis.erase(_kanji_groups[i].kanjis.begin(), _kanji_groups[i].kanjis.begin() + j);
+				_kanji_groups[i].kanjis.erase(_kanji_groups[i].kanjis.begin() + 1, _kanji_groups[i].kanjis.end());
+
+				_kanji_groups.erase(_kanji_groups.begin(), _kanji_groups.begin() + i);
+				_kanji_groups.erase(_kanji_groups.begin() + 1, _kanji_groups.end());
+
+				return;
+			}
+		}
+	}
+
+	for (size_t i = 0U; i < _readings.size(); ++i)
+	{
+		if (_readings[i].text == the_only_writing)
+		{
+			std::vector<KanjiGroup> new_kanji_groups;
+			for(auto& group : _kanji_groups)
+			{
+				std::cout << group.readings.size() << " " << group.readings.at(0) << std::endl;
+				if (std::find(group.readings.begin(), group.readings.end(), i) != group.readings.end())
+				{
+					new_kanji_groups.emplace_back(group);
+				}
+			}
+			std::cout << _kanji_groups.size() << " " << new_kanji_groups.size() << std::endl;
+			_kanji_groups = new_kanji_groups;
+
+			return;
+		}
+	}
+
+	assert(false);
+}
+
+void DEntry::filter_senses(const std::vector<std::pair<int, int> > &sense_indices)
+{
+	parse_sense_groups();
+	std::vector<SenseGroup> new_sense_groups;
+	for(auto it = sense_indices.begin(); it != sense_indices.end();)
+	{
+		const int sense_group_index = it->first;
+		const SenseGroup& sense_group = _sense_groups[sense_group_index];
+		std::vector<std::string> new_senses;
+		for(;it != sense_indices.end() && sense_group_index == it->first; ++it)
+		{
+			new_senses.emplace_back(sense_group.senses[it->second]);
+		}
+		new_sense_groups.push_back({sense_group.types, new_senses});
+	}
+	_sense_groups = new_sense_groups;
 }
 
 const std::vector<SenseGroup>& DEntry::sense_groups()
