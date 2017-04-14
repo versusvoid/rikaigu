@@ -37,30 +37,6 @@ if (localStorage.length > 0) {
 	chrome.storage.local.set(newConfig);
 }
 
-function initOption(name, defaultValue) {
-	chrome.storage.local.get(name, function(config) {
-		if (!(name in config)) {
-			config = {};
-			config[name] = defaultValue;
-			chrome.storage.local.set(config);
-		}
-	});
-}
-
-initOption("smartSegmentation", false);
-initOption("deinflectExpressions", true);
-initOption("popupColor", "blue");
-initOption("matchHighlight", true);
-initOption("onlyReadings", false);
-initOption("showMiniHelp", true);
-initOption("enableKeys", true);
-initOption("showKanjiComponents", true);
-initOption("popupDelay", 150);
-initOption("showOnKey", "None");
-initOption("defaultDict", 0);
-initOption('kanjiInfo', 'H L E DK N V Y P IN I U');
-initOption('configVersion', 'v1.0.0');
-
 var config = null;
 var cppConfig = ['onlyReadings', 'showKanjiComponents', 'smartSegmentation', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
@@ -81,7 +57,35 @@ function onConfigChange(configChange) {
 	}
 }
 
-chrome.storage.local.get(null, function(config) {
+function initConfig(config) {
+	const defaultConfig = {
+		"smartSegmentation": false,
+		"deinflectExpressions": true,
+		"popupColor": "blue",
+		"matchHighlight": true,
+		"onlyReadings": false,
+		"showMiniHelp": true,
+		"enableKeys": true,
+		"showKanjiComponents": true,
+		"popupDelay": 150,
+		"showOnKey": "None",
+		"defaultDict": 0,
+		'kanjiInfo': 'H L E DK N V Y P IN I U',
+		'configVersion': 'v1.0.0',
+	};
+
+	var needUpdate = false;
+	for (var k in defaultConfig) {
+		if (!(k in config)) {
+			config[k] = defaultConfig[k];
+			needUpdate = true;
+		}
+	}
+	if (needUpdate) {
+		chrome.storage.local.set(config);
+	}
+
 	window.config = config;
 	chrome.storage.onChanged.addListener(onConfigChange);
-});
+}
+chrome.storage.local.get(null, initConfig);
