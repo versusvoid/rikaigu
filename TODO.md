@@ -3,10 +3,10 @@
 - [x] Option to enable (disabled by default) smart-segmentation,
 option to disable (enabled by default) expression deinflection.
 - [x] Build scripts (makefiles).
-- [ ] Tests for everything (scripts and expression).
-- [ ] Documentation + second content script refactoring.
+- [x] Tests for everything (scripts and expression).
 - [ ] crfpp suck. Especially it's memory management. It would be nice to find other usable implementation.
   * Turns out it's most recent, performant (precision and recall) and easy to build implementation. So... rewrite 😞
+- [ ] Documentation + second content script refactoring.
 - [ ] Check if TreeWalker is really necessary or simple iteration through DOM would be fast enough.
 - [ ] Generate kanji.dat. KANJIDIC is good enough, but Wiktionary (en and jp) has entries it hasn't.
 - [ ] Japanese dictionary (lexicon). Sanseido is fine if it has offline version, but I prefer Wiktionary.

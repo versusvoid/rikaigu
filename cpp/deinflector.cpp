@@ -254,7 +254,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 						if (have.count(new_special) > 0)
 						{
-							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
+//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
 							continue;
 						}
 
@@ -272,7 +272,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						auto new_special = new_word + u8"ば";
 						if (have.count(new_special) > 0)
 						{
-							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
+//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
 							continue;
 						}
 
@@ -290,7 +290,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						auto new_special = new_word + u8"い";
 						if (have.count(new_special) > 0)
 						{
-							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
+//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
 							continue;
 						}
 
@@ -306,7 +306,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					{
 						if (have.count(new_word) > 0)
 						{
-							std::cerr << "Well, that's strange: " << word << " " << new_word << std::endl;
+//							std::cerr << "Well, that's strange: " << word << " " << new_word << std::endl;
 							continue;
 						}
 
