@@ -444,7 +444,6 @@ KanjiResult kanji_search(const char* kanji)
 	{
 		return result;
 	}
-	std::cout << "kanji_code = " << uint32_t(kanji_code) << std::endl;
 
 	std::string kanji_definition = find_kanji(uint32_t(kanji_code));
 	if (kanji_definition.empty())
@@ -513,7 +512,6 @@ SearchResult search(const char* text)
 {
 	PROFILE
 	Dictionary dictionary = config.default_dictionary;
-	std::cout << "default_dictionary = " << int(config.default_dictionary) << std::endl;
 
 	SearchResult res;
 	do
@@ -534,7 +532,6 @@ SearchResult search(const char* text)
 				res = word_search(text, true);
 				break;
 			case KANJI:
-				std::cout << "searching kanji from" << text << std::endl;
 				res = kanji_search(text);
 				break;
 		}

@@ -215,7 +215,6 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 		prefix = "";
 	}
 
-	console.log('search', prefix, text);
 	chrome.runtime.sendMessage({
 			"type": "xsearch",
 			"text": text,

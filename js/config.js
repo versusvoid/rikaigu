@@ -47,6 +47,8 @@ function initOption(name, defaultValue) {
 	});
 }
 
+initOption("smartSegmentation", false);
+initOption("deinflectExpressions", true);
 initOption("popupColor", "blue");
 initOption("matchHighlight", true);
 initOption("onlyReadings", false);
@@ -60,19 +62,17 @@ initOption('kanjiInfo', 'H L E DK N V Y P IN I U');
 initOption('configVersion', 'v1.0.0');
 
 var config = null;
-var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
+var cppConfig = ['onlyReadings', 'showKanjiComponents', 'smartSegmentation', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
-	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'string'],
+	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'number', 'number', 'string'],
 		cppConfig.map(key => config[key]));
 }
 
 function onConfigChange(configChange) {
-	console.log('configChange', configChange);
 	for (var key in configChange) {
 		window.config[key] = configChange[key].newValue;
 	}
-	console.log('config', window.config);
 	for (var key of cppConfig) {
 		if (key in configChange) {
 			updateCppConfig();

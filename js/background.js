@@ -190,7 +190,6 @@ function rikaiguDisable() {
 }
 
 function search(request) {
-	console.log('search');
 	var matchLengthPtr = Module._malloc(4);
 	var prefixLengthPtr = Module._malloc(4);
 	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number'],

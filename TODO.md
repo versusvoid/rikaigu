@@ -3,7 +3,7 @@
 - [x] Option to enable (disabled by default) smart-segmentation,
 option to disable (enabled by default) expression deinflection.
 - [ ] Tests for everything (scripts and expression).
-- [ ] Build scripts.
+- [ ] Build scripts (makefiles).
 - [ ] crfpp suck. Especially it's memory management. It would be nice to find other usable implementation.
   * Turns out it's most recent, performant (precision and recall) and easy to build implementation. So... rewrite 😞
 - [ ] Documentation + second content script refactoring.

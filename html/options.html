@@ -1,6 +1,7 @@
 <html>
 
 <head>
+	<meta charset="utf-8">
 	<link rel="stylesheet" type="text/css" href="/css/options.css" />
 	<title>Rikaigu settings</title>
 </head>
@@ -28,6 +29,18 @@
 							<option value="1">Names</option>
 							<option value="2">Kanji</option>
 					</select>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="smartSegmentation" bind></input>
+					<span>Consider characters before cursor when searching</span>
+				</label>
+			</div>
+			<div class="checkbox">
+				<label>
+					<input class="config" type="checkbox" id="deinflectExpressions" bind></input>
+					<span>Recognize and split off expressions (～みたい、～らしい、etc.)</span>
 				</label>
 			</div>
 			<div class="checkbox">

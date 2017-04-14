@@ -473,7 +473,6 @@ function onMouseMove(ev) {
 	var dy = rikaigu.shownY - ev.screenY;
 	var distance = Math.sqrt(dx * dx + dy * dy);
 	if (distance > 4) {
-		console.log('closing popup');
 		reset();
 	}
 }
@@ -489,7 +488,6 @@ chrome.runtime.onMessage.addListener(
 				disableTab();
 				break;
 			case 'show':
-				console.log('show');
 				if (window.self === window.top) {
 					if (request.match === rikaigu.shownMatch) {
 						updatePopupPosition(
@@ -497,7 +495,6 @@ chrome.runtime.onMessage.addListener(
 							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
 						);
 					} else {
-						console.log('reshowwing', request.html);
 						showPopup(request.html,
 							request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
 							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)

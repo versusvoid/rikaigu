@@ -234,9 +234,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					have[new_word] = &r.back();
 
 				}
-				else if (g.suffix_length < candidate.word.length())
+				else if (g.suffix_length < candidate.word.length() && config.deinflect_expressions)
 				{
-
 					// Expression
 					if (!candidate.expressions.empty() &&
 							(candidate.expressions.back()->after_type & rule.source_type) == 0)
