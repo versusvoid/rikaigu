@@ -57,7 +57,7 @@ initOption("enableKeys", true);
 initOption("showKanjiComponents", true);
 initOption("popupDelay", 150);
 initOption("showOnKey", "None");
-initOption("defaultDict", "words");
+initOption("defaultDict", 0);
 initOption('kanjiInfo', 'H L E DK N V Y P IN I U');
 initOption('configVersion', 'v1.0.0');
 
