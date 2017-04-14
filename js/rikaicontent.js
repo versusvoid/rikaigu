@@ -57,11 +57,6 @@ function enableTab(config, popup) {
 	if (rikaigu === null) {
 		rikaigu = {
 			altView: 0,
-			forceKanji: false,
-			sameDict: 0,
-			kanjiDict: 1,
-			defaultDict: 2,
-			nextDict: 3,
 			keysDown: {},
 			lastPos: {
 				clientX: 0,
@@ -290,10 +285,18 @@ function onKeyDown(ev) {
 	if (!rikaigu.config.enableKeys && ev.key !== 'Shift') return;
 
 	switch (ev.code) {
-		case 'ShiftRight':
 		case 'ShiftLeft':
+			chrome.storage.local.set({defaultDict: (rikaigu.config.defaultDict - 1 + 3) % 3}, function() {
+				rikaigu.shownMatch = null;
+				extractTextAndSearch();
+			});
+			break;
+		case 'ShiftRight':
 		case 'Enter':
-			extractTextAndSearch(rikaigu.nextDict);
+			chrome.storage.local.set({defaultDict: (rikaigu.config.defaultDict + 1) % 3}, function() {
+				rikaigu.shownMatch = null;
+				extractTextAndSearch();
+			});
 			break;
 		case 'Escape':
 			reset();
@@ -305,7 +308,7 @@ function onKeyDown(ev) {
 		case 'KeyD':
 			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings}, function() {
 				rikaigu.shownMatch = null;
-				extractTextAndSearch(rikaigu.sameDict);
+				extractTextAndSearch();
 			});
 			break;
 		case 'KeyY':
@@ -437,7 +440,6 @@ function onMouseMove(ev) {
 	rikaigu.lastRangeOffset = rangeOffset;
 
 	if (rikaigu.lastRangeNode && rikaigu.lastRangeOffset < rangeEnd) {
-		rikaigu.forceKanji = ev.shiftKey;
 		var delay = !!ev.noDelay ? 1 : rikaigu.config.popupDelay;
 		if (rikaigu.timer) {
 			clearTimeout(rikaigu.timer);
@@ -449,9 +451,7 @@ function onMouseMove(ev) {
 						|| rangeOffset != rikaigu.lastRangeOffset) {
 					return;
 				}
-				extractTextAndSearch(
-					rikaigu.forceKanji ? rikaigu.kanjiDict : rikaigu.defaultDict,
-					rangeNode, rangeOffset);
+				extractTextAndSearch(rangeNode, rangeOffset);
 			}, delay, rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
 		return;
 	}

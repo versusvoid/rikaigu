@@ -13,6 +13,10 @@
 
 /* used for word definitions */
 
+#rikaigu-window td.word {
+	border-color: silver !important;
+}
+
 #rikaigu-window .w-kanji {
 	color: #7070E0 !important;
 }

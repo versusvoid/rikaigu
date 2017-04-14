@@ -33,17 +33,17 @@ std::vector<std::string> split(const std::string& str, char sep)
 }
 
 // see `kanji_numbers` in html_render.cpp
-Config config = { false, true, "words", {"H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"} };
+Config config = { false, true, WORDS, {"H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"} };
 
 void rikaigu_set_config(
 		bool only_reading,
 		bool kanji_components,
-		const char* default_dictionary,
+		int default_dictionary,
 		const char* kanji_info)
 {
 	config.only_reading = only_reading;
 	config.kanji_components = kanji_components;
-	config.default_dictionary = default_dictionary;
+	config.default_dictionary = Dictionary(default_dictionary);
 
 	std::cout << "kanji_info = " << kanji_info << std::endl;
 	config.kanji_info.clear();

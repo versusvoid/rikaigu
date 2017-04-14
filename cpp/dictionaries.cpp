@@ -193,7 +193,7 @@ struct KanaConvertor
 std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 {
 	PROFILE
-	std::cout << "find( " << word << " )" << std::endl;
+//	std::cout << "find( " << word << " )" << std::endl;
 
 	const char* beg = index->index_start;
 	const char* end = index->index_end;
@@ -444,6 +444,7 @@ KanjiResult kanji_search(const char* kanji)
 	{
 		return result;
 	}
+	std::cout << "kanji_code = " << uint32_t(kanji_code) << std::endl;
 
 	std::string kanji_definition = find_kanji(uint32_t(kanji_code));
 	if (kanji_definition.empty())
@@ -508,47 +509,39 @@ KanjiResult kanji_search(const char* kanji)
 	return result;
 }
 
-static int show_mode = 0;
-static std::array<std::string, 3> dictionaries{{"words", "kanji", "names"}};
-SearchResult search(const char* text, SearchMode search_mode)
+SearchResult search(const char* text)
 {
 	PROFILE
-
-	switch (search_mode) {
-		case FORCE_KANJI:
-			return kanji_search(text);
-		case DEFAULT_DICT:
-			show_mode = (std::find(dictionaries.begin(), dictionaries.end(), config.default_dictionary) -
-				dictionaries.begin()) % dictionaries.size();
-			break;
-		case NEXT_DICT:
-			show_mode = (show_mode + 1) % dictionaries.size();
-			break;
-	}
-	const int first_show_mode = show_mode;
+	Dictionary dictionary = config.default_dictionary;
+	std::cout << "default_dictionary = " << int(config.default_dictionary) << std::endl;
 
 	SearchResult res;
-	do {
-		switch (show_mode) {
-		case 0:
-			res = word_search(text, false);
-			if (search_mode == DEFAULT_DICT) {
-				SearchResult res2 = word_search(text, true);
-				if (res2.max_match_symbols_length > res.max_match_symbols_length) {
-					return res2;
+	do
+	{
+		switch (dictionary)
+		{
+			case WORDS:
+				res = word_search(text, false);
+				if (dictionary == config.default_dictionary)
+				{
+					SearchResult res2 = word_search(text, true);
+					if (res2.max_match_symbols_length > res.max_match_symbols_length) {
+						return res2;
+					}
 				}
-			}
-			break;
-		case 1:
-			res = kanji_search(text);
-			break;
-		case 2:
-			res = word_search(text, true);
-			break;
+				break;
+			case NAMES:
+				res = word_search(text, true);
+				break;
+			case KANJI:
+				std::cout << "searching kanji from" << text << std::endl;
+				res = kanji_search(text);
+				break;
 		}
 		if (res.max_match_symbols_length > 0) break;
-		show_mode = (show_mode + 1) % dictionaries.size();
-	} while (show_mode != first_show_mode);
+		dictionary = Dictionary((dictionary + 1) % 3);
+
+	} while (dictionary != config.default_dictionary);
 
 	return res;
 }

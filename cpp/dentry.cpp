@@ -53,7 +53,6 @@ uint32_t DEntry::all_pos()
 
 void DEntry::filter_writings(const std::string &the_only_writing)
 {
-	std::cout << "filter_writings(" << the_only_writing << "): " << kanji_string << " " << reading_string << std::endl;
 	parse_readings();
 	parse_kanji_groups();
 
@@ -94,13 +93,11 @@ void DEntry::filter_writings(const std::string &the_only_writing)
 			std::vector<KanjiGroup> new_kanji_groups;
 			for(auto& group : _kanji_groups)
 			{
-				std::cout << group.readings.size() << " " << group.readings.at(0) << std::endl;
 				if (std::find(group.readings.begin(), group.readings.end(), i) != group.readings.end())
 				{
 					new_kanji_groups.emplace_back(group);
 				}
 			}
-			std::cout << _kanji_groups.size() << " " << new_kanji_groups.size() << std::endl;
 			_kanji_groups = new_kanji_groups;
 
 			return;

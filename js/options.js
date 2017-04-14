@@ -22,10 +22,16 @@ function loadValues() {
 function saveValues() {
 	var newConfig = {}
 	for (var input of document.querySelectorAll('[bind]')) {
-		if (input.getAttribute('type') === 'checkbox') {
+		switch (input.getAttribute('type')) {
+		case 'checkbox':
 			newConfig[input.id] = input.checked;
-		} else {
-			 newConfig[input.id] = input.value;
+			break;
+		case 'number':
+			newConfig[input.id] = parseInt(input.value);
+			break;
+		default:
+			newConfig[input.id] = input.value;
+			break;
 		}
 	}
 

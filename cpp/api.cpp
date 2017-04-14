@@ -26,17 +26,17 @@ bool rikaigu_set_file(const char* filename, const char* data, uint32_t length)
 
 }
 
-const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix, int search_mode,
+const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 		int32_t* match_symbols_length, int32_t* prefix_symbols_length)
 {
 	PROFILE
-	SearchResult res = search(utf8_text, SearchMode(search_mode));
+	SearchResult res = search(utf8_text);
 	*prefix_symbols_length = 0;
-	if (utf8_prefix[0] != '\0' && search_mode == DEFAULT_DICT && config.default_dictionary == "words") {
+	if (utf8_prefix[0] != '\0' && config.default_dictionary == WORDS) {
 		std::string extended_text = crf_extend(utf8_text, utf8_prefix, prefix_symbols_length);
 		if (extended_text.size() > 0)
 		{
-			SearchResult res2 = search(extended_text.c_str(), SearchMode(search_mode));
+			SearchResult res2 = search(extended_text.c_str());
 			if (res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length)
 			{
 				res = res2;

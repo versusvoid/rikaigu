@@ -52,6 +52,7 @@ public:
 	int freq();
 	uint32_t all_pos();
 
+	// TODO mb filter in render?
 	void filter_writings(const std::string& the_only_writing);
 	void filter_senses(const std::vector<std::pair<int, int>>& sense_indices);
 

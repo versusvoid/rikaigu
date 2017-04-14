@@ -47,8 +47,6 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 		'<tr><td>Y</td><td>Move popup location down</td></tr>' +
 		'<tr><td>D</td><td>Hide/show definitions</td></tr>' +
 		'<tr><td>Shift/Enter&nbsp;&nbsp;</td><td>Switch dictionaries</td></tr>' +
-		'<tr><td colspan="2">&nbsp;</td></tr>' +
-		'<tr><td colspan="2">Hold Shift to search only kanji</td></tr>' +
 		'</table>';
 
 
@@ -195,8 +193,8 @@ function search(request) {
 	console.log('search');
 	var matchLengthPtr = Module._malloc(4);
 	var prefixLengthPtr = Module._malloc(4);
-	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number', 'number'],
-			[request.text, request.prefix, request.dictOption, matchLengthPtr, prefixLengthPtr]);
+	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number'],
+			[request.text, request.prefix, matchLengthPtr, prefixLengthPtr]);
 	var matchLength = Module.getValue(matchLengthPtr, 'i32');
 	var prefixLength = Module.getValue(prefixLengthPtr, 'i32');
 	Module._free(matchLengthPtr);

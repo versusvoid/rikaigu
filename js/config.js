@@ -6,7 +6,7 @@ if (localStorage.length > 0) {
 		popupColor: localStorage["popupcolor"],
 		enableKeys: localStorage["disablekeys"] !== 'true',
 		popupDelay: parseInt(localStorage['popupDelay']) || 150,
-		defaultDict: localStorage["defaultDict"]
+		defaultDict: ['words', 'names', 'kanji'].indexOf(localStorage["defaultDict"])
 	};
 	for (var oldNew of [
 			["highlight", "matchHighlight"],
@@ -63,22 +63,25 @@ var config = null;
 var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
-	console.log('rikaigu_set_config');
-	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'string', 'string'],
+	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'string'],
 		cppConfig.map(key => config[key]));
 }
 
 function onConfigChange(configChange) {
-	chrome.storage.local.get(null, function(config) {
-		window.config = config;
-		for (var key of cppConfig) {
-			if (key in configChange) {
-				updateCppConfig();
-				return;
-			}
+	console.log('configChange', configChange);
+	for (var key in configChange) {
+		window.config[key] = configChange[key].newValue;
+	}
+	console.log('config', window.config);
+	for (var key of cppConfig) {
+		if (key in configChange) {
+			updateCppConfig();
+			return;
 		}
-	});
+	}
 }
 
-onConfigChange({});
-chrome.storage.onChanged.addListener(onConfigChange);
+chrome.storage.local.get(null, function(config) {
+	window.config = config;
+	chrome.storage.onChanged.addListener(onConfigChange);
+});

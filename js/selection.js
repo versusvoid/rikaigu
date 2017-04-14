@@ -168,7 +168,7 @@ function getTextFromRange(rangeNode, offset, forward) {
 }
 
 var spacePrefixRegexp = /^\s/;
-function extractTextAndSearch(dictOption, rangeNode, rangeOffset) {
+function extractTextAndSearch(rangeNode, rangeOffset) {
 	if (!rangeNode) {
 		rangeNode = rikaigu.lastShownRangeNode;
 		rangeOffset = rikaigu.lastShownRangeOffset;
@@ -221,8 +221,7 @@ function extractTextAndSearch(dictOption, rangeNode, rangeOffset) {
 			"text": text,
 			"prefix": prefix,
 			"screenX": rikaigu.lastPos.screenX,
-			"screenY": rikaigu.lastPos.screenY,
-			"dictOption": dictOption
+			"screenY": rikaigu.lastPos.screenY
 		},
 		processSearchResult.bind(window, fullSelectionRange, prefixSelectionRange));
 }

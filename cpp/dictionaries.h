@@ -53,14 +53,7 @@ struct SearchResult
 
 };
 
-
-enum SearchMode {
-	FORCE_KANJI = 1,
-	DEFAULT_DICT = 2,
-	NEXT_DICT = 3,
-};
-
-SearchResult search(const char* text, SearchMode search_mode);
+SearchResult search(const char* text);
 
 bool dictionaries_init(const char* filename, const char* content, uint32_t length);
 

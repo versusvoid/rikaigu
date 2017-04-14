@@ -31,11 +31,18 @@ struct profiler
 	~profiler();
 };
 
+enum Dictionary : int
+{
+	WORDS = 0,
+	NAMES = 1,
+	KANJI = 2
+};
+
 struct Config
 {
 	bool only_reading;
 	bool kanji_components;
-	std::string default_dictionary;
+	Dictionary default_dictionary;
 	std::set<std::string> kanji_info;
 };
 extern Config config;
