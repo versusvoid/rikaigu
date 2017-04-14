@@ -8,8 +8,11 @@ EMCCFLAGS = -s TOTAL_MEMORY=32MB \
 	    -g1 -s LZ4=1 \
 	    --preload-file ../data/dict.dat@/dict.dat \
 	    --preload-file ../data/names.dat@/names.dat \
-	    --preload-file ../data/kanji.dat@/kanji.dat \
-	    $(DEBUG_FLAGS)
+	    --preload-file ../data/kanji.dat@/kanji.dat
+
+ifndef release
+EMCCFLAGS += ${DEBUG_FLAGS}
+endif
 
 OBJECTS = api.bc crf.bc deinflector.bc dentry.bc dictionaries.bc html_render.bc word_types.bc utils.bc
 

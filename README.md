@@ -5,9 +5,10 @@ Enhanced version of rikaikun - translate Japanese by hovering over words. Now wi
 
 ## Building
 
-You'll need **make** and **python3**. From repo root execute:
+You'll need **make**, **python3** and [**emcc**](https://github.com/kripken/emscripten). From repo root execute:
 ```bash
-rikiagu/$ make dicts
+rikiagu/$ make
 ```
 
 Then you can '*load unpacked extension*' from Chrome.
+

@@ -6,6 +6,7 @@ data/dict.*
 data/names.*
 data/*.idx
 data/model.bin
+data/expressions.dat
 cpp/rikai.asm.*
 *.swp
 __pycache__

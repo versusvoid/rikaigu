@@ -171,13 +171,13 @@ def should_join(word1, word2):
 
 def generate_samples_from_dictionaries():
 	for form in all_forms:
-		record_samples([form])
+		#record_samples([form])
 
 		prefix = random.choice(all_forms)
 		record_samples([prefix, form])
 
-		suffix = random.choice(all_forms)
-		record_samples([form, suffix])
+		#suffix = random.choice(all_forms)
+		#record_samples([form, suffix])
 
 known_expressions = load_expressions()
 dictionary, all_forms = load_dictionary()
@@ -212,12 +212,12 @@ random.shuffle(lsamples)
 # For now we only use left samples
 for direction, samples in [('l', lsamples)]:
 	with open(f'segmentation/{direction}-all.csv', 'w') as f:
-			print(*samples, sep='\n\n', end='', file=f)
+		print(*samples, sep='\n\n', end='', file=f)
 	with open(f'segmentation/{direction}-train.csv', 'w') as f:
-			print(*samples[0:int(0.7*len(samples))], sep='\n\n', end='', file=f)
+		print(*samples[0:int(0.7*len(samples))][:4*10**6], sep='\n\n', end='', file=f)
 	with open(f'segmentation/{direction}-cv-train.csv', 'w') as f:
-			print(*samples[0:int(0.1*len(samples))], sep='\n\n', end='', file=f)
+		print(*samples[0:int(0.1*len(samples))], sep='\n\n', end='', file=f)
 	with open(f'segmentation/{direction}-cv.csv', 'w') as f:
-			print(*samples[int(0.7*len(samples)):int(0.8*len(samples))], sep='\n\n', end='', file=f)
+		print(*samples[int(0.7*len(samples)):int(0.8*len(samples))], sep='\n\n', end='', file=f)
 	with open(f'segmentation/{direction}-test.csv', 'w') as f:
-			print(*samples[int(0.8*len(samples)):], sep='\n\n', end='', file=f)
+		print(*samples[int(0.8*len(samples)):], sep='\n\n', end='', file=f)
