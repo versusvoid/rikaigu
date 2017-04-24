@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import os
 import random
 import sys
 from collections import namedtuple
+import os
 mydir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(mydir + '/../data')
 from expressions import parse, sentences_file, deinflect, deinflection_rules, inflecting_pos
@@ -196,42 +196,18 @@ del all_forms
 
 random.shuffle(rsamples)
 random.shuffle(lsamples)
-#lsamples = lsamples[:10000]
-
-
-def char_class(c):
-	if is_kanji(c):
-		return 'K'
-	elif is_hiragana(c):
-		return 'h'
-	elif is_katakana(c):
-		return 'k'
-	else:
-		return 'm'
-
-def make_crfpp_sample(sample):
-	res = []
-	for c in sample:
-		if c == ' ':
-			res[-1] = res[-1][:-1] + 'S'
-		else:
-			res.append(f'{c}\t{char_class(c)}\tM')
-	return '\n'.join(res)
+lsamples = lsamples[:1000000]
 
 # For now we only use left samples
 for direction, samples in [('l', lsamples)]:
 	with open(f'segmentation/{direction}-all.csv', 'w', encoding='utf-16') as f:
-			print(*samples, sep='\n', end='', file=f)
+		print(*samples, sep='\n', end='', file=f)
 
 	with open(f'segmentation/{direction}-train.csv', 'w', encoding='utf-16') as f:
-			print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
-#	with open(f'segmentation/{direction}-train.crfpp.csv', 'w') as f:
-#			print(*map(make_crfpp_sample, samples[0:int(0.8*len(samples))]), sep='\n\n', end='', file=f)
+		print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
 
 	with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
-			print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
+		print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
 
 	with open(f'segmentation/{direction}-test.csv', 'w', encoding='utf-16') as f:
-			print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
-#	with open(f'segmentation/{direction}-test.crfpp.csv', 'w') as f:
-#			print(*map(make_crfpp_sample, samples[int(0.8*len(samples)):]), sep='\n\n', end='', file=f)
+		print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
