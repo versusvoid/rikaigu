@@ -9,12 +9,17 @@ sys.path.append(mydir + '/../data')
 from expressions import parse, sentences_file, deinflect, deinflection_rules, inflecting_pos
 from index import index_keys
 from utils import *
+import lzma
 
 # Right (suffix) samples
 rsamples = []
 # Left (prefix) samples (each sample in reverse direction)
 lsamples = []
+glove_file = lzma.open('segmentation/glove.csv.xz', 'wt')
+def record_sentence(sentence):
+	print(*''.join(sentence), sep=' ', file=glove_file)
 def record_samples(sentence):
+	record_sentence(sentence)
 	sentence = ' ' + ' '.join(sentence)
 	for i in range(2, len(sentence)):
 		if sentence[i] == ' ': continue
@@ -53,7 +58,8 @@ def inflect(word, all_pos):
 					inflections.append((new_form, rule.target_type, inflection_reasons + [rule.reason]))
 
 	seen = list(seen)
-	return random.choice(seen)
+	random.shuffle(seen)
+	return seen[:10]
 
 def load_expressions():
 	expressions = {}
@@ -84,31 +90,20 @@ def load_expressions():
 
 def load_dictionary():
 	dictionary = {}
-	all_forms = set()
+	all_forms = {}
 	for entry, _ in dictionary_reader():
 		all_pos = set().union(*[sg.pos for sg in entry.sense_groups])
-		inflecting = len(inflecting_pos.intersection(all_pos)) > 0
+		inflecting = inflecting_pos.intersection(all_pos)
 		for form in index_keys(entry, variate=True, convert_to_hiragana=False):
 			dictionary.setdefault(kata_to_hira(form), set()).update(all_pos)
 
-			if form in all_forms: continue
-
-			# TODO can be optimized because every form would have same
-			# inflecting ending, so we really need to call inflect() once per entry
-			# Moreover to reduce memory usage we can have list of pairs
-			# (entry's form's prefixes, pos) and compute inflected forms only when needed
-			# But anyway we will hit resource starvation during learning before we
-			# hit it here
-			if inflecting:
-				all_forms.add(inflect(form, all_pos))
-			else:
-				all_forms.add(form)
+			all_forms.setdefault(form, set()).update(inflecting)
 
 	for entry, _ in dictionary_reader('JMnedict.xml.gz'):
 		for form in index_keys(entry, variate=False, convert_to_hiragana=False):
-			all_forms.add(form)
+			all_forms[form] = set()
 
-	return dictionary, list(all_forms)
+	return dictionary, list(all_forms.items())
 
 def get_dictionary_pos(word):
 	return dictionary.get(kata_to_hira(word.dkanji), set())
@@ -155,14 +150,22 @@ def should_join(word1, word2):
 	return meets_requirements(word1, requirements)
 
 def generate_samples_from_dictionaries():
-	for form in all_forms:
-		#record_samples([form])
+	form_no = 0
+	for form, pos in all_forms:
+		record_samples([form])
 
-		prefix = random.choice(all_forms)
-		record_samples([prefix, form])
+		for inflected_form in inflect(form, pos):
+			prefix = random.choice(all_forms)[0]
+			#record_samples([prefix, form])
+			record_sentence([prefix, inflected_form])
 
-		#suffix = random.choice(all_forms)
-		#record_samples([form, suffix])
+			suffix = random.choice(all_forms)[0]
+			#record_samples([form, suffix])
+			record_sentence([inflected_form, suffix])
+
+		form_no += 1
+		if form_no % 100000 == 0:
+			print(form_no, '/', len(all_forms))
 
 known_expressions = load_expressions()
 dictionary, all_forms = load_dictionary()
@@ -200,14 +203,12 @@ lsamples = lsamples[:1000000]
 
 # For now we only use left samples
 for direction, samples in [('l', lsamples)]:
-	with open(f'segmentation/{direction}-all.csv', 'w', encoding='utf-16') as f:
-		print(*samples, sep='\n', end='', file=f)
-
 	with open(f'segmentation/{direction}-train.csv', 'w', encoding='utf-16') as f:
 		print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
 
-	with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
-		print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
+	#with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
+		#print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
 
 	with open(f'segmentation/{direction}-test.csv', 'w', encoding='utf-16') as f:
 		print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
+glove_file.close()

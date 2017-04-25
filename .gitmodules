@@ -1,3 +1,6 @@
 [submodule "crfpp"]
 	path = crfpp
 	url = https://github.com/versusvoid/crfpp
+[submodule "GloVe"]
+	path = GloVe
+	url = https://github.com/stanfordnlp/GloVe.git
