@@ -18,11 +18,14 @@ def char_class(c):
 
 def make_crfpp_sample(sample):
 	res = []
+	tag = 'M'
 	for c in sample:
 		if c == ' ':
-			res[-1] = res[-1][:-1] + 'S'
+			#if len(res) > 0: res[-1] = res[-1][:-1] + 'S'
+			tag = 'S'
 		else:
-			res.append(f'{c}\t{char_class(c)}\tM')
+			res.append(f'{c}\t{char_class(c)}\t{tag}')
+			tag = 'M'
 	for i in range(len(res)):
 		res[i] += 'M' if i + 1 >= len(res) else res[i + 1][-1]
 		res[i] += 'M' if i + 2 >= len(res) else res[i + 2][-1]

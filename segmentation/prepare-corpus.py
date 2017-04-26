@@ -17,13 +17,17 @@ rsamples = []
 lsamples = []
 glove_file = lzma.open('segmentation/glove.csv.xz', 'wt')
 def record_sentence(sentence):
-	print(*''.join(sentence), sep=' ', file=glove_file)
+	#print(*''.join(sentence), sep=' ', file=glove_file)
+	pass
 def record_samples(sentence):
 	record_sentence(sentence)
 	sentence = ' ' + ' '.join(sentence)
+	#lsamples.append(sentence[::-1])
+	#lsamples.append(sentence)
 	for i in range(2, len(sentence)):
 		if sentence[i] == ' ': continue
-		lsamples.append(sentence[max(i - 14, 0):i + 1][::-1])
+		#lsamples.append(sentence[max(i - 14, 0):i + 1][::-1])
+		lsamples.append(sentence[max(i - 14, 0):i + 1])
 
 Inflection = namedtuple('Inflection', 'to, source_type, target_type, reason')
 inflection_rules = {}
@@ -35,6 +39,8 @@ for source, rules in deinflection_rules.items():
 		inflection_rules.setdefault(rule.to, []).append(inflection_rule)
 
 def inflect(word, all_pos):
+	if len(inflecting_pos.intersection(all_pos)) == 0:
+		return [word]
 	inflections = [(word, all_pos, [])]
 	seen = set([word])
 	i = -1
@@ -59,7 +65,8 @@ def inflect(word, all_pos):
 
 	seen = list(seen)
 	random.shuffle(seen)
-	return seen[:10]
+	#print(word, all_pos, seen); input()
+	return seen[:1]
 
 def load_expressions():
 	expressions = {}
@@ -156,15 +163,17 @@ def generate_samples_from_dictionaries():
 
 		for inflected_form in inflect(form, pos):
 			prefix = random.choice(all_forms)[0]
+			#record_sentence([prefix, inflected_form])
+			record_samples([prefix, inflected_form])
 			#record_samples([prefix, form])
-			record_sentence([prefix, inflected_form])
 
 			suffix = random.choice(all_forms)[0]
 			#record_samples([form, suffix])
-			record_sentence([inflected_form, suffix])
+			record_samples([inflected_form, suffix])
+			#record_sentence([inflected_form, suffix])
 
 		form_no += 1
-		if form_no % 100000 == 0:
+		if form_no % 10000 == 0:
 			print(form_no, '/', len(all_forms))
 
 known_expressions = load_expressions()
