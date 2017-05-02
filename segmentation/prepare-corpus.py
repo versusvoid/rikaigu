@@ -40,7 +40,7 @@ for source, rules in deinflection_rules.items():
 
 def inflect(word, all_pos):
 	if len(inflecting_pos.intersection(all_pos)) == 0:
-		return [word]
+		return [word, word, word]
 	inflections = [(word, all_pos, [])]
 	seen = set([word])
 	i = -1
@@ -66,7 +66,7 @@ def inflect(word, all_pos):
 	seen = list(seen)
 	random.shuffle(seen)
 	#print(word, all_pos, seen); input()
-	return seen[:1]
+	return seen[:3]
 
 def load_expressions():
 	expressions = {}
@@ -159,18 +159,12 @@ def should_join(word1, word2):
 def generate_samples_from_dictionaries():
 	form_no = 0
 	for form, pos in all_forms:
-		record_samples([form])
-
-		for inflected_form in inflect(form, pos):
-			prefix = random.choice(all_forms)[0]
-			#record_sentence([prefix, inflected_form])
-			record_samples([prefix, inflected_form])
-			#record_samples([prefix, form])
-
-			suffix = random.choice(all_forms)[0]
-			#record_samples([form, suffix])
-			record_samples([inflected_form, suffix])
-			#record_sentence([inflected_form, suffix])
+		inflected_forms = inflect(form, pos)
+		record_samples([inflected_forms[0]])
+		if len(inflected_forms) > 1:
+			record_samples([random.choice(all_forms)[0], inflected_forms[1]])
+			if len(inflected_forms) > 2:
+				record_samples([inflected_forms[2], random.choice(all_forms)[0]])
 
 		form_no += 1
 		if form_no % 10000 == 0:

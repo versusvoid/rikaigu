@@ -38,7 +38,7 @@ for filename in sys.argv[1:]:
 		for l in f:
 			if not first:
 				print('\n\n', end='', file=of)
-			print(make_crfpp_sample(l[:-1]), end='', file=of)
+			print(make_crfpp_sample(l.strip('\n')), end='', file=of)
 			first = False
 
 

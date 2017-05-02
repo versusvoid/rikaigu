@@ -14,11 +14,23 @@
 
 namespace po = boost::program_options;
 
+static const std::vector<std::string> tags = {
+	"MMM",
+	"MMS",
+	"MSM",
+	"MSS",
+	"SMM",
+	"SMS",
+	"SSM",
+	"SSS"
+};
+const size_t NUM_LABELS = tags.size();
+
 struct symbol_t
 {
 	char16_t symbol;
 	char symbol_class;
-	bool start;
+	uint8_t tag;
 };
 
 typedef std::vector<symbol_t> sample_t;
@@ -51,7 +63,7 @@ std::ostream& operator<<(std::ostream& out, const std::pair<sample_t, sample_fea
 	{
 		auto& s = sample.first[i];
 		mb[wctomb(mb, s.symbol)] = 0;
-		out << mb << '\t' << s.symbol_class << '\t' << (s.start ? "S(1)" : "M(0)") << '\t';
+		out << mb << '\t' << s.symbol_class << '\t' << s.tag << '\t';
 		for (auto feature_id : sample.second[i])
 		{
 			out << feature_id << " ";
@@ -61,23 +73,21 @@ std::ostream& operator<<(std::ostream& out, const std::pair<sample_t, sample_fea
 	return out;
 }
 
-
-#define NUM_LABELS 2
-#define MIN_FEATURE_COUNT 1000
-
 sample_t read_sample(const std::u16string& line)
 {
 	std::vector<symbol_t> result;
 
+	uint8_t tag = 0;
 	for (auto& character : line)
 	{
 		if (character == char16_t(' '))
 		{
-			result.back().start = true;
+			tag = 1;
 			continue;
 		}
 
-		result.push_back({character, 'm', false});
+		result.push_back({character, 'm', tag});
+		tag = 0;
 		symbol_t& symbol = result.back();
 
 		if (character >= 0x4e00 && character <= 0x9fa5) {
@@ -87,6 +97,13 @@ sample_t read_sample(const std::u16string& line)
 		} else if (character >= 0x30a1 && character <= 0x30fe) {
 			symbol.symbol_class = 'k';
 		}
+	}
+
+	for (auto i = 0U; i < result.size(); ++i)
+	{
+		result[i].tag <<= 2;
+		result[i].tag |= (i + 1 < result.size() ? result[i + 1].tag << 1 : 0);
+		result[i].tag |= (i + 2 < result.size() ? result[i + 2].tag : 0);
 	}
 
 	result.shrink_to_fit();
@@ -109,13 +126,23 @@ int record_feature(feature_index_t& feature_index, const std::u16string& key)
 	}
 }
 
-std::vector<std::vector<uint32_t>> make_features(const sample_t& sample,
-	const std::function<int(const std::u16string&)>& get_feature_id)
+#define RECORD_FEATURE(key, vec) feature_id = get_feature_id(key); if (feature_id >= 0) vec.push_back(uint32_t(feature_id));
+void make_features(const sample_t& sample,
+	const std::function<int(const std::u16string&)>& get_feature_id,
+	std::vector<std::vector<uint32_t>>& unigram_features,
+	std::vector<std::vector<uint32_t>>& bigram_features)
 {
-	std::vector<std::vector<uint32_t>> result;
+	if (unigram_features.size() < sample.size())
+	{
+		unigram_features.resize(sample.size());
+		bigram_features.resize(sample.size());
+	}
+
+	int feature_id;
 	for (auto i = 0; size_t(i) < sample.size(); ++i)
 	{
-		std::vector<uint32_t> features;
+		std::vector<uint32_t>& symbol_unigram_features = unigram_features[i];
+		symbol_unigram_features.clear();
 
 		char16_t key = u'а';
 		for (auto start : {-2, -1, 0, 1, 2})
@@ -155,31 +182,46 @@ std::vector<std::vector<uint32_t>> make_features(const sample_t& sample,
 					symbol_class_feature += char16_t(sample[index].symbol_class);
 				}
 
-				for (const std::u16string* f : {&symbol_feature, &symbol_class_feature})
-				{
-					int feature_id = get_feature_id(std::u16string(u"U") + key + *f);
-					if (feature_id >= 0)
-					{
-						features.push_back(uint32_t(feature_id));
-					}
-					++key;
-				}
+				RECORD_FEATURE(std::u16string(u"U") + key + symbol_feature, symbol_unigram_features)
+				++key;
+				RECORD_FEATURE(std::u16string(u"U") + key + symbol_class_feature, symbol_unigram_features)
+				++key;
 			}
 		}
-		result.emplace_back(features);
+
+		if (i > 0)
+		{
+			std::vector<uint32_t>& symbol_bigram_features = bigram_features[i];
+			symbol_bigram_features.clear();
+			RECORD_FEATURE(u"B", symbol_bigram_features)
+
+			std::u16string f = u"B1";
+			f += char16_t(sample[i - 1].symbol_class);
+			f += char16_t(sample[i].symbol_class);
+			if (size_t(i + 1) < sample.size())
+			{
+				f += char16_t(sample[i + 1].symbol_class);
+			}
+			else
+			{
+				f += u"C[1]";
+			}
+			RECORD_FEATURE(f, symbol_bigram_features)
+		}
 	}
-	return result;
 }
 
 sample_t read_sample_and_extract_features(const std::u16string& line, feature_index_t& feature_index)
 {
 	std::vector<symbol_t> symbols = read_sample(line);
-
-	make_features(symbols, std::bind(record_feature, std::ref(feature_index), std::placeholders::_1));
+	std::vector<std::vector<uint32_t>> unigram_features, bigram_features;
+	make_features(symbols, std::bind(record_feature, std::ref(feature_index), std::placeholders::_1),
+		unigram_features, bigram_features);
 
 	return symbols;
 }
 
+#define MIN_FEATURE_COUNT 1000
 void filter_features(feature_index_t& feature_index)
 {
 	uint32_t new_feature_id = 0;
@@ -192,22 +234,20 @@ void filter_features(feature_index_t& feature_index)
 		else
 		{
 			it->second = new_feature_id;
-			new_feature_id += NUM_LABELS;
+			new_feature_id += (it->first[0] == u'B' ? NUM_LABELS*NUM_LABELS : NUM_LABELS);
 			++it;
 		}
 	}
-	feature_index[u"B"] = new_feature_id;
-	new_feature_id += NUM_LABELS*NUM_LABELS;
 	feature_index.num_features = new_feature_id;
 }
 
 void dump_feature_index(feature_index_t& feature_index, const char* features_index_filename)
 {
-	std::ofstream out(features_index_filename, std::ios::binary);
+	std::ofstream out(features_index_filename);
 	std::set<std::u16string> keys;
 	for (auto& kv : feature_index)
 	{
-		out << kv.first << '\t' << kv.second << std::endl;
+		out << kv.first << '\t' << std::to_string(kv.second) << std::endl;
 //		keys.insert(kv.first);
 		/*
 		out.write((char*)kv.first.data(), kv.first.length()*sizeof (char16_t));
@@ -223,6 +263,42 @@ void dump_feature_index(feature_index_t& feature_index, const char* features_ind
 	{
 		std::cout << key << std::endl;
 	}
+}
+
+feature_index_t load_feature_index(const char* filename)
+{
+	std::ifstream in(filename);
+	feature_index_t result;
+	std::string line;
+	uint32_t num_features = 0;
+	while (std::getline(in, line))
+	{
+		auto p = line.find('\t');
+		assert(p != std::string::npos);
+
+		std::u16string key;
+		mbstate_t ps;
+		memset(&ps, 0, sizeof(ps));
+		size_t i = 0;
+		while (i < p)
+		{
+			wchar_t character;
+			const size_t count = mbrtowc(&character, line.data() + i, p - i, &ps);
+			if (character > 0xffff)
+			{
+				throw std::logic_error("Unexpected character in feature " + line);
+			}
+			assert(count > 0 && count <= 4);
+			key += char16_t(character);
+			i += count;
+		}
+		uint32_t feature_id = std::stoul(line.substr(p + 1));
+		result[key] = feature_id;
+		num_features = std::max(num_features, feature_id + uint32_t(key[0] == u'B' ? NUM_LABELS * NUM_LABELS : NUM_LABELS));
+	}
+
+	result.num_features = num_features;
+	return result;
 }
 
 std::tuple<feature_index_t, samples_t> read_features_and_samples(const char* corpus_filename)
@@ -281,7 +357,7 @@ struct Node {
 	double               beta;
 	double               cost;
 	double               bestCost;
-	ssize_t prev;
+	size_t prev;
 	std::vector<std::shared_ptr<Path>>  lpath;
 	std::vector<std::shared_ptr<Path>>  rpath;
 
@@ -294,7 +370,7 @@ struct Node {
 		, beta(0.0)
 		, cost(0.0)
 		, bestCost(0.0)
-		, prev(-1)
+		, prev(NUM_LABELS)
 	{}
 };
 
@@ -359,23 +435,15 @@ std::ostream& operator<<(std::ostream& out, const std::vector<std::vector<Node>>
 				<< ", cost=" << node.cost
 				<< ", bestCost=" << node.bestCost
 				<< ", prev=" << node.prev
-				<< ", lpath={";
+				<< ", lpath={" << std::endl;
 			for (auto i = 0U; i < node.lpath.size(); ++i)
 			{
-				if (i > 0)
-				{
-					out << ',';
-				}
-				out << node.lpath[i]->cost;
+				out << '\t' << node.lpath[i]->cost << std::endl;
 			}
-			out << "}, rpath={";
+			out << "}, rpath={" << std::endl;
 			for (auto i = 0U; i < node.rpath.size(); ++i)
 			{
-				if (i > 0)
-				{
-					out << ',';
-				}
-				out << node.rpath[i]->cost;
+				out << '\t' << node.rpath[i]->cost << std::endl;
 			}
 			out << "} }\t";
 		}
@@ -391,30 +459,29 @@ struct Predictor
 	std::function<int(const std::u16string&)> get_feature_id;
 	const double* weights;
 
-	std::vector<std::vector<uint32_t>> features;
+	std::vector<std::vector<uint32_t>> unigram_features;
+	std::vector<std::vector<uint32_t>> bigram_features;
 	std::vector<std::vector<Node>> nodes;
 	double Z_;
 	std::vector<uint32_t> result_;
-	uint32_t b_feature_id;
 
 	Predictor(const std::function<int(const std::u16string&)>& get_feature_id, const double* weights)
 		: get_feature_id(get_feature_id)
 		, weights(weights)
-		, b_feature_id(uint32_t(get_feature_id(u"B")))
 	{}
 
 	void calcCost(size_t x, size_t y)
 	{
-		for (auto feature_id : features[x])
+		for (auto feature_id : unigram_features[x])
 		{
 			nodes[x][y].cost += COST_FACTOR*weights[feature_id + y];
 		}
 
-		if (x > 0)
+		for (auto feature_id : bigram_features[x])
 		{
 			for (auto i = 0U; i < NUM_LABELS; ++i)
 			{
-				nodes[x][y].lpath[i]->cost += COST_FACTOR*weights[b_feature_id + i*NUM_LABELS + y];
+				nodes[x][y].lpath[i]->cost += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
 			}
 		}
 	}
@@ -465,7 +532,10 @@ struct Predictor
 			}
 		}
 
-		for (int i = static_cast<int>(sample.size() - 1); i >= 0;  --i) {
+		size_t i = sample.size();
+		while (i > 0)
+		{
+			--i;
 			for (size_t j = 0; j < NUM_LABELS; ++j) {
 				nodes[i][j].calcBeta();
 			}
@@ -481,18 +551,19 @@ struct Predictor
 	{
 		const Node& node = nodes[x][y];
 		const double c = std::exp(node.alpha + node.beta - node.cost - Z_);
-		for (auto feature_id : features[x])
+		for (auto feature_id : unigram_features[x])
 		{
 			expected[feature_id + y] += c;
 		}
 
-		if (x == 0) return;
-
-		for (auto i = 0U; i < NUM_LABELS; ++i)
+		for (auto feature_id : bigram_features[x])
 		{
-			auto& p = node.lpath[i];
-			const double c = std::exp(p->lnode->alpha + p->cost + p->rnode->beta - Z_);
-			expected[b_feature_id + i*NUM_LABELS + y] += c;
+			for (auto i = 0U; i < NUM_LABELS; ++i)
+			{
+				auto& p = node.lpath[i];
+				const double c = std::exp(p->lnode->alpha + p->cost + p->rnode->beta - Z_);
+				expected[feature_id + i*NUM_LABELS + y] += c;
+			}
 		}
 	}
 
@@ -520,20 +591,22 @@ struct Predictor
 		}
 
 		double bestc = -1e37;
-		ssize_t y = -1;
+		size_t y = NUM_LABELS;
 		size_t s = sample.size() - 1;
 		for (size_t j = 0; j < NUM_LABELS; ++j)
 		{
 			if (bestc < nodes[s][j].bestCost)
 			{
-				y  = ssize_t(j);
+				y  = j;
 				bestc = nodes[s][j].bestCost;
 			}
 		}
 
 		result_.resize(sample.size(), 0);
-		for (ssize_t i = ssize_t(result_.size() - 1); i >= 0; --i)
+		size_t i = result_.size();
+		while (i > 0)
 		{
+			--i;
 			result_[i] = uint32_t(y);
 			y = nodes[i][y].prev;
 		}
@@ -543,18 +616,22 @@ struct Predictor
 	{
 		if (sample.empty()) return 0.0;
 
-		features = make_features(sample, get_feature_id);
+		make_features(sample, get_feature_id, unigram_features, bigram_features);
 
 //		std::cout << "sample:\n" << std::make_pair(sample, features) << std::endl;
 
 		buildLattice(sample);
 
+
+		viterbi(sample);
 //		std::cout << "lattice:\n" << nodes;
 
 		forwardBackward(sample);
 
-//		std::cout << "forwardBackward:\n" << nodes;
-//		std::cout << "Z_ = " << Z_ << std::endl;
+		/*
+		std::cout << "forwardBackward:\n" << nodes;
+		std::cout << "Z_ = " << Z_ << std::endl;
+		*/
 
 		double s = 0.0;
 
@@ -566,10 +643,11 @@ struct Predictor
 			}
 		}
 
+
 		for (size_t i = 0; i < sample.size(); ++i)
 		{
-			auto y = uint32_t(sample[i].start);
-			for (auto feature_id : features[i])
+			auto y = sample[i].tag;
+			for (auto feature_id : unigram_features[i])
 			{
 				--expected[feature_id + y];
 			}
@@ -577,8 +655,11 @@ struct Predictor
 
 			if (i == 0) continue;
 
-			auto prev_y = uint32_t(sample[i - 1].start);
-			--expected[b_feature_id + prev_y * NUM_LABELS + y];
+			auto prev_y = sample[i - 1].tag;
+			for (auto feature_id : bigram_features[i])
+			{
+				--expected[feature_id + prev_y * NUM_LABELS + y];
+			}
 			s += nodes[i][y].lpath[prev_y]->cost;
 		}
 
@@ -591,85 +672,59 @@ struct Predictor
 		std::cout << std::endl;
 */
 
-		viterbi(sample);
-
-/*
-		std::cout << "viterbi:\n" << nodes;
-		for (auto y : result_)
-		{
-			std::cout << y << " ";
-		}
-		std::cout << std::endl;
-*/
-
 		return Z_ - s ;
 	}
 
 	std::vector<uint32_t> predict(const sample_t& sample)
 	{
-		features = make_features(sample, get_feature_id);
+		make_features(sample, get_feature_id, unigram_features, bigram_features);
 		buildLattice(sample);
 		viterbi(sample);
 		return result_;
 	}
 
-	int eval(const sample_t& sample, bool& error_first)
+	int eval(const sample_t& sample)
 	{
 		assert(sample.size() == result_.size());
 		int err = 0;
-		bool first = true;
 		for (size_t i = 0; i < sample.size(); ++i)
 		{
-			if (uint32_t(sample[i].start) != result_[i])
+			if (sample[i].tag != result_[i])
 			{
-				if (first)
-				{
-					error_first = true;
-				}
 				++err;
-			}
-			if (sample[i].start || result_[i] == 1)
-			{
-				first = false;
 			}
 		}
 		return err;
 	}
 };
 
-#define NUM_FAKE_FEATURES 20
-std::array<std::u16string, NUM_FAKE_FEATURES> fake_features = {
-	u"Utc", u"Utc",
-	u"Us掏", u"Us掏",
-	u"Uc矏漐", u"Uc矏漐",
-	u"Uq矏漐翈", u"Uq矏漐翈",
-
-	u"B", u"B", u"B", u"B",
-
-	u"Uo漐翈", u"Uo漐翈",
-	u"UfC[-1]ab", u"UfC[-1]ab",
-	u"Uo劽泮", u"Uo劽泮",
-	u"Uvca", u"Uvca",
+std::unordered_map<std::u16string, uint32_t> fake_features = {
+	{u"Uа毲", 0},
+	{u"B", NUM_LABELS}
 };
 int get_test_features(const std::u16string& key)
 {
-	auto it = std::find(fake_features.begin(), fake_features.end(), key);
+	auto it = fake_features.find(key);
 	if (it == fake_features.end())
 	{
 		return -1;
 	}
 	else
 	{
-		return it - fake_features.begin();
+		return int(it->second);
 	}
 }
 
 int main_test(int, char*[])
 {
 	std::locale::global(std::locale("en_US.UTF-8"));
-	std::array<double, NUM_FAKE_FEATURES> weights = {
-		0.9468,  0.8978, -0.3843, -0.0098, 0.7339, -0.2137, -0.0205, -0.2711, -0.0954,  0.5965,
-		-0.001, -0.6337, -0.9543, -0.3915, 0.7780,  0.2471,  0.1481, -0.0541,  0.6157, -0.4334
+	std::array<double, 8 + 8*8> weights = {
+		0.2277, 0.5562, -0.8271, 0.1732, 0.5766, 0.6755, 0.6696, 0.5387, -0.5272, -0.1661, 0.1718, 0.6204, -0.8499,
+		-0.1671, 0.6117, 0.1135, 0.7622, -0.0028, 0.0451, 0.2367, -0.2144, 0.6808, 0.3066, -0.2559, -0.9013, -0.2359,
+		-0.8393, 0.4544, 0.9062, 0.8766, -0.8139, 0.4308, -0.1595, -0.8759, -0.4251, -0.6401, -0.6595, 0.0779, 0.0961,
+		-0.1691, -0.3485, 0.8815, -0.8278, -0.0943, -0.0695, -0.641, -0.2377, 0.064, -0.7586, -0.1627, -0.0313, 0.6813,
+		0.2844, -0.3523, 0.1633, 0.748, -0.635, -0.3963, 0.8417, 0.8207, 0.1813, 0.3449, -0.4297, -0.9229, -0.1472,
+		0.902, 0.7855, 0.7293, -0.0101, -0.926, 0.9603, -0.4158
 	};
 	Predictor p(get_test_features, weights.data());
 	sample_t sample = {
@@ -684,8 +739,13 @@ int main_test(int, char*[])
 		{ u'掏', 'b', false },
 		{ u'爎', 'b', false },
 	};
-	std::vector<double> expected(NUM_FAKE_FEATURES, 0.0);
+	std::vector<double> expected(weights.size(), 0.0);
 	p.gradient(sample, expected);
+	for (auto& v : p.result_)
+	{
+		std::cout << v << " ";
+	}
+	std::cout << std::endl;
 
 	return 0;
 }
@@ -695,13 +755,13 @@ struct CRFEncoderTask
 	const samples_t* samples;
 	size_t start_i;
 	size_t thread_num;
-	int zeroone;
-	int err;
-	int error_first;
 	double obj;
 	std::vector<double> expected;
 
 	Predictor predictor;
+
+	int zeroone;
+	int err;
 
 	CRFEncoderTask(size_t start_i, size_t thread_num, const samples_t* samples, size_t num_weights, Predictor&& predictor)
 		: samples(samples)
@@ -713,17 +773,12 @@ struct CRFEncoderTask
 
 	void run() {
 		obj = 0.0;
-		err = zeroone = error_first = 0;
+		err = zeroone = 0;
 		std::fill(expected.begin(), expected.end(), 0.0);
 		for (size_t i = start_i; i < samples->size(); i += thread_num)
 		{
 			obj += predictor.gradient((*samples)[i], expected);
-			bool error_first = false;
-			int error_num = predictor.eval((*samples)[i], error_first);
-			if (error_first)
-			{
-				this->error_first += 1;
-			}
+			int error_num = predictor.eval((*samples)[i]);
 //			std::cout << "sample #" << i << ": " << error_num << std::endl;
 			err += error_num;
 			if (error_num)
@@ -814,11 +869,10 @@ bool runCRF(const samples_t& samples,
 		double diff = (itr == 0 ? 1.0 : std::abs(old_obj - tasks[0].obj)/old_obj);
 		std::cout << "iter="  << itr
 				  << " per-tag error=" << double(tasks[0].err) / num_labels
-				  << " sentence with first start error=" << double(tasks[0].error_first) / samples.size()
 				  << " per-sentence error=" << double(tasks[0].zeroone) / samples.size()
 				  << " nonzero weights=" << num_nonzero
 				  << " obj=" << tasks[0].obj
-				  << " diff="  << diff << std::endl;
+				  << " diff="  << diff << '%' << std::endl;
 		old_obj = tasks[0].obj;
 
 		if (diff < eta)
@@ -858,7 +912,7 @@ weights_t train(const samples_t& samples, const feature_index_t& feature_index)
 void test(const weights_t& weights, const feature_index_t& feature_index, const char* filename)
 {
 	auto input = utf16_file(filename);
-	double tp = 0.0, tn = 0.0, fp = 0.0, fn = 0.0, true_first = 0.0, num_samples = 0.0;
+	double tp = 0.0, tn = 0.0, fp = 0.0, fn = 0.0, true_first = 0.0, true_last = 0.0, num_samples = 0.0;
 	Predictor predictor(std::bind(::get_feature_id, std::ref(feature_index), std::placeholders::_1), weights.data());
 	std::u16string line;
 	uint32_t line_no = 0;
@@ -870,31 +924,38 @@ void test(const weights_t& weights, const feature_index_t& feature_index, const 
 		const std::vector<uint32_t> prediction = predictor.predict(sample);
 		assert(prediction.size() == sample.size());
 		bool first_start = true;
+		uint32_t sample_true_last = 1;
 		for (auto i = 0U; i < prediction.size(); ++i)
 		{
-			const uint32_t gold = uint32_t(sample[i].start);
-			if (gold == 0 and prediction[i] == 0)
+			const uint32_t gold = sample[i].tag >> 2;
+			const uint32_t predicted = prediction[i] >> 2;
+			if (gold == 0 and predicted == 0)
 			{
 				tn += 1;
 			}
-			else if (gold == 1 and prediction[i] == 1)
+			else if (gold == 1 and predicted == 1)
 			{
 				tp += 1;
 				true_first += (first_start ? 1 : 0);
 				first_start = false;
+				sample_true_last = 1;
 			}
-			else if (gold == 0 and prediction[i] == 1)
+			else if (gold == 0 and predicted == 1)
 			{
 				fp += 1;
 				first_start = false;
+				sample_true_last = 0;
 			}
 			else
 			{
 				fn += 1;
 				first_start = false;
+				sample_true_last = 0;
 			}
 		}
 
+		true_first += (first_start ? 1 : 0);
+		true_last += sample_true_last;
 		num_samples += 1;
 
 		line_no += 1;
@@ -907,12 +968,16 @@ void test(const weights_t& weights, const feature_index_t& feature_index, const 
 	double precision = tp / (tp + fp);
 	double recall = tp / (tp + fn);
 	double true_first_ratio = true_first / num_samples;
+	double true_last_ratio = true_last / num_samples;
 	double f1 = 2 * precision * recall / (precision + recall);
 	std::cout << filename << ":" << std::endl;
+	std::cout << num_samples << std::endl;
+	std::cout << true_first << std::endl;
 	std::cout << tp << "\t\t" << fp << std::endl;
 	std::cout << fn << "\t\t" << tn << std::endl;
 	std::cout
 		<< "tfirst = " << true_first_ratio
+		<< ", tlast = " << true_last_ratio
 		<< ", recall = " << recall
 		<< ", precision = " << precision
 		<< ", F1 = " << f1 << std::endl;
@@ -926,24 +991,60 @@ void dump_weights(const weights_t& weights, const char* filename)
 		float float_weight = float(w);
 		out.write((char*)&float_weight, sizeof(float_weight));
 	}
+	out.flush();
+}
+
+weights_t load_weights(const char* filename)
+{
+	std::ifstream in(filename, std::ios::binary);
+	weights_t result;
+	while (!in.eof())
+	{
+		float w;
+		in.read((char*)&w, sizeof(w));
+		result.push_back(w);
+	}
+	result.pop_back();
+	return result;
+}
+
+void train(char* argv[])
+{
+	feature_index_t feature_index;
+	samples_t samples;
+	std::tie(feature_index, samples) = read_features_and_samples(argv[1]);
+	auto weights = train(samples, feature_index);
+	std::cout << feature_index.num_features << " " << weights.size() << std::endl;
+	assert(weights.size() == feature_index.num_features);
+	test(weights, feature_index, argv[1]);
+	test(weights, feature_index, argv[2]);
+	dump_weights(weights, "model.bin");
+}
+
+void test(char* argv[])
+{
+	feature_index_t feature_index = load_feature_index(argv[1]);
+	weights_t weights = load_weights(argv[2]);
+	std::cout << feature_index.num_features << " " << weights.size() << std::endl;
+	assert(weights.size() == feature_index.num_features);
+	test(weights, feature_index, argv[3]);
 }
 
 int main(int argc, char *argv[])
 {
-	assert(argc == 3);
 	std::locale::global(std::locale("en_US.UTF-8"));
 	std::cout.setf(std::ios::fixed, std::ios::floatfield);
 	std::cout.precision(5);
 
 	std::cout << argv[1] << " " << argv[2] << std::endl;
 
-	feature_index_t feature_index;
-	samples_t samples;
-	std::tie(feature_index, samples) = read_features_and_samples(argv[1]);
-	auto weights = train(samples, feature_index);
-	test(weights, feature_index, argv[1]);
-	test(weights, feature_index, argv[2]);
-	dump_weights(weights, "model.bin");
+	if (argc == 4) {
+		test(argv);
+	} else if (argc == 3) {
+		train(argv);
+	} else {
+		std::cerr << "2 or 3 arguments" << std::endl;
+	}
 
 	return 0;
 }
