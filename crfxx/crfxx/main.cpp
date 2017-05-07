@@ -234,7 +234,7 @@ void filter_features(feature_index_t& feature_index)
 		else
 		{
 			it->second = new_feature_id;
-			new_feature_id += (it->first[0] == u'B' ? NUM_LABELS*NUM_LABELS : NUM_LABELS);
+			new_feature_id += (it->first[0] == u'B' ? 2*NUM_LABELS : NUM_LABELS);
 			++it;
 		}
 	}
@@ -351,19 +351,16 @@ int get_feature_id(const feature_index_t& feature_index, const std::u16string& k
 struct Path;
 
 struct Node {
-//	unsigned int         x;
-//	unsigned short int   y;
-	double               alpha;
-	double               beta;
-	double               cost;
-	double               bestCost;
+	double alpha;
+	double beta;
+	double cost;
+	double bestCost;
 	size_t prev;
-	std::vector<std::shared_ptr<Path>>  lpath;
-	std::vector<std::shared_ptr<Path>>  rpath;
+	std::vector<std::shared_ptr<Path>> lpath;
+	std::vector<std::shared_ptr<Path>> rpath;
 
 	void calcAlpha();
 	void calcBeta();
-	void calcExpectation(double *expected, double, size_t) const;
 
 	Node()
 		: alpha(0.0)
@@ -375,21 +372,17 @@ struct Node {
 };
 
 struct Path {
-  Node      *lnode;
-  Node      *rnode;
-  double     cost;
+	Node *lnode;
+	Node *rnode;
+	double cost;
 
-  Path(Node *lnode, Node *rnode)
-	: lnode(lnode)
-	, rnode(rnode)
-	, cost(0.0)
-  {
+	Path(Node *lnode, Node *rnode)
+		: lnode(lnode)
+		, rnode(rnode)
+		, cost(0.0)
+	{
 
-  }
-
-  // for CRF
-  void calcExpectation(double *expected, double, size_t) const;
-  void add(Node *_lnode, Node *_rnode);
+	}
 };
 
 #define MINUS_LOG_EPSILON 50
@@ -500,14 +493,13 @@ struct Predictor
 				nodes[i].resize(NUM_LABELS);
 				if (i == 0) continue;
 
-				for (auto y1 = 0U; y1 < NUM_LABELS; ++y1)
+				for (auto y12 = 0U; y12 < 2*NUM_LABELS; ++y12)
 				{
-					for (auto y2 = 0U; y2 < NUM_LABELS; ++y2)
-					{
-						auto p = std::make_shared<Path>(&nodes[i - 1][y1], &nodes[i][y2]);
-						nodes[i - 1][y1].rpath.push_back(p);
-						nodes[i][y2].lpath.push_back(p);
-					}
+					auto y1 = y12 >> 1;
+					auto y2 = y12 & 0b111;
+					auto p = std::make_shared<Path>(&nodes[i - 1][y1], &nodes[i][y2]);
+					nodes[i - 1][y1].rpath.push_back(p);
+					nodes[i][y2].lpath.push_back(p);
 				}
 			}
 		}
@@ -558,7 +550,7 @@ struct Predictor
 
 		for (auto feature_id : bigram_features[x])
 		{
-			for (auto i = 0U; i < NUM_LABELS; ++i)
+			for (auto i = 0U; i < node.lpath.size(); ++i)
 			{
 				auto& p = node.lpath[i];
 				const double c = std::exp(p->lnode->alpha + p->cost + p->rnode->beta - Z_);
@@ -582,7 +574,7 @@ struct Predictor
 							nodes[i][j].cost;
 					if (cost > bestc) {
 						bestc = cost;
-						best  = ssize_t(k);
+						best  = ssize_t((k << 2) | (j >> 1));
 					}
 				}
 				nodes[i][j].prev     = best;
@@ -655,7 +647,7 @@ struct Predictor
 
 			if (i == 0) continue;
 
-			auto prev_y = sample[i - 1].tag;
+			size_t prev_y = sample[i - 1].tag >> 2;
 			for (auto feature_id : bigram_features[i])
 			{
 				--expected[feature_id + prev_y * NUM_LABELS + y];
