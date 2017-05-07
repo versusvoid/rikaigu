@@ -472,16 +472,19 @@ struct Predictor
 
 	void calcCost(size_t x, size_t y)
 	{
+		Node& n = nodes[x][y];
+		n.cost = 0.0;
 		for (auto feature_id : unigram_features[x])
 		{
-			nodes[x][y].cost += COST_FACTOR*weights[feature_id + y];
+			n.cost += COST_FACTOR*weights[feature_id + y];
 		}
 
-		for (auto feature_id : bigram_features[x])
+		for (auto i = 0U; i < n.lpath.size(); ++i)
 		{
-			for (auto i = 0U; i < NUM_LABELS; ++i)
+			n.lpath[i]->cost = 0.0;
+			for (auto feature_id : bigram_features[x])
 			{
-				nodes[x][y].lpath[i]->cost += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
+				n.lpath[i]->cost += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
 			}
 		}
 	}
@@ -490,27 +493,21 @@ struct Predictor
 	{
 		if (nodes.size() < sample.size())
 		{
+			size_t old_size = nodes.size();
 			nodes.resize(sample.size());
-		}
-
-		for (size_t cur = 0; cur < sample.size(); ++cur)
-		{
-			nodes[cur].clear();
-			for (size_t i = 0; i < NUM_LABELS; ++i)
+			for (auto i = old_size; i < nodes.size(); ++i)
 			{
-				nodes[cur].emplace_back();
-			}
-		}
+				nodes[i].resize(NUM_LABELS);
+				if (i == 0) continue;
 
-		for (size_t cur = 1; cur < sample.size(); ++cur)
-		{
-			for (size_t j = 0; j < NUM_LABELS; ++j)
-			{
-				for (size_t i = 0; i < NUM_LABELS; ++i)
+				for (auto y1 = 0U; y1 < NUM_LABELS; ++y1)
 				{
-					auto p = std::make_shared<Path>(&nodes[cur-1][j], &nodes[cur][i]);
-					nodes[cur-1][j].rpath.push_back(p);
-					nodes[cur][i].lpath.push_back(p);
+					for (auto y2 = 0U; y2 < NUM_LABELS; ++y2)
+					{
+						auto p = std::make_shared<Path>(&nodes[i - 1][y1], &nodes[i][y2]);
+						nodes[i - 1][y1].rpath.push_back(p);
+						nodes[i][y2].lpath.push_back(p);
+					}
 				}
 			}
 		}
@@ -532,7 +529,10 @@ struct Predictor
 			}
 		}
 
-		size_t i = sample.size();
+		size_t i = sample.size() - 1;
+		for (size_t j = 0; j < NUM_LABELS; ++j) {
+			nodes[i][j].beta = nodes[i][j].cost;
+		}
 		while (i > 0)
 		{
 			--i;
