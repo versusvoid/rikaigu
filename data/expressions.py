@@ -8,22 +8,19 @@ import sys
 import re
 import json
 import traceback
+import functools
 import pickle
 import xml.etree.ElementTree as ET
 from collections import namedtuple
 from enum import Enum
 from utils import *
+import dictionary
+import corpus
 
 def error(*args):
 	print('\033[31m', end='', file=sys.stderr)
 	print(*args, end='', file=sys.stderr)
 	print('\033[0m', file=sys.stderr)
-
-sentences_file = "tmp/jpn_indices.csv"
-if not os.path.exists(sentences_file):
-	download('http://downloads.tatoeba.org/exports/jpn_indices.tar.bz2', 'jpn_indices.tar.bz2')
-	subprocess.run(["tar", "-xf", "tmp/jpn_indices.tar.bz2", "-C", "tmp"], check=True)
-	subprocess.run(["rm", "tmp/jpn_indices.tar.bz2"], check=True)
 
 Deinflection = namedtuple('Deinflection', 'to, source_type, target_type, reason')
 deinflection_rules = {}
@@ -110,7 +107,7 @@ class ExpressionType(Enum):
 all_expressions = []
 
 Expression = namedtuple('Expression', 'entry, base_forms, etype, sense_group_indices, elem, seen_forms')
-dictionary = {}
+pure_expressions = {}
 # TODO sometimes s_inf is contained inside <gloss>
 s_inf_regex = re.compile(r'\b(after|follows|attaches)\b.*?\b(form|stem|noun)s?\b', re.IGNORECASE)
 def record_entry(entry, base_forms, elem):
@@ -160,62 +157,16 @@ def record_entry(entry, base_forms, elem):
 	if e.etype == ExpressionType.PURE_EXP:
 		keys = entry.readings if len(entry.kanjis) == 0 else entry.kanjis
 		for key in keys:
-			dictionary.setdefault(key.text, []).append(e)
+			pure_expressions.setdefault(key.text, []).append(e)
 
-def fullfill_dictionary():
-	for expressions in list(dictionary.values()):
+def fullfill_pure_expressions():
+	for expressions in list(pure_expressions.values()):
 		for e in expressions:
 			for r in e.entry.readings:
-				if r.text not in dictionary:
-					dictionary[r.text] = [e]
+				if r.text not in pure_expressions:
+					pure_expressions[r.text] = [e]
 
-Word = namedtuple('Word', 'dkanji, dreading, form, sense_index')
-def parse(w):
-	dkanji = []
-	reading = []
-	form = []
-	sense = []
-	last_control = ''
-	for c in w:
-		if c in '{}()[]|~':
-			last_control = c
-		elif last_control == '':
-			dkanji.append(c)
-		elif last_control == '(':
-			reading.append(c)
-		elif last_control == '{':
-			form.append(c)
-		elif last_control == '[' or last_control == '|':
-			sense.append(c)
-	dkanji = ''.join(dkanji)
-	reading = ''.join(reading) if len(reading) > 0 else None
-	form = ''.join(form) if len(form) > 0 else dkanji
-	for i in range(43):
-		form = form.replace(chr(ord('0') + i), chr(ord('０') + i))
-	form = form.replace('、', '')
-	form = form.replace('～', '')
-	sense = int(''.join(sense)) - 1 if len(sense) > 0 else None
-	return Word(dkanji, reading, form, sense)
-
-assert parse('は|1') == Word('は', None, 'は', 0)
-assert parse('二十歳(はたち){２０歳}') == Word('二十歳', 'はたち', '２０歳', None)
-assert parse('になる[02]{になりました}') == Word('になる', None, 'になりました', 1)
-assert parse('妻(つま)|1') == Word('妻', 'つま', '妻', 0)
-
-def find_entry(k, r):
-	expressions = dictionary.get(k)
-	if expressions is None:
-		expressions = dictionary.get(kata_to_hira(k))
-	if expressions is None:
-		return []
-	if len(expressions) == 1 or r is None:
-		return expressions
-	r = kata_to_hira(r)
-	for e in expressions:
-		for reading in e.entry.readings:
-			if kata_to_hira(reading.text) == r:
-				return [e]
-	raise Exception(f'Unknown entry {k}|{r}:\n{expressions}')
+find_entry = functools.partial(dictionary.find_entry, d=pure_expressions)
 
 def record_expression_form(expression, word):
 	if word.form in expression.base_forms or kata_to_hira(word.form) in expression.base_forms:
@@ -234,23 +185,10 @@ def record_expression_form(expression, word):
 			error('Unknown inflection:', word)
 
 def infer_from_corpus():
-	line_no = 0
-	since = 0
-	with open(sentences_file, 'r') as f:
-		for string_line in f:
-			line_no += 1
-			if line_no < since: continue
-			if line_no % 1000 == 0: print(sentences_file, line_no)
-			words = string_line.split()[2:]
-			i = 0
-			for word in words:
-				if word.startswith('※'):
-					continue
-
-				word = parse(word)
-				assert len(word.form) > 0
-				for e in find_entry(word.dkanji, word.dreading):
-					record_expression_form(e, word)
+	for words in corpus.corpus_reader():
+		for word in words:
+			for e in find_entry(word.dkanji, word.dreading):
+				record_expression_form(e, word)
 
 s_inf_mapping = {
 	}
@@ -507,7 +445,7 @@ def possible_pos(entry):
 def pickle_unpickle():
 	global all_expressions
 	if len(all_expressions) > 0:
-		fullfill_dictionary()
+		fullfill_pure_expressions()
 		infer_from_corpus()
 		all_expressions.sort(key=lambda e: e.etype.value)
 		with open('tmp/all_expressions.pkl', 'wb') as f:

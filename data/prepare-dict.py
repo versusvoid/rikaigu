@@ -10,6 +10,7 @@ from freqs import max_freq, get_frequency
 from index import index_keys
 from romaji import is_romajination
 import expressions
+import dictionary
 
 control_sense_symbols = re.compile('[\\`]')
 def format_sense(sense, entry):
@@ -126,7 +127,7 @@ def format_entry(entry):
 	parts.append(';'.join(readings))
 	del readings
 
-	if type(entry) == Entry:
+	if type(entry) == dictionary.Entry:
 		'''
 		Format sense groups
 		'''
@@ -189,7 +190,7 @@ def prepare_names():
 	offset = 0
 	combined_entries = {}
 	with open(f'data/names.dat', 'wb') as of:
-		for entry, _ in dictionary_reader('JMnedict.xml.gz'):
+		for entry, _ in dictionary.dictionary_reader('JMnedict.xml.gz'):
 			if len(entry.readings) == 1 and len(entry.transes) == 1 and len(entry.transes[0].glosses) == 1:
 				key = entry.readings[0].text + ' - ' + ','.join(entry.transes[0].types)
 				combined_entry = combined_entries.get(key)
@@ -234,7 +235,7 @@ def prepare_dict(process_expressions):
 	index = {}
 	offset = 0
 	with open(f'data/dict.dat', 'wb') as of:
-		for entry, elem in dictionary_reader('JMdict_e.gz'):
+		for entry, elem in dictionary.dictionary_reader('JMdict_e.gz'):
 			entry_index_keys = index_keys(entry, variate=True)
 			for key in entry_index_keys:
 				index.setdefault(key, set()).add(offset)

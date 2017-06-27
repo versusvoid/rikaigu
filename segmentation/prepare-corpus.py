@@ -4,12 +4,16 @@ import random
 import sys
 from collections import namedtuple
 import os
+import lzma
+import itertools
+
 mydir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(mydir + '/../data')
-from expressions import parse, sentences_file, deinflect, deinflection_rules, inflecting_pos
+from expressions import deinflect, deinflection_rules, inflecting_pos
 from index import index_keys
+import corpus
+import dictionary
 from utils import *
-import lzma
 
 # Right (suffix) samples
 rsamples = []
@@ -28,45 +32,6 @@ def record_samples(sentence):
 		if sentence[i] == ' ': continue
 		#lsamples.append(sentence[max(i - 14, 0):i + 1][::-1])
 		lsamples.append(sentence[max(i - 14, 0):i + 1])
-
-Inflection = namedtuple('Inflection', 'to, source_type, target_type, reason')
-inflection_rules = {}
-max_inflection_length = 0
-for source, rules in deinflection_rules.items():
-	for rule in rules:
-		max_inflection_length = max(max_inflection_length, len(rule.to))
-		inflection_rule = Inflection(source, rule.target_type, rule.source_type, rule.reason)
-		inflection_rules.setdefault(rule.to, []).append(inflection_rule)
-
-def inflect(word, all_pos):
-	if len(inflecting_pos.intersection(all_pos)) == 0:
-		return [word, word, word]
-	inflections = [(word, all_pos, [])]
-	seen = set([word])
-	i = -1
-	while i + 1 < len(inflections):
-		i += 1
-		form, form_pos, inflection_reasons = inflections[i]
-
-		for j in range(min(len(form), max_inflection_length), 0, -1):
-			suffix_inflection_rules = inflection_rules.get(form[-j:])
-			if suffix_inflection_rules is None: continue
-
-			for rule in suffix_inflection_rules:
-				if len(rule.source_type.intersection(form_pos)) == 0: continue
-				if rule.reason in inflection_reasons: continue
-				new_form = form[:-j] + rule.to
-
-				if new_form in seen: continue
-				seen.add(new_form)
-
-				if len(inflection_reasons) < 2: # max - 3 inflections (current being third)
-					inflections.append((new_form, rule.target_type, inflection_reasons + [rule.reason]))
-
-	seen = list(seen)
-	random.shuffle(seen)
-	#print(word, all_pos, seen); input()
-	return seen[:3]
 
 def load_expressions():
 	expressions = {}
@@ -95,25 +60,13 @@ def load_expressions():
 
 	return expressions
 
-def load_dictionary():
-	dictionary = {}
-	all_forms = {}
-	for entry, _ in dictionary_reader():
-		all_pos = set().union(*[sg.pos for sg in entry.sense_groups])
-		inflecting = inflecting_pos.intersection(all_pos)
-		for form in index_keys(entry, variate=True, convert_to_hiragana=False):
-			dictionary.setdefault(kata_to_hira(form), set()).update(all_pos)
-
-			all_forms.setdefault(form, set()).update(inflecting)
-
-	for entry, _ in dictionary_reader('JMnedict.xml.gz'):
-		for form in index_keys(entry, variate=False, convert_to_hiragana=False):
-			all_forms[form] = set()
-
-	return dictionary, list(all_forms.items())
-
 def get_dictionary_pos(word):
-	return dictionary.get(kata_to_hira(word.dkanji), set())
+	res = set()
+	for e in dictionary.find_entry(word.dkanji, word.dreading):
+		for sg in e.sense_groups:
+			res.update(sg.pos)
+
+	return res
 
 def get_expression_requirements(word):
 	requirements = known_expressions.get(word.dkanji)
@@ -156,49 +109,101 @@ def should_join(word1, word2):
 
 	return meets_requirements(word1, requirements)
 
-def generate_samples_from_dictionaries():
-	form_no = 0
-	for form, pos in all_forms:
-		inflected_forms = inflect(form, pos)
-		record_samples([inflected_forms[0]])
-		if len(inflected_forms) > 1:
-			record_samples([random.choice(all_forms)[0], inflected_forms[1]])
-			if len(inflected_forms) > 2:
-				record_samples([inflected_forms[2], random.choice(all_forms)[0]])
-
-		form_no += 1
-		if form_no % 10000 == 0:
-			print(form_no, '/', len(all_forms))
-
 known_expressions = load_expressions()
-dictionary, all_forms = load_dictionary()
-generate_samples_from_dictionaries()
+dictionary.load_dictionary()
+words_by_pos = {}
+for entries in dictionary._dictionary.values():
+	for entry in entries:
+		for sg in entry.sense_groups:
+			pos_key = '-'.join(sg.pos)
+			words_by_pos.setdefault(pos_key, []).append(entry)
 
-line_no = 0
-with open(sentences_file, 'r') as f:
-	for ls in f:
-		line_no += 1
-		if line_no % 1000 == 0:
-			print(sentences_file, line_no)
-			#if len(lsamples) >= 10000: break
-		sentence = [parse(w) for w in ls.split()[2:]]
+PartialEntry = namedtuple('PartialEntry', 'entry, sense_groups_indices')
+DictionaryBackedWord = namedtuple('DBK', 'corpus_word, partial_entries, base_suffix_len, inflected_suffix_len')
+non_substituable_pos = {'aux', 'conj', 'cop-da', 'exp', 'int', 'n-pref', 'n-suf', 'n-t', 'num', 'pref', 'prt', 'suf', 'unc'}
+def resolve(word):
+	entries = dictionary.find_entry(word.dkanji, word.dreading)
+	partial_entries = []
+	for entry in entries:
+		sense_groups_indices = []
+		for i, sense_group in enumerate(entry.sense_groups):
+			if len(non_substituable_pos.intersection(sense_group.pos)) == 0:
+				sense_groups_indices.append(i)
+		if len(sense_groups_indices) > 0:
+			assert all([i < len(entry.sense_groups) for i in sense_groups_indices])
+			partial_entries.append(PartialEntry(entry, sense_groups_indices))
+	if len(partial_entries) == 0:
+		partial_entries = None
+	return DictionaryBackedWord(word, partial_entries, None, None)
 
+def join(word1, word2):
+	return word1._replace(form=word1.form + word2.form)
+
+def common_prefix_len(a, b):
+	for i in range(min(len(a), len(b))):
+		if not b.startswith(a[:i + 1]):
+			return i
+
+	return min(len(a), len(b))
+
+# TODO test
+def inflected_suffixes_len(entry, form):
+	longest_prefix = -1
+	base_suffix_len = None
+	inflected_suffix_len = len(form)
+	for k in itertools.chain(entry.kanjis, entry.readings):
+		prefix_len = common_prefix_len(k.text, form)
+		if prefix_len > longest_prefix:
+			longest_prefix = prefix_len
+			base_suffix_len = len(k.text) - prefix_len
+			inflected_suffix_len = len(form) - prefix_len
+
+	return base_suffix_len, inflected_suffix_len
+
+def conjugate(new_entry, sense_group_index, old_entry, old_corpus_word, base_suffix_len, inflected_suffix_len):
+	if base_suffix_len is None:
+		base_suffix_len, inflected_suffix_len = inflected_suffixes_len(old_entry, old_corpus_word.form)
+	# TODO filter out unused in this sense group
+	candidates = new_entry.kanjis + new_entry.readings
+	dkanji = random.choice(candidates).text
+	new_corpus_word = corpus.Word(dkanji, None, dkanji[:-base_suffix_len] + old_corpus_word.form[-inflected_suffix_len:], None)
+	return DictionaryBackedWord(new_corpus_word, [PartialEntry(new_entry, [sense_group_index])], base_suffix_len, inflected_suffix_len)
+
+def substitute_word(word):
+	if word.partial_entries is None:
+		return word
+	entry, sense_groups_indices = random.choice(word.partial_entries)
+	i = random.choice(sense_groups_indices)
+	assert i < len(entry.sense_groups), f'{entry}\n{sense_groups_indices}'
+	pos_key = '-'.join(entry.sense_groups[i].pos)
+	new_entry = random.choice(words_by_pos[pos_key])
+	for i, sg in enumerate(new_entry.sense_groups):
+		if '-'.join(sg.pos) == pos_key:
+			break
+	return conjugate(new_entry, i, entry, word.corpus_word, word.base_suffix_len, word.inflected_suffix_len)
+
+
+for sentence in corpus.corpus_reader():
 		i = 0
 		while i + 1 < len(sentence):
 			# TODO test
 			if should_join(sentence[i], sentence[i + 1]):
-				sentence[i] = sentence[i]._replace(form=sentence[i].form + sentence[i + 1].form)
+				#sentence[i]._replace(form=sentence[i].form + sentence[i + 1].form)
+				sentence[i] = join(sentence[i], sentence[i+1])
 				sentence.pop(i + 1)
 			else:
 				i += 1
 
 		record_samples([w.form for w in sentence])
 
+		sentence = [resolve(w) for w in sentence]
+		for i in range(5):
+			for i, w in enumerate(sentence):
+				sentence[i] = substitute_word(w)
+			record_samples([w.corpus_word.form for w in sentence])
 
-del dictionary
 del known_expressions
-del all_forms
-
+del words_by_pos
 
 random.shuffle(rsamples)
 random.shuffle(lsamples)
