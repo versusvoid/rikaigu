@@ -32,7 +32,7 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	PROFILE
 	SearchResult res = search(utf8_text);
 	*prefix_symbols_length = 0;
-	if (utf8_prefix[0] != '\0' && config.default_dictionary == WORDS && config.smart_segmentation)
+	if (config.smart_segmentation && utf8_prefix[0] != '\0' && config.default_dictionary == WORDS)
 	{
 		std::string extended_text = crf_extend(utf8_text, utf8_prefix, prefix_symbols_length);
 		if (extended_text.size() > 0)

@@ -155,7 +155,7 @@ function rikaiguEnable(tab) {
 					/* names.dat, dict.dat, and kanji.dat are stored
 					 * compressed in virtual file system of asm.js.
 					 */
-					loadFile('data/model.bin'),
+					//loadFile('data/model.bin'),
 					loadFile('data/radicals.dat'),
 					loadFile('data/dict.idx'),
 					loadFile('data/names.idx'),

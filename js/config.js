@@ -59,7 +59,7 @@ function onConfigChange(configChange) {
 
 function initConfig(config) {
 	const defaultConfig = {
-		"smartSegmentation": true,
+		"smartSegmentation": false,
 		"deinflectExpressions": true,
 		"popupColor": "blue",
 		"matchHighlight": true,

@@ -12,7 +12,7 @@ CPP = cpp/rikai.asm.js cpp/rikai.asm.js.mem cpp/rikai.asm.data
 .PHONY: all dicts clean
 
 all: dist/rikaigu.zip
-dev: ${DICT_DYNAMIC} ${CPP} data/model.bin
+dev: ${DICT_DYNAMIC} ${CPP} #data/model.bin
 
 ${DICT_DYNAMIC}: data/prepare-dict.py data/utils.py data/index.py data/freqs.py
 	data/prepare-dict.py
@@ -29,14 +29,15 @@ crfpp/js/libcrfpp.bc crfpp/crf_learn: crfpp/tagger.cpp
 ${CPP}: crfpp/js/libcrfpp.bc ${DICT_DYNAMIC}
 	cd cpp && make release=1
 
-dist/rikaigu.zip: manifest.json ${CSS} ${DICT_STATIC} ${IMG} ${HTML} ${JS} ${DICT_DYNAMIC} ${CPP} data/model.bin
+dist/rikaigu.zip: manifest.json ${CSS} ${DICT_STATIC} ${IMG} ${HTML} ${JS} ${DICT_DYNAMIC} ${CPP} #data/model.bin
 	mkdir -p dist/rikaigu/{css,data,images,html,js,cpp}
 	ln -sfr ${CSS} dist/rikaigu/css
 	ln -sfr ${IMG} dist/rikaigu/images
 	ln -sfr ${HTML} dist/rikaigu/html
 	ln -sfr ${JS} dist/rikaigu/js
 	ln -sfr ${CPP} dist/rikaigu/cpp
-	ln -sfr data/model.bin \
+	#ln -sfr data/model.bin
+	ln -sfr \
 		data/radicals.dat \
 		data/deinflect.dat data/expressions.dat \
 		data/dict.idx data/names.idx data/kanji.idx \
