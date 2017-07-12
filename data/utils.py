@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 def is_kanji(c):
 	code = ord(c)
-	return (code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff
+	return (code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff # last one isn't good enough in case of ja.wiktionary
 
 def is_hiragana(c):
 	code = ord(c)
@@ -15,6 +15,12 @@ def is_hiragana(c):
 def is_katakana(c):
 	code = ord(c)
 	return code >= 0x30a1 and code <= 0x30fe
+
+def is_japanese_character(c):
+	code = ord(c)
+	return ((code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff
+				or (code >= 0x3041 and code <= 0x3096)
+				or (code >= 0x30a1 and code <= 0x30fa))
 
 def is_english(c):
 	code = ord(c)
@@ -43,6 +49,8 @@ def download(url, filename):
 	maketmp()
 	path = os.path.join('tmp', filename)
 	if not os.path.exists(path):
+		print(f"Downloading {filename}")
 		urllib.request.urlretrieve(url, path)
+		print(f"Downloaded {filename}")
 	return path
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 from utils import *
 from index import index_keys
+import xml.etree.ElementTree as ET
+import gzip
+import pickle
+import os
 
 Kanji = namedtuple('Kanji', 'text, common')
 Reading = namedtuple('Reading', 'text, common, kanjis')
@@ -163,7 +167,9 @@ def _record_entry(entry):
 	#for hook in record_entry_hooks:
 		#hook(entry)
 
-def find_entry(k, r, d=_dictionary):
+def find_entry(k, r, d=None):
+	if d is None:
+		d = _dictionary
 	entries = d.get(k)
 	if entries is None:
 		entries = d.get(kata_to_hira(k))
@@ -205,5 +211,15 @@ def dictionary_reader(dictionary='JMdict_e.gz', store_in_memory=False):
 			elem.clear()
 
 def load_dictionary(dictionary='JMdict_e.gz'):
+	global _dictionary
+	if len(_dictionary) > 0:
+		return
+	if os.path.exists('tmp/parsed-jmdict.pkl'):
+		with open('tmp/parsed-jmdict.pkl', 'rb') as f:
+			_dictionary = pickle.load(f)
+		return
 	for _ in dictionary_reader(dictionary, True):
 		pass
+	with open('tmp/parsed-jmdict.pkl', 'wb') as f:
+		pickle.dump(_dictionary, f)
+
