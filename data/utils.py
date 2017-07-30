@@ -20,7 +20,8 @@ def is_japanese_character(c):
 	code = ord(c)
 	return ((code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff
 				or (code >= 0x3041 and code <= 0x3096)
-				or (code >= 0x30a1 and code <= 0x30fa))
+				or (code >= 0x30a1 and code <= 0x30fa)
+				or code == 0x30fc)
 
 def is_english(c):
 	code = ord(c)

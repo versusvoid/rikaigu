@@ -185,7 +185,7 @@ def record_expression_form(expression, word):
 			error('Unknown inflection:', word)
 
 def infer_from_corpus():
-	for words in corpus.corpus_reader():
+	for _, words in corpus.corpus_reader():
 		for word in words:
 			for e in find_entry(word.dkanji, word.dreading):
 				record_expression_form(e, word)

@@ -15,23 +15,53 @@ import corpus
 import dictionary
 from utils import *
 
-# Right (suffix) samples
-rsamples = []
-# Left (prefix) samples (each sample in reverse direction)
-lsamples = []
-glove_file = lzma.open('segmentation/glove.csv.xz', 'wt')
-def record_sentence(sentence):
-	#print(*''.join(sentence), sep=' ', file=glove_file)
-	pass
-def record_samples(sentence):
-	record_sentence(sentence)
-	sentence = ' ' + ' '.join(sentence)
-	#lsamples.append(sentence[::-1])
-	#lsamples.append(sentence)
-	for i in range(2, len(sentence)):
-		if sentence[i] == ' ': continue
-		#lsamples.append(sentence[max(i - 14, 0):i + 1][::-1])
-		lsamples.append(sentence[max(i - 14, 0):i + 1])
+def split_words(sentence_part, start_index, words, words_start_index):
+	sample = []
+	i = 0
+
+	#print(sentence_part, start_index, words, words_start_index)
+
+	if words_start_index < len(words) and start_index > words[words_start_index].start_index:
+		words_start_index += 1
+
+	while i < len(sentence_part):
+		if words_start_index >= len(words):
+			sample.append(sentence_part[i:])
+			i = len(sentence_part)
+		elif start_index + i < words[words_start_index].start_index:
+			end = words[words_start_index].start_index - start_index
+			sample.append(sentence_part[i:end])
+			i = end
+		else:
+			if start_index + i != words[words_start_index].start_index:
+				print(sentence_part)
+				print('start_index =', start_index, 'i =', i, 'words_start_index =', words_start_index)
+				print(*enumerate(words), sep='\n')
+				raise Exception('Wtf')
+			end = i + len(words[words_start_index].form)
+			sample.append(sentence_part[i:end])
+			i = end
+			words_start_index += 1
+
+	return ' '.join(sample), words_start_index
+
+samples = []
+def record_samples(sentence_text, words):
+	sample_start_index = 0
+	words_start_index = 0
+	current_sample = None
+	for i, c in enumerate(sentence_text):
+		if not is_japanese_character(c):
+			if current_sample is not None:
+				sample, words_start_index = split_words(''.join(current_sample), sample_start_index, words, words_start_index)
+				#print(sample)
+				samples.append(sample)
+			current_sample = None
+		else:
+			if current_sample is None:
+				current_sample = []
+				sample_start_index = i
+			current_sample.append(c)
 
 def load_expressions():
 	expressions = {}
@@ -103,6 +133,9 @@ def meets_requirements(word, requirements):
 
 
 def should_join(word1, word2):
+	if word1.start_index + len(word1.form) != word2.start_index:
+		return False
+
 	requirements = get_expression_requirements(word2)
 	if requirements is None:
 		return False
@@ -183,40 +216,37 @@ def substitute_word(word):
 	return conjugate(new_entry, i, entry, word.corpus_word, word.base_suffix_len, word.inflected_suffix_len)
 
 
-for sentence in corpus.corpus_reader():
-		i = 0
-		while i + 1 < len(sentence):
-			# TODO test
-			if should_join(sentence[i], sentence[i + 1]):
-				#sentence[i]._replace(form=sentence[i].form + sentence[i + 1].form)
-				sentence[i] = join(sentence[i], sentence[i+1])
-				sentence.pop(i + 1)
-			else:
-				i += 1
+for sentence_text, words in corpus.corpus_reader():
+	i = 0
+	while i + 1 < len(words):
+		# TODO test
+		if should_join(words[i], words[i + 1]):
+			#sentence[i]._replace(form=sentence[i].form + sentence[i + 1].form)
+			words[i] = join(words[i], words[i+1])
+			words.pop(i + 1)
+		else:
+			i += 1
 
-		record_samples([w.form for w in sentence])
+	record_samples(sentence_text, words)
 
-		sentence = [resolve(w) for w in sentence]
-		for i in range(5):
-			for i, w in enumerate(sentence):
-				sentence[i] = substitute_word(w)
-			record_samples([w.corpus_word.form for w in sentence])
+	#sentence = [resolve(w) for w in sentence]
+	#for i in range(5):
+	#	for i, w in enumerate(sentence):
+	#		sentence[i] = substitute_word(w)
+	#	record_samples([w.corpus_word.form for w in sentence])
 
 del known_expressions
 del words_by_pos
 
-random.shuffle(rsamples)
-random.shuffle(lsamples)
-lsamples = lsamples[:1000000]
+random.shuffle(samples)
+print("Number of samples:", len(samples))
+#lsamples = lsamples[:1000000]
 
-# For now we only use left samples
-for direction, samples in [('l', lsamples)]:
-	with open(f'segmentation/{direction}-train.csv', 'w', encoding='utf-16') as f:
-		print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
+with open('segmentation/train.csv', 'w', encoding='utf-16') as f:
+	print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
 
-	#with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
-		#print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
+#with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
+	#print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
 
-	with open(f'segmentation/{direction}-test.csv', 'w', encoding='utf-16') as f:
-		print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
-glove_file.close()
+with open('segmentation/test.csv', 'w', encoding='utf-16') as f:
+	print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
