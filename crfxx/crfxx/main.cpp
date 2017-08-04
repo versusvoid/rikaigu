@@ -11,31 +11,10 @@
 
 #include "lbfgs.h"
 #include "utf16.h"
+#include "encode.h"
 
 namespace po = boost::program_options;
 
-static const std::vector<std::string> tags = {
-	"MMM",
-	"MMS",
-	"MSM",
-	"MSS",
-	"SMM",
-	"SMS",
-	"SSM",
-	"SSS"
-};
-const size_t NUM_LABELS = tags.size();
-
-struct symbol_t
-{
-	char16_t symbol;
-	char symbol_class;
-	uint8_t tag;
-};
-
-typedef std::vector<symbol_t> sample_t;
-typedef std::vector<std::vector<uint32_t>> sample_features_t;
-typedef std::vector<sample_t> samples_t;
 struct extract_feature_index_t : std::unordered_map<std::u16string, uint32_t>
 {
 	int get_feature_id(const std::u16string& key)
@@ -102,139 +81,6 @@ std::ostream& operator<<(std::ostream& out, const std::pair<sample_t, sample_fea
 		out << std::endl;
 	}
 	return out;
-}
-
-sample_t read_sample(const std::u16string& line)
-{
-	std::vector<symbol_t> result;
-
-	uint8_t tag = 0;
-	for (auto& character : line)
-	{
-		if (character == char16_t(' '))
-		{
-			tag = 1;
-			continue;
-		}
-
-		result.push_back({character, 'm', tag});
-		tag = 0;
-		symbol_t& symbol = result.back();
-
-		if (character >= 0x4e00 && character <= 0x9fa5) {
-			symbol.symbol_class = 'K';
-		} else if (character >= 0x3040 && character <= 0x309f) {
-			symbol.symbol_class = 'h';
-		} else if (character >= 0x30a1 && character <= 0x30fe) {
-			symbol.symbol_class = 'k';
-		}
-	}
-
-	for (auto i = 0U; i < result.size(); ++i)
-	{
-		result[i].tag <<= 2;
-		result[i].tag |= (i + 1 < result.size() ? result[i + 1].tag << 1 : 0);
-		result[i].tag |= (i + 2 < result.size() ? result[i + 2].tag : 0);
-	}
-
-	result.shrink_to_fit();
-
-	return result;
-}
-
-template<typename feature_index_t>
-inline void record_feature(feature_index_t& feature_index, const std::u16string& key,
-	std::vector<uint32_t>& features)
-{
-	int feature_id = feature_index.get_feature_id(key);
-	if (feature_id >= 0)
-	{
-		features.push_back(uint32_t(feature_id));
-	}
-}
-
-template<typename feature_index_t>
-void make_features(const sample_t& sample,
-	feature_index_t& feature_index,
-	std::vector<std::vector<uint32_t>>& unigram_features,
-	std::vector<std::vector<uint32_t>>& bigram_features)
-{
-	if (unigram_features.size() < sample.size())
-	{
-		unigram_features.resize(sample.size());
-		bigram_features.resize(sample.size());
-	}
-
-	for (auto i = 0; size_t(i) < sample.size(); ++i)
-	{
-		std::vector<uint32_t>& symbol_unigram_features = unigram_features[i];
-		symbol_unigram_features.clear();
-
-		char16_t key = u'а';
-		for (auto start : {-2, -1, 0, 1, 2})
-		{
-			std::u16string symbol_feature;
-			std::u16string symbol_class_feature;
-			for (auto len : {1, 2, 3})
-			{
-				if (start + len - 1 > 2) break;
-				int index = i + start + len - 1;
-				if (index < 0 || size_t(index) >= sample.size())
-				{
-					std::string number = std::to_string(index < 0 ? index : index + 1 - int(sample.size()));
-					/* * /
-					if (index > 0)
-					{
-						number = '+' + number;
-					}
-					symbol_feature.append(u"_B");
-					symbol_feature.append(number.begin(), number.end());
-
-					symbol_class_feature.append(u"_B");
-					symbol_class_feature.append(number.begin(), number.end());
-					/ * */
-					symbol_feature.append(u"S[");
-					symbol_feature.append(number.begin(), number.end());
-					symbol_feature.append(u"]");
-
-					symbol_class_feature.append(u"C[");
-					symbol_class_feature.append(number.begin(), number.end());
-					symbol_class_feature.append(u"]");
-					/* */
-				}
-				else
-				{
-					symbol_feature += sample[index].symbol;
-					symbol_class_feature += char16_t(sample[index].symbol_class);
-				}
-
-				record_feature(feature_index, std::u16string(u"U") + key + symbol_feature, symbol_unigram_features);
-				++key;
-				record_feature(feature_index, std::u16string(u"U") + key + symbol_class_feature, symbol_unigram_features);
-				++key;
-			}
-		}
-
-		if (i > 0)
-		{
-			std::vector<uint32_t>& symbol_bigram_features = bigram_features[i];
-			symbol_bigram_features.clear();
-			record_feature(feature_index, u"B", symbol_bigram_features);
-
-			std::u16string f = u"B1";
-			f += char16_t(sample[i - 1].symbol_class);
-			f += char16_t(sample[i].symbol_class);
-			if (size_t(i + 1) < sample.size())
-			{
-				f += char16_t(sample[i + 1].symbol_class);
-			}
-			else
-			{
-				f += u"C[1]";
-			}
-			record_feature(feature_index, f, symbol_bigram_features);
-		}
-	}
 }
 
 sample_t read_sample_and_extract_features(const std::u16string& line, extract_feature_index_t& feature_index)
@@ -364,11 +210,8 @@ struct Node {
 	double cost;
 	double bestCost;
 	size_t prev;
-	std::vector<std::shared_ptr<Path>> lpath;
-	std::vector<std::shared_ptr<Path>> rpath;
-
-	void calcAlpha();
-	void calcBeta();
+	std::vector<double> lpath;
+	std::vector<double> rpath;
 
 	Node()
 		: alpha(0.0)
@@ -377,20 +220,6 @@ struct Node {
 		, bestCost(0.0)
 		, prev(NUM_LABELS)
 	{}
-};
-
-struct Path {
-	Node *lnode;
-	Node *rnode;
-	double cost;
-
-	Path(Node *lnode, Node *rnode)
-		: lnode(lnode)
-		, rnode(rnode)
-		, cost(0.0)
-	{
-
-	}
 };
 
 #define MINUS_LOG_EPSILON 50
@@ -405,24 +234,28 @@ inline double logsumexp(double x, double y, bool flg) {
 	}
 }
 
-void Node::calcAlpha() {
-	alpha = 0.0;
-	for (auto it = lpath.begin(); it != lpath.end(); ++it) {
-		alpha = logsumexp(alpha,
-						  (*it)->cost +(*it)->lnode->alpha,
-						  (it == lpath.begin()));
+void calcAlpha(std::vector<std::vector<Node>>& nodes, size_t x, size_t y)
+{
+	Node& n = nodes[x][y];
+	n.alpha = 0.0;
+	for (auto i = 0U; i < n.lpath.size(); ++i)
+	{
+		size_t prev_y = (i << 2) | (y >> 1);
+		n.alpha = logsumexp(n.alpha, n.lpath[i] + nodes[x-1][prev_y].alpha, i == 0);
 	}
-	alpha += cost;
+	n.alpha += n.cost;
 }
 
-void Node::calcBeta() {
-	beta = 0.0;
-	for (auto it = rpath.begin(); it != rpath.end(); ++it) {
-		beta = logsumexp(beta,
-						 (*it)->cost +(*it)->rnode->beta,
-						 (it == rpath.begin()));
+void calcBeta(std::vector<std::vector<Node>>& nodes, size_t x, size_t y)
+{
+	Node& n = nodes[x][y];
+	n.beta = 0.0;
+	for (auto i = 0U; i < n.rpath.size(); ++i)
+	{
+		size_t next_y = ((y << 1) & 0b111) | i;
+		n.beta = logsumexp(n.beta, n.rpath[i] + nodes[x+1][next_y].beta, i == 0);
 	}
-	beta += cost;
+	n.beta += n.cost;
 }
 
 std::ostream& operator<<(std::ostream& out, const std::vector<std::vector<Node>>& lattice)
@@ -439,12 +272,12 @@ std::ostream& operator<<(std::ostream& out, const std::vector<std::vector<Node>>
 				<< ", lpath={" << std::endl;
 			for (auto i = 0U; i < node.lpath.size(); ++i)
 			{
-				out << '\t' << node.lpath[i]->cost << std::endl;
+				out << '\t' << node.lpath[i] << std::endl;
 			}
 			out << "}, rpath={" << std::endl;
 			for (auto i = 0U; i < node.rpath.size(); ++i)
 			{
-				out << '\t' << node.rpath[i]->cost << std::endl;
+				out << '\t' << node.rpath[i] << std::endl;
 			}
 			out << "} }\t";
 		}
@@ -482,11 +315,12 @@ struct Predictor
 
 		for (auto i = 0U; i < n.lpath.size(); ++i)
 		{
-			n.lpath[i]->cost = 0.0;
+			n.lpath[i] = 0.0;
 			for (auto feature_id : bigram_features[x])
 			{
-				n.lpath[i]->cost += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
+				n.lpath[i] += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
 			}
+			nodes[x-1][(i << 2) | (y >> 1)].rpath[y & 0b1] = n.lpath[i];
 		}
 	}
 
@@ -505,9 +339,8 @@ struct Predictor
 				{
 					auto y1 = y12 >> 1;
 					auto y2 = y12 & 0b111;
-					auto p = std::make_shared<Path>(&nodes[i - 1][y1], &nodes[i][y2]);
-					nodes[i - 1][y1].rpath.push_back(p);
-					nodes[i][y2].lpath.push_back(p);
+					nodes[i - 1][y1].rpath.push_back(0.0);
+					nodes[i][y2].lpath.push_back(0.0);
 				}
 			}
 		}
@@ -525,7 +358,7 @@ struct Predictor
 	{
 		for (size_t i = 0; i < sample.size(); ++i) {
 			for (size_t j = 0; j < NUM_LABELS; ++j) {
-				nodes[i][j].calcAlpha();
+				calcAlpha(nodes, i, j);
 			}
 		}
 
@@ -537,7 +370,7 @@ struct Predictor
 		{
 			--i;
 			for (size_t j = 0; j < NUM_LABELS; ++j) {
-				nodes[i][j].calcBeta();
+				calcBeta(nodes, i, j);
 			}
 		}
 
@@ -560,8 +393,8 @@ struct Predictor
 		{
 			for (auto i = 0U; i < node.lpath.size(); ++i)
 			{
-				auto& p = node.lpath[i];
-				const double c = std::exp(p->lnode->alpha + p->cost + p->rnode->beta - Z_);
+				size_t prev_y = (i << 2) | (y >> 1);
+				const double c = std::exp(nodes[x-1][prev_y].alpha + node.lpath[i] + node.beta - Z_);
 				expected[feature_id + i*NUM_LABELS + y] += c;
 			}
 		}
@@ -569,24 +402,25 @@ struct Predictor
 
 	void viterbi(const sample_t& sample)
 	{
-		for (size_t i = 0;   i < sample.size(); ++i)
+		for (size_t i = 0; i < sample.size(); ++i)
 		{
-			for (size_t j = 0; j < NUM_LABELS; ++j) {
-				double bestc = -1e37;
+			for (size_t j = 0; j < NUM_LABELS; ++j)
+			{
+				double bestCost = -1e37;
 				ssize_t best = -1;
-				auto& lpath = nodes[i][j].lpath;
-				for (auto k = 0U; k < lpath.size(); ++k)
+				Node& n = nodes[i][j];
+				for (auto k = 0U; k < n.lpath.size(); ++k)
 				{
-					auto& p = lpath[k];
-					double cost = p->lnode->bestCost + p->cost +
-							nodes[i][j].cost;
-					if (cost > bestc) {
-						bestc = cost;
-						best  = ssize_t((k << 2) | (j >> 1));
+					size_t prev_y = (k << 2) | (j >> 1);
+					double cost = nodes[i-1][prev_y].bestCost + n.lpath[k] + n.cost;
+					if (cost > bestCost)
+					{
+						bestCost = cost;
+						best  = ssize_t(prev_y);
 					}
 				}
-				nodes[i][j].prev     = best;
-				nodes[i][j].bestCost = (best != -1) ? bestc : nodes[i][j].cost;
+				n.prev = best;
+				n.bestCost = (best != -1) ? bestCost : n.cost;
 			}
 		}
 
@@ -660,7 +494,7 @@ struct Predictor
 			{
 				--expected[feature_id + prev_y * NUM_LABELS + y];
 			}
-			s += nodes[i][y].lpath[prev_y]->cost;
+			s += nodes[i][y].lpath[prev_y];
 		}
 
 /*
