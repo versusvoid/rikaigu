@@ -15,7 +15,7 @@ class LBFGS {
  private:
   class Mcsrch;
   int iflag_, iscn, nfev, iycn, point, npt;
-  int iter, info, ispt, isyt, iypt, maxfev;
+  int iter, info, ispt, isyt, iypt;
   double stp, stp1;
   std::vector <double> diag_;
   std::vector <double> w_;
@@ -41,7 +41,7 @@ class LBFGS {
  public:
   explicit LBFGS(): iflag_(0), iscn(0), nfev(0), iycn(0),
                     point(0), npt(0), iter(0), info(0),
-                    ispt(0), isyt(0), iypt(0), maxfev(0),
+                    ispt(0), isyt(0), iypt(0),
                     stp(0.0), stp1(0.0), mcsrch_(0) {}
   virtual ~LBFGS() { clear(); }
 
