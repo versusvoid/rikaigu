@@ -202,26 +202,6 @@ std::tuple<train_feature_index_t, samples_t> read_features_and_samples(const cha
 	return std::make_tuple(filtered, samples);
 }
 
-struct Path;
-
-struct Node {
-	double alpha;
-	double beta;
-	double cost;
-	double bestCost;
-	size_t prev;
-	std::vector<double> lpath;
-	std::vector<double> rpath;
-
-	Node()
-		: alpha(0.0)
-		, beta(0.0)
-		, cost(0.0)
-		, bestCost(0.0)
-		, prev(NUM_LABELS)
-	{}
-};
-
 #define MINUS_LOG_EPSILON 50
 inline double logsumexp(double x, double y, bool flg) {
 	if (flg) return y;  // init mode
@@ -286,73 +266,16 @@ std::ostream& operator<<(std::ostream& out, const std::vector<std::vector<Node>>
 	return out;
 }
 
-#define COST_FACTOR 1.0
 
-struct Predictor
+struct TrainPredictor : Predictor<train_feature_index_t>
 {
-	const train_feature_index_t& feature_index;
-	const double* weights;
-
-	std::vector<std::vector<uint32_t>> unigram_features;
-	std::vector<std::vector<uint32_t>> bigram_features;
-	std::vector<std::vector<Node>> nodes;
 	double Z_;
-	std::vector<uint32_t> result_;
-
-	Predictor(const train_feature_index_t& feature_index, const double* weights)
-		: feature_index(feature_index)
-		, weights(weights)
-	{}
-
-	void calcCost(size_t x, size_t y)
+	TrainPredictor(const train_feature_index_t& feature_index, const double* weights)
 	{
-		Node& n = nodes[x][y];
-		n.cost = 0.0;
-		for (auto feature_id : unigram_features[x])
-		{
-			n.cost += COST_FACTOR*weights[feature_id + y];
-		}
-
-		for (auto i = 0U; i < n.lpath.size(); ++i)
-		{
-			n.lpath[i] = 0.0;
-			for (auto feature_id : bigram_features[x])
-			{
-				n.lpath[i] += COST_FACTOR*weights[feature_id + i*NUM_LABELS + y];
-			}
-			nodes[x-1][(i << 2) | (y >> 1)].rpath[y & 0b1] = n.lpath[i];
-		}
+		this->feature_index = &feature_index;
+		this->weights = weights;
 	}
 
-	void buildLattice(const sample_t& sample)
-	{
-		if (nodes.size() < sample.size())
-		{
-			size_t old_size = nodes.size();
-			nodes.resize(sample.size());
-			for (auto i = old_size; i < nodes.size(); ++i)
-			{
-				nodes[i].resize(NUM_LABELS);
-				if (i == 0) continue;
-
-				for (auto y12 = 0U; y12 < 2*NUM_LABELS; ++y12)
-				{
-					auto y1 = y12 >> 1;
-					auto y2 = y12 & 0b111;
-					nodes[i - 1][y1].rpath.push_back(0.0);
-					nodes[i][y2].lpath.push_back(0.0);
-				}
-			}
-		}
-
-		for (size_t i = 0; i < sample.size(); ++i)
-		{
-			for (size_t j = 0; j < NUM_LABELS; ++j)
-			{
-				calcCost(i, j);
-			}
-		}
-	}
 
 	void forwardBackward(const sample_t& sample)
 	{
@@ -400,65 +323,12 @@ struct Predictor
 		}
 	}
 
-	void viterbi(const sample_t& sample)
-	{
-		for (size_t i = 0; i < sample.size(); ++i)
-		{
-			for (size_t j = 0; j < NUM_LABELS; ++j)
-			{
-				double bestCost = -1e37;
-				ssize_t best = -1;
-				Node& n = nodes[i][j];
-				for (auto k = 0U; k < n.lpath.size(); ++k)
-				{
-					size_t prev_y = (k << 2) | (j >> 1);
-					double cost = nodes[i-1][prev_y].bestCost + n.lpath[k] + n.cost;
-					if (cost > bestCost)
-					{
-						bestCost = cost;
-						best  = ssize_t(prev_y);
-					}
-				}
-				n.prev = best;
-				n.bestCost = (best != -1) ? bestCost : n.cost;
-			}
-		}
-
-		double bestc = -1e37;
-		size_t y = NUM_LABELS;
-		size_t s = sample.size() - 1;
-		for (size_t j = 0; j < NUM_LABELS; ++j)
-		{
-			if (bestc < nodes[s][j].bestCost)
-			{
-				y  = j;
-				bestc = nodes[s][j].bestCost;
-			}
-		}
-
-		result_.resize(sample.size(), 0);
-		size_t i = result_.size();
-		while (i > 0)
-		{
-			--i;
-			result_[i] = uint32_t(y);
-			y = nodes[i][y].prev;
-		}
-	}
 
 	double gradient(const sample_t& sample, std::vector<double>& expected)
 	{
 		if (sample.empty()) return 0.0;
 
-		make_features(sample, feature_index, unigram_features, bigram_features);
-
-//		std::cout << "sample:\n" << std::make_pair(sample, features) << std::endl;
-
-		buildLattice(sample);
-
-
-		viterbi(sample);
-//		std::cout << "lattice:\n" << nodes;
+		predict(*this, sample);
 
 		forwardBackward(sample);
 
@@ -509,14 +379,6 @@ struct Predictor
 		return Z_ - s ;
 	}
 
-	std::vector<uint32_t> predict(const sample_t& sample)
-	{
-		make_features(sample, feature_index, unigram_features, bigram_features);
-		buildLattice(sample);
-		viterbi(sample);
-		return result_;
-	}
-
 	int eval(const sample_t& sample)
 	{
 		assert(sample.size() == result_.size());
@@ -548,7 +410,7 @@ int main_test(int, char*[])
 	fake_features[u"Uа毲"] = 0;
 	fake_features[u"B"] = NUM_LABELS;
 
-	Predictor p(fake_features, weights.data());
+	TrainPredictor p(fake_features, weights.data());
 	sample_t sample = {
 		{ u'毲', 'a', false },
 		{ u'浨', 'b', false },
@@ -580,12 +442,13 @@ struct CRFEncoderTask
 	double obj;
 	std::vector<double> expected;
 
-	Predictor predictor;
+	TrainPredictor predictor;
 
 	int zeroone;
 	int err;
 
-	CRFEncoderTask(size_t start_i, size_t thread_num, const samples_t* samples, size_t num_weights, Predictor&& predictor)
+	CRFEncoderTask(size_t start_i, size_t thread_num, const samples_t* samples, size_t num_weights,
+			TrainPredictor&& predictor)
 		: samples(samples)
 		, start_i(start_i)
 		, thread_num(thread_num)
@@ -632,7 +495,7 @@ bool runCRF(const samples_t& samples,
 
 	for (auto i = 0U; i < thread_num; ++i)
 	{
-		tasks.emplace_back(i, thread_num, &samples, weights.size(), Predictor(feature_index, &weights[0]));
+		tasks.emplace_back(i, thread_num, &samples, weights.size(), TrainPredictor(feature_index, &weights[0]));
 	}
 
 	size_t num_labels = 0;
@@ -734,7 +597,7 @@ void test(const weights_t& weights, const train_feature_index_t& feature_index, 
 {
 	auto input = utf16_file(filename);
 	double tp = 0.0, tn = 0.0, fp = 0.0, fn = 0.0, true_first = 0.0, true_last = 0.0, num_samples = 0.0;
-	Predictor predictor(feature_index, weights.data());
+	TrainPredictor predictor(feature_index, weights.data());
 	std::u16string line;
 	uint32_t line_no = 0;
 	while(input.getline(line))
@@ -742,11 +605,11 @@ void test(const weights_t& weights, const train_feature_index_t& feature_index, 
 		if (line.empty()) continue;
 
 		const auto sample = read_sample(line);
-		const std::vector<uint32_t> prediction = predictor.predict(sample);
-		assert(prediction.size() == sample.size());
+		const std::vector<uint32_t>& prediction = predict(predictor, sample);
+		assert(prediction.size() >= sample.size());
 		bool first_start = true;
 		uint32_t sample_true_last = 1;
-		for (auto i = 0U; i < prediction.size(); ++i)
+		for (auto i = 0U; i < sample.size(); ++i)
 		{
 			const uint32_t gold = sample[i].tag >> 2;
 			const uint32_t predicted = prediction[i] >> 2;

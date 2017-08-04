@@ -108,3 +108,150 @@ void make_features(const sample_t& sample,
 }
 
 sample_t read_sample(const std::u16string& line);
+
+struct Node
+{
+	double alpha;
+	double beta;
+	double cost;
+	double bestCost;
+	size_t prev;
+	std::vector<double> lpath;
+	std::vector<double> rpath;
+
+	Node()
+		: alpha(0.0)
+		, beta(0.0)
+		, cost(0.0)
+		, bestCost(0.0)
+		, prev(NUM_LABELS)
+	{}
+};
+
+template<typename feature_index_t>
+struct Predictor
+{
+	const feature_index_t* feature_index;
+	const double* weights;
+
+	std::vector<std::vector<uint32_t>> unigram_features;
+	std::vector<std::vector<uint32_t>> bigram_features;
+	std::vector<std::vector<Node>> nodes;
+	std::vector<uint32_t> result_;
+};
+
+
+#define COST_FACTOR 1.0
+template<typename feature_index_t>
+void calcCost(Predictor<feature_index_t>& predictor, size_t x, size_t y)
+{
+	Node& n = predictor.nodes[x][y];
+	n.cost = 0.0;
+	for (auto feature_id : predictor.unigram_features[x])
+	{
+		n.cost += COST_FACTOR*predictor.weights[feature_id + y];
+	}
+
+	for (auto i = 0U; i < n.lpath.size(); ++i)
+	{
+		n.lpath[i] = 0.0;
+		for (auto feature_id : predictor.bigram_features[x])
+		{
+			n.lpath[i] += COST_FACTOR*predictor.weights[feature_id + i*NUM_LABELS + y];
+		}
+		predictor.nodes[x-1][(i << 2) | (y >> 1)].rpath[y & 0b1] = n.lpath[i];
+	}
+}
+
+template<typename feature_index_t>
+void buildLattice(Predictor<feature_index_t>& predictor, const sample_t& sample)
+{
+	if (predictor.nodes.size() < sample.size())
+	{
+		size_t old_size = predictor.nodes.size();
+		predictor.nodes.resize(sample.size());
+		for (auto i = old_size; i < predictor.nodes.size(); ++i)
+		{
+			predictor.nodes[i].resize(NUM_LABELS);
+			if (i == 0) continue;
+
+			for (auto y12 = 0U; y12 < 2*NUM_LABELS; ++y12)
+			{
+				auto y1 = y12 >> 1;
+				auto y2 = y12 & 0b111;
+				predictor.nodes[i - 1][y1].rpath.push_back(0.0);
+				predictor.nodes[i][y2].lpath.push_back(0.0);
+			}
+		}
+	}
+
+	for (size_t i = 0; i < sample.size(); ++i)
+	{
+		for (size_t j = 0; j < NUM_LABELS; ++j)
+		{
+			calcCost(predictor, i, j);
+		}
+	}
+}
+
+template<typename feature_index_t>
+void viterbi(Predictor<feature_index_t>& predictor, const sample_t& sample)
+{
+	for (size_t i = 0; i < sample.size(); ++i)
+	{
+		for (size_t j = 0; j < NUM_LABELS; ++j)
+		{
+			double bestCost = -1e37;
+			ssize_t best = -1;
+			Node& n = predictor.nodes[i][j];
+			for (auto k = 0U; k < n.lpath.size(); ++k)
+			{
+				size_t prev_y = (k << 2) | (j >> 1);
+				double cost = predictor.nodes[i-1][prev_y].bestCost + n.lpath[k] + n.cost;
+				if (cost > bestCost)
+				{
+					bestCost = cost;
+					best  = ssize_t(prev_y);
+				}
+			}
+			n.prev = best;
+			n.bestCost = (best != -1) ? bestCost : n.cost;
+		}
+	}
+
+	double bestc = -1e37;
+	size_t y = NUM_LABELS;
+	size_t s = sample.size() - 1;
+	for (size_t j = 0; j < NUM_LABELS; ++j)
+	{
+		if (bestc < predictor.nodes[s][j].bestCost)
+		{
+			y  = j;
+			bestc = predictor.nodes[s][j].bestCost;
+		}
+	}
+
+	predictor.result_.resize(sample.size(), 0);
+	size_t i = predictor.result_.size();
+	while (i > 0)
+	{
+		--i;
+		predictor.result_[i] = uint32_t(y);
+		y = predictor.nodes[i][y].prev;
+	}
+}
+
+template<typename feature_index_t>
+const std::vector<uint32_t>& predict(Predictor<feature_index_t>& predictor, const sample_t& sample)
+{
+	make_features(sample, *predictor.feature_index, predictor.unigram_features, predictor.bigram_features);
+
+//	std::cout << "sample:\n" << std::make_pair(sample, features) << std::endl;
+
+	buildLattice(predictor, sample);
+	viterbi(predictor, sample);
+
+//	std::cout << "lattice:\n" << nodes;
+
+	return predictor.result_;
+}
