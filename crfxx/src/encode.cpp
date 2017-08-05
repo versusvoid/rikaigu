@@ -1,39 +1,39 @@
 #include "encode.h"
 
-sample_t read_sample(const std::u16string& line)
+#include <iostream>
+#include <cassert>
+#include <cstring>
+
+train_feature_index_t load_feature_index(std::istream& in)
 {
-	std::vector<symbol_t> result;
-
-	uint8_t tag = 1; // S
-	for (auto& character : line)
+	train_feature_index_t result;
+	std::string line;
+	while (std::getline(in, line))
 	{
-		if (character == char16_t(' '))
+		auto p = line.find('\t');
+		assert(p != std::string::npos);
+
+		std::u16string key;
+		mbstate_t ps;
+		memset(&ps, 0, sizeof(ps));
+		size_t i = 0;
+		while (i < p)
 		{
-			tag = 1;
-			continue;
+			wchar_t character;
+			const size_t count = mbrtowc(&character, line.data() + i, p - i, &ps);
+			if (character > 0xffff)
+			{
+				throw std::logic_error("Unexpected character in feature " + line);
+			}
+			assert(count > 0 && count <= 4);
+			key += char16_t(character);
+			i += count;
 		}
-
-		result.push_back({character, 'm', tag});
-		tag = 0;
-		symbol_t& symbol = result.back();
-
-		if (character >= 0x4e00 && character <= 0x9fa5) {
-			symbol.symbol_class = 'K';
-		} else if (character >= 0x3040 && character <= 0x309f) {
-			symbol.symbol_class = 'h';
-		} else if (character >= 0x30a1 && character <= 0x30fe) {
-			symbol.symbol_class = 'k';
-		}
+		uint32_t feature_id = std::stoul(line.substr(p + 1));
+		result[key] = feature_id;
+		result.num_features = std::max(result.num_features,
+			feature_id + uint32_t(key[0] == u'B' ? 2 * NUM_LABELS : NUM_LABELS));
 	}
-
-	for (auto i = 0U; i < result.size(); ++i)
-	{
-		result[i].tag <<= 2;
-		result[i].tag |= (i + 1 < result.size() ? result[i + 1].tag << 1 : 0);
-		result[i].tag |= (i + 2 < result.size() ? result[i + 2].tag : 0);
-	}
-
-	result.shrink_to_fit();
 
 	return result;
 }

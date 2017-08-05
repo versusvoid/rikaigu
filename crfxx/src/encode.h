@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <unordered_map>
 
 static const std::vector<std::string> tags = {
 	"MMM",
@@ -109,7 +110,7 @@ void make_features(const sample_t& sample,
 	}
 }
 
-sample_t read_sample(const std::u16string& line);
+inline symbol_t read_symbol(char16_t symbol);
 
 struct Node
 {
@@ -259,4 +260,46 @@ const std::vector<uint32_t>& predict(Predictor<feature_index_t>& predictor, cons
 //	std::cout << "lattice:\n" << nodes;
 
 	return predictor.result_;
+}
+
+struct train_feature_index_t : std::unordered_map<std::u16string, uint32_t>
+{
+	uint32_t num_features;
+	train_feature_index_t()
+		: num_features(0)
+	{}
+
+	int get_feature_id(const std::u16string& key) const
+	{
+		auto it = find(key);
+		if (it != end())
+		{
+			return int(it->second);
+		}
+		else
+		{
+			return -1;
+		}
+	}
+};
+train_feature_index_t load_feature_index(std::istream& in);
+
+inline char symbolClass(char16_t character)
+{
+	if (character >= 0x4e00 && character <= 0x9fa5)
+	{
+			return 'K';
+	}
+	else if (character >= 0x3040 && character <= 0x309f)
+	{
+		return 'h';
+	}
+	else if (character >= 0x30a1 && character <= 0x30fe)
+	{
+		return 'k';
+	}
+	else
+	{
+		return 'm';
+	}
 }
