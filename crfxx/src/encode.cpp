@@ -4,7 +4,7 @@ sample_t read_sample(const std::u16string& line)
 {
 	std::vector<symbol_t> result;
 
-	uint8_t tag = 0;
+	uint8_t tag = 1; // S
 	for (auto& character : line)
 	{
 		if (character == char16_t(' '))

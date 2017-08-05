@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -24,6 +25,7 @@ struct symbol_t
 typedef std::vector<symbol_t> sample_t;
 typedef std::vector<std::vector<uint32_t>> sample_features_t;
 typedef std::vector<sample_t> samples_t;
+typedef std::vector<double> weights_t;
 
 template<typename feature_index_t>
 inline void record_feature(feature_index_t& feature_index, const std::u16string& key, std::vector<uint32_t>& features)
@@ -157,7 +159,7 @@ void calcCost(Predictor<feature_index_t>& predictor, size_t x, size_t y)
 		n.lpath[i] = 0.0;
 		for (auto feature_id : predictor.bigram_features[x])
 		{
-			n.lpath[i] += COST_FACTOR*predictor.weights[feature_id + i*NUM_LABELS + y];
+			n.lpath[i] += COST_FACTOR*predictor.weights[feature_id + i * NUM_LABELS + y];
 		}
 		predictor.nodes[x-1][(i << 2) | (y >> 1)].rpath[y & 0b1] = n.lpath[i];
 	}
@@ -175,7 +177,7 @@ void buildLattice(Predictor<feature_index_t>& predictor, const sample_t& sample)
 			predictor.nodes[i].resize(NUM_LABELS);
 			if (i == 0) continue;
 
-			for (auto y12 = 0U; y12 < 2*NUM_LABELS; ++y12)
+			for (auto y12 = 0U; y12 < 2 * NUM_LABELS; ++y12)
 			{
 				auto y1 = y12 >> 1;
 				auto y2 = y12 & 0b111;
