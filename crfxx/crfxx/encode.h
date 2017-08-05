@@ -231,8 +231,11 @@ void viterbi(Predictor<feature_index_t>& predictor, const sample_t& sample)
 		}
 	}
 
-	predictor.result_.resize(sample.size(), 0);
-	size_t i = predictor.result_.size();
+	if (predictor.result_.size() < sample.size())
+	{
+		predictor.result_.resize(sample.size(), 0);
+	}
+	size_t i = sample.size();
 	while (i > 0)
 	{
 		--i;

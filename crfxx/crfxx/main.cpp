@@ -381,7 +381,7 @@ struct TrainPredictor : Predictor<train_feature_index_t>
 
 	int eval(const sample_t& sample)
 	{
-		assert(sample.size() == result_.size());
+		assert(sample.size() <= result_.size());
 		int err = 0;
 		for (size_t i = 0; i < sample.size(); ++i)
 		{
