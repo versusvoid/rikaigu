@@ -9,11 +9,11 @@
 #include <cstring>
 #include <cassert>
 
-bool rikaigu_set_file(const char* filename, const char* data, uint32_t length)
+bool rikaigu_set_file(const char* filename, char* data, uint32_t length)
 {
 	if (0 == strcmp(filename, "data/model.bin"))
 	{
-		return crf_init(data, length);
+		return crf_init(filename, data, length);
 	}
 	else if (0 == strcmp(filename, "data/radicals.dat"))
 	{
@@ -34,7 +34,7 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	*prefix_symbols_length = 0;
 	if (config.smart_segmentation && utf8_prefix[0] != '\0' && config.default_dictionary == WORDS)
 	{
-		std::string extended_text = crf_extend(utf8_text, utf8_prefix, prefix_symbols_length);
+		std::string extended_text = crf_extend(utf8_prefix, utf8_text, prefix_symbols_length);
 		if (extended_text.size() > 0)
 		{
 			SearchResult res2 = search(extended_text.c_str());

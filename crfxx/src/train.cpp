@@ -318,20 +318,6 @@ struct TrainPredictor : Predictor<train_feature_index_t>
 
 		return Z_ - s ;
 	}
-
-	int eval(const sample_t& sample)
-	{
-		assert(sample.size() <= result_.size());
-		int err = 0;
-		for (size_t i = 0; i < sample.size(); ++i)
-		{
-			if (sample[i].tag != result_[i])
-			{
-				++err;
-			}
-		}
-		return err;
-	}
 };
 
 int main_test(int, char*[])
@@ -384,9 +370,6 @@ struct CRFEncoderTask
 
 	TrainPredictor predictor;
 
-	int zeroone;
-	int err;
-
 	CRFEncoderTask(size_t start_i, size_t thread_num, const samples_t* samples, size_t num_weights,
 			TrainPredictor&& predictor)
 		: samples(samples)
@@ -398,18 +381,11 @@ struct CRFEncoderTask
 
 	void run() {
 		obj = 0.0;
-		err = zeroone = 0;
 		std::fill(expected.begin(), expected.end(), 0.0);
 		for (size_t i = start_i; i < samples->size(); i += thread_num)
 		{
 			obj += predictor.gradient((*samples)[i], expected);
-			int error_num = predictor.eval((*samples)[i]);
 //			std::cout << "sample #" << i << ": " << error_num << std::endl;
-			err += error_num;
-			if (error_num)
-			{
-				++zeroone;
-			}
 		}
 	}
 

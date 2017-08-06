@@ -5,7 +5,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++14 -Wall -Werror")
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb -Og")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_library(crfxx include/api.h src/api.cpp src/encode.cpp src/encode.h)
+add_library(crfxx include/crfxx/api.h src/api.cpp src/encode.cpp src/encode.h)
 include_directories(include)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL Emscripten)

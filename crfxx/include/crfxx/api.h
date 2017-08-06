@@ -3,7 +3,11 @@
 
 struct Tagger;
 
-Tagger* make_tagger(char* feature_index, char* model_file);
+Tagger* makeTagger();
+
+void setFeatureIndex(Tagger* tagger, char* feature_index, uint32_t length);
+
+void setWeights(Tagger* tagger, char* weights);
 
 void deleteTagger(Tagger* tagger);
 

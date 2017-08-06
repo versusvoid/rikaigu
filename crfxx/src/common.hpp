@@ -57,7 +57,7 @@ void test(const weights_t& weights, const train_feature_index_t& feature_index, 
 		for (auto i = 0U; i < sample.size(); ++i)
 		{
 			const uint32_t gold = sample[i].tag >> 2;
-			const uint32_t predicted = prediction[i] >> 2;
+			const uint32_t predicted = prediction[i];
 			if (gold == 0 and predicted == 0)
 			{
 				tn += 1;

@@ -135,7 +135,7 @@ struct KanaConvertor
 		out.resize(out_offset);
 	}
 
-	bool operator() (const size_t i, wchar_t u, const char*, const size_t)
+	bool operator() (const size_t i, wchar_t u, const char* in, const size_t count)
 	{
 		// Half & full-width katakana to hiragana conversion.
 		// Note: katakana `vu` is never converted to hiragana
@@ -169,19 +169,16 @@ struct KanaConvertor
 		else if (u == 0xFF5E) {
 			previous = 0;
 			return true;
+		} else {
+			return false;
 		}
 
 		if (out_offset + 4 > out.size())
 		{
 			out.resize(out.size() * 2);
 		}
-		int written = wctomb(&out[0] + out_offset, u);
-		if (written < 0)
-		{
-			out.clear();
-			return false;
-		}
-		out_offset += size_t(written);
+		memcpy(&out[0] + out_offset, in, count);
+		out_offset += size_t(count);
 		true_length_mapping.resize(out_offset + 1, 0);
 		true_length_mapping.at(out_offset) = i + 1; // Need to keep real length because of the half-width semi/voiced conversion
 		previous = v;

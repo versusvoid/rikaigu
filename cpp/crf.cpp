@@ -5,7 +5,8 @@
 #include "html_render.h"
 #include "utils.h"
 
-#include <crfpp.h>
+#include <crfxx/api.h>
+
 #include <cstring>
 #include <string>
 #include <cwchar>
@@ -18,132 +19,151 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdlib>
+#include <cassert>
 
-static std::shared_ptr<CRFPP::Tagger> tagger;
-static std::shared_ptr<CRFPP::Model> model;
-static std::shared_ptr<const char> model_file_content;
+static Tagger* tagger = nullptr;
 
-bool crf_init(const char* model_file_content, uint32_t length)
+bool crf_init(const char* filename, char* model_file_content, uint32_t length)
 {
-	std::locale::global(std::locale("en_US.UTF-8"));
-	::model_file_content.reset(model_file_content, reinterpret_cast<void(*)(const char*)>(free));
-	model.reset(CRFPP::createModelFromArray("", model_file_content, length));
-	if (!model)
+	if (tagger == nullptr)
 	{
-		std::cerr << "can't create model from file" << std::endl;
-		return false;
+		std::locale::global(std::locale("en_US.UTF-8"));
+		tagger = makeTagger();
 	}
-	tagger.reset(model->createTagger());
-	if (!tagger)
+
+	if (strcmp(filename, "data/weights.bin"))
 	{
-		model.reset();
-		std::cerr << "can't create tagger from model" << std::endl;
-		return false;
+		setWeights(tagger, model_file_content);
 	}
+	else
+	{
+		assert(strcmp(filename, "data/feature-index.bin") == 0);
+		setFeatureIndex(tagger, model_file_content, length);
+	}
+
 	return true;
 }
 
 struct AnnotateAndAddConvertor
 {
+	// changes with start
+	size_t prefix_utf8_length;
+	std::vector<size_t> code_point_to_utf8_pos;
+
+	// absolute
+	size_t start_utf8_pos;
+	size_t current_utf8_length;
+	size_t end_utf8_pos;
+
+	void reset(size_t prefix_utf8_length)
+	{
+		this->prefix_utf8_length = prefix_utf8_length;
+		this->start_utf8_pos = 0;
+		this->current_utf8_length = 0;
+		this->end_utf8_pos = 0;
+		this->code_point_to_utf8_pos.clear();
+	}
+
 	void reserve(size_t) {}
 
-	bool operator() (size_t, wchar_t character, const char* in, size_t character_length)
+	bool operator() (size_t, wchar_t character, const char*, size_t character_length)
 	{
-		char annotated[4 + 2 + 1];
-		std::copy(in, in + character_length, annotated);
-		annotated[character_length] = '\t';
-
-		if (character >= 0x4e00 && character <= 0x9fa5) {
-			annotated[character_length + 1] = 'K';
-		} else if (character >= 0x3040 && character <= 0x309f) {
-			annotated[character_length + 1] = 'h';
-		} else if (character >= 0x30a1 && character <= 0x30fe) {
-			annotated[character_length + 1] = 'k';
-		} else {
-			annotated[character_length + 1] = 'm';
+		if (character <= 0xffff)
+		{
+			add(tagger, (char16_t)character);
+			code_point_to_utf8_pos.push_back(current_utf8_length);
+			current_utf8_length += character_length;
 		}
-		annotated[character_length + 2] = '\0';
-		tagger->add(annotated);
-
+		// Kanji with code >= 0xffff are always separate words. So we can short-cut here
+		else if (current_utf8_length == start_utf8_pos + prefix_utf8_length) // if our search starts with kanji >= 0xffff
+		{
+			// we want to search only it
+			start_utf8_pos = current_utf8_length;
+			end_utf8_pos = current_utf8_length + character_length;
+			prefix_utf8_length = 0;
+			code_point_to_utf8_pos.resize(1, 0);
+			clear(tagger);
+			add(tagger, (char16_t)character);
+			return false;
+		}
+		else if (current_utf8_length > start_utf8_pos + prefix_utf8_length) // if we meet it after some characters
+		{
+			// we want to search up until it
+			end_utf8_pos = current_utf8_length;
+			return false;
+		}
+		else // if we meet it before search start
+		{
+			// we want to search after it
+			clear(tagger);
+			current_utf8_length += character_length;
+			prefix_utf8_length -= current_utf8_length - start_utf8_pos;
+			start_utf8_pos = current_utf8_length;
+			code_point_to_utf8_pos.resize(1, 0);
+		}
 		return true;
 	}
 };
 static AnnotateAndAddConvertor annotate_and_add_convertor;
 
-int32_t crf_split(const char* utf8_string) {
-	if (tagger == NULL) return -1;
-
-	tagger->clear();
-	if (!stream_utf8_convertor(utf8_string, annotate_and_add_convertor)) {
-		return -2;
-	}
-	if (!tagger->parse())
-	{
-		std::cerr << "Can't parse" << std::endl;
-	}
-
-	for (size_t i = 0; i < tagger->size(); ++i) {
-		if (tagger->y2(i)[0] == 'S') {
-			return int32_t(i);
-		}
-	}
-	return 0;
-}
-
-std::string append_prefix(const char* utf8_text, const char* utf8_prefix)
+std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* prefix_length)
 {
-	std::string res;
-	size_t p = 0;
-	if ((utf8_text[p] & 0b11000000) == 0b11000000)
+	if (tagger == NULL) return "";
+
+	clear(tagger);
+	std::string joined = utf8_prefix;
+	annotate_and_add_convertor.reset(joined.length());
+	joined.append(utf8_text);
+
+	if (!stream_utf8_convertor(joined.c_str(), annotate_and_add_convertor)) {
+		return "";
+	}
+	if (annotate_and_add_convertor.prefix_utf8_length == 0)
 	{
-		while ((utf8_text[p + 1] & 0b11000000) == 0b10000000)
+		return "";
+	}
+	if (annotate_and_add_convertor.start_utf8_pos > 0 && annotate_and_add_convertor.end_utf8_pos > 0)
+	{
+		joined = joined.substr(annotate_and_add_convertor.start_utf8_pos,
+			annotate_and_add_convertor.end_utf8_pos - annotate_and_add_convertor.start_utf8_pos);
+	}
+	else if (annotate_and_add_convertor.start_utf8_pos > 0)
+	{
+		joined = joined.substr(annotate_and_add_convertor.start_utf8_pos);
+	}
+	else if (annotate_and_add_convertor.end_utf8_pos > 0)
+	{
+		joined = joined.substr(0, annotate_and_add_convertor.end_utf8_pos);
+	}
+
+	auto& res = parse(tagger);
+
+	size_t start = annotate_and_add_convertor.prefix_utf8_length;
+
+	auto i = 0U;
+	for (; i < annotate_and_add_convertor.code_point_to_utf8_pos.size() && annotate_and_add_convertor.code_point_to_utf8_pos[i] <= annotate_and_add_convertor.prefix_utf8_length; ++i)
+	{
+		if (res[i] == 1)
 		{
-			p += 1;
+			start = annotate_and_add_convertor.code_point_to_utf8_pos[i];
 		}
 	}
-	res.append(utf8_text, p + 1);
-
-	size_t end = strlen(utf8_prefix);
-	p = end - 1;
-	while (end != 0)
+	if (start == annotate_and_add_convertor.prefix_utf8_length)
 	{
-		while (p > 0 && (utf8_prefix[p] & 0b11000000) == 0b10000000)
-		{
-			p -= 1;
-		}
-		res.append(utf8_prefix + p, end - p);
-		end = p;
-		p = end - 1;
+		return "";
 	}
+	*prefix_length = int32_t(annotate_and_add_convertor.prefix_utf8_length - start);
 
-	return res;
-}
-
-std::string prepend_prefix(const char* utf8_text, const char* utf8_prefix, int prefix_length)
-{
-	size_t p = strlen(utf8_prefix);
-	while (prefix_length > 0)
+	size_t end = joined.length();
+	for (i += 1; i < annotate_and_add_convertor.code_point_to_utf8_pos.size(); ++i)
 	{
-		p -= 1;
-		while ((utf8_prefix[p] & 0b11000000) == 0b10000000)
+		if (res[i] == 1)
 		{
-			p -= 1;
+			end = annotate_and_add_convertor.code_point_to_utf8_pos[i];
+			break;
 		}
-		prefix_length -= 1;
 	}
 
-	return std::string(utf8_prefix + p) + utf8_text;
-}
-
-std::string crf_extend(const char* utf8_text, const char* utf8_prefix, int32_t* prefix_length)
-{
-	std::string crf_input = append_prefix(utf8_text, utf8_prefix);
-	*prefix_length = crf_split(crf_input.c_str());
-	if (*prefix_length > 0) {
-		return prepend_prefix(utf8_text, utf8_prefix, *prefix_length);
-	} else {
-		*prefix_length = 0;
-		return std::string();
-	}
+	return joined.substr(start, end - start);
 }
 

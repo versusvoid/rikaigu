@@ -12,7 +12,7 @@ void EMSCRIPTEN_KEEPALIVE rikaigu_set_config(
 	int default_dictionary,
 	const char* kanji_info);
 
-bool EMSCRIPTEN_KEEPALIVE rikaigu_set_file(const char* filename, const char* data, uint32_t length);
+bool EMSCRIPTEN_KEEPALIVE rikaigu_set_file(const char* filename, char* data, uint32_t length);
 
 const char* EMSCRIPTEN_KEEPALIVE rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	int32_t* match_symbols_length, int32_t* prefix_symbols_length);

@@ -242,7 +242,7 @@ void viterbi(Predictor<feature_index_t>& predictor, const sample_t& sample)
 	while (i > 0)
 	{
 		--i;
-		predictor.result_[i] = uint32_t(y);
+		predictor.result_[i] = uint32_t(y >> 2);
 		y = predictor.nodes[i][y].prev;
 	}
 }
@@ -267,6 +267,11 @@ struct train_feature_index_t : std::unordered_map<std::u16string, uint32_t>
 	uint32_t num_features;
 	train_feature_index_t()
 		: num_features(0)
+	{}
+
+	train_feature_index_t(const train_feature_index_t&& other)
+		: std::unordered_map<std::u16string, uint32_t>(other)
+		, num_features(std::move(other.num_features))
 	{}
 
 	int get_feature_id(const std::u16string& key) const

@@ -1,4 +1,4 @@
-#include <api.h>
+#include <crfxx/api.h>
 
 #include <unordered_map>
 #include <sstream>
@@ -13,16 +13,21 @@ struct Tagger
 
 };
 
-Tagger* make_tagger(char* feature_index_file, char* model_file)
+Tagger* makeTagger()
 {
-	auto tagger = new Tagger;
-	tagger->predictor.weights = (double*)model_file;
+	return new Tagger;
+}
 
-	std::istringstream in(feature_index_file);
-	tagger->predictor.feature_index = new train_feature_index_t(std::move(load_feature_index(in)));
-	free(feature_index_file);
+void setFeatureIndex(Tagger* tagger, char* feature_index, uint32_t length)
+{
+	std::istringstream in(std::string(feature_index, length));
+	tagger->predictor.feature_index = new train_feature_index_t(load_feature_index(in));
+	free(feature_index);
+}
 
-	return tagger;
+void setWeights(Tagger* tagger, char* weights)
+{
+	tagger->predictor.weights = (double*)weights;
 }
 
 void deleteTagger(Tagger* tagger)
