@@ -262,22 +262,18 @@ const std::vector<uint32_t>& predict(Predictor<feature_index_t>& predictor, cons
 	return predictor.result_;
 }
 
-struct train_feature_index_t : std::unordered_map<std::u16string, uint32_t>
+struct train_feature_index_t
 {
 	uint32_t num_features;
+	std::unordered_map<std::u16string, uint32_t> map;
 	train_feature_index_t()
 		: num_features(0)
 	{}
 
-	train_feature_index_t(const train_feature_index_t&& other)
-		: std::unordered_map<std::u16string, uint32_t>(other)
-		, num_features(std::move(other.num_features))
-	{}
-
 	int get_feature_id(const std::u16string& key) const
 	{
-		auto it = find(key);
-		if (it != end())
+		auto it = map.find(key);
+		if (it != map.end())
 		{
 			return int(it->second);
 		}

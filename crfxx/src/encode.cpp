@@ -30,7 +30,7 @@ train_feature_index_t load_feature_index(std::istream& in)
 			i += count;
 		}
 		uint32_t feature_id = std::stoul(line.substr(p + 1));
-		result[key] = feature_id;
+		result.map[key] = feature_id;
 		result.num_features = std::max(result.num_features,
 			feature_id + uint32_t(key[0] == u'B' ? 2 * NUM_LABELS : NUM_LABELS));
 	}

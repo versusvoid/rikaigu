@@ -2,15 +2,13 @@
 #include <thread>
 #include <algorithm>
 #include <numeric>
+#include <set>
 
 #include <unordered_map>
-#include <boost/program_options.hpp>
 
 #include "lbfgs.h"
 #include "utf16.h"
 #include "common.hpp"
-
-namespace po = boost::program_options;
 
 struct extract_feature_index_t : std::unordered_map<std::u16string, uint32_t>
 {
@@ -77,7 +75,7 @@ train_feature_index_t filter_features(const extract_feature_index_t& feature_ind
 	{
 		if (it->second >= MIN_FEATURE_COUNT)
 		{
-			filtered[it->first] = new_feature_id;
+			filtered.map[it->first] = new_feature_id;
 			new_feature_id += (it->first[0] == u'B' ? 2 * NUM_LABELS : NUM_LABELS);
 		}
 	}
@@ -90,7 +88,7 @@ void dump_feature_index(train_feature_index_t& feature_index, const char* featur
 {
 	std::ofstream out(features_index_filename);
 	std::set<std::u16string> keys;
-	for (auto& kv : feature_index)
+	for (auto& kv : feature_index.map)
 	{
 		out << kv.first << '\t' << std::to_string(kv.second) << std::endl;
 //		keys.insert(kv.first);
@@ -318,6 +316,20 @@ struct TrainPredictor : Predictor<train_feature_index_t>
 
 		return Z_ - s ;
 	}
+
+	int eval(const sample_t& sample)
+	{
+		assert(sample.size() <= result_.size());
+		int err = 0;
+		for (size_t i = 0; i < sample.size(); ++i)
+		{
+			if (uint32_t(sample[i].tag >> 2) != result_[i])
+			{
+				++err;
+			}
+		}
+		return err;
+	}
 };
 
 int main_test(int, char*[])
@@ -333,8 +345,8 @@ int main_test(int, char*[])
 	}};
 
 	train_feature_index_t fake_features;
-	fake_features[u"Uа毲"] = 0;
-	fake_features[u"B"] = NUM_LABELS;
+	fake_features.map[u"Uа毲"] = 0;
+	fake_features.map[u"B"] = NUM_LABELS;
 
 	TrainPredictor p(fake_features, weights.data());
 	sample_t sample = {
@@ -370,6 +382,9 @@ struct CRFEncoderTask
 
 	TrainPredictor predictor;
 
+	int zeroone;
+	int err;
+
 	CRFEncoderTask(size_t start_i, size_t thread_num, const samples_t* samples, size_t num_weights,
 			TrainPredictor&& predictor)
 		: samples(samples)
@@ -381,11 +396,18 @@ struct CRFEncoderTask
 
 	void run() {
 		obj = 0.0;
+		err = zeroone = 0;
 		std::fill(expected.begin(), expected.end(), 0.0);
 		for (size_t i = start_i; i < samples->size(); i += thread_num)
 		{
 			obj += predictor.gradient((*samples)[i], expected);
+			int error_num = predictor.eval((*samples)[i]);
 //			std::cout << "sample #" << i << ": " << error_num << std::endl;
+			err += error_num;
+			if (error_num)
+			{
+				++zeroone;
+			}
 		}
 	}
 
