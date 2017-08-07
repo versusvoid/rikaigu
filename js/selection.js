@@ -142,8 +142,9 @@ var startElementExpr ='boolean(parent::rp or ancestor::rt)';
 var maxWordLength = 13;
 function getTextFromRange(rangeNode, offset, forward) {
 	var text = [], fullSelectionRange = [];
+	var maxLength = forward ? maxWordLength : 65536;
 	if (isInput(rangeNode)) {
-		getText(rangeNode, maxWordLength, forward, text, fullSelectionRange, offset);
+		getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
 		return [text[0], fullSelectionRange[0]];
 	}
 
@@ -153,10 +154,10 @@ function getTextFromRange(rangeNode, offset, forward) {
 	if (document.evaluate(startElementExpr, rangeNode, null, XPathResult.BOOLEAN_TYPE, null).booleanValue)
 		return ['', null];
 
-	var currentLength = getText(rangeNode, maxWordLength, forward, text, fullSelectionRange, offset);
+	var currentLength = getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
 	var nextNode = getNext(rangeNode, forward);
-	while (nextNode !== null && currentLength < maxWordLength) {
-		currentLength += getInlineText(nextNode, maxWordLength - currentLength, forward, text, fullSelectionRange);
+	while (nextNode !== null && currentLength < maxLength) {
+		currentLength += getInlineText(nextNode, maxLength - currentLength, forward, text, fullSelectionRange);
 		nextNode = getNext(nextNode, forward);
 	}
 

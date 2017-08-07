@@ -550,7 +550,7 @@ void train(char* argv[])
 	assert(weights.size() == feature_index.num_features);
 	test(weights, feature_index, argv[1]);
 	test(weights, feature_index, argv[2]);
-	dump_weights(weights, "model.bin");
+	dump_weights(weights, "weights.bin");
 }
 
 
