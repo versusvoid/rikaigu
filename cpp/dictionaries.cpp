@@ -169,8 +169,6 @@ struct KanaConvertor
 		else if (u == 0xFF5E) {
 			previous = 0;
 			return true;
-		} else {
-			return false;
 		}
 
 		if (out_offset + 4 > out.size())
