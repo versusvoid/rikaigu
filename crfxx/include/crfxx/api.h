@@ -7,7 +7,7 @@ Tagger* makeTagger();
 
 void setFeatureIndex(Tagger* tagger, char* feature_index, uint32_t length);
 
-void setWeights(Tagger* tagger, char* weights);
+void setWeights(Tagger* tagger, char* weights, uint32_t length);
 
 void deleteTagger(Tagger* tagger);
 

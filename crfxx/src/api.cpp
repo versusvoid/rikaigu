@@ -25,9 +25,17 @@ void setFeatureIndex(Tagger* tagger, char* feature_index, uint32_t length)
 	free(feature_index);
 }
 
-void setWeights(Tagger* tagger, char* weights)
+void setWeights(Tagger* tagger, char* weights, uint32_t length)
 {
-	tagger->predictor.weights = (double*)weights;
+	float* float_weights = reinterpret_cast<float*>(weights);
+	size_t num = length / sizeof(float);
+	double* double_weights = (double*)malloc(num * sizeof(double));
+	for (auto i = 0U; i < num; ++i)
+	{
+		double_weights[i] = float_weights[i];
+	}
+	tagger->predictor.weights = double_weights;
+	free(weights);
 }
 
 void deleteTagger(Tagger* tagger)
@@ -48,5 +56,11 @@ void add(Tagger* tagger, char16_t character)
 
 const std::vector<uint32_t>& parse(Tagger* tagger)
 {
-	return predict(tagger->predictor, tagger->sample);
+	printf("%u expanded features, %zu base features\n", tagger->predictor.feature_index->num_features, tagger->predictor.feature_index->map.size());
+	auto& res = predict(tagger->predictor, tagger->sample);
+	for (auto i = 0U; i < tagger->sample.size(); ++i)
+	{
+		printf("%d %d\n", int(tagger->sample[i].symbol), int(res[i]));
+	}
+	return res;
 }

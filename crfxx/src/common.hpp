@@ -36,6 +36,8 @@ sample_t read_sample(const std::u16string& line)
 
 void test(const weights_t& weights, const train_feature_index_t& feature_index, const char* filename)
 {
+	std::cout << weights.size() << " weights, " << feature_index.num_features << " expanded features, " << feature_index.map.size() << " base features" << std::endl;
+
 	auto input = utf16_file(filename);
 	double tp = 0.0, tn = 0.0, fp = 0.0, fn = 0.0, true_first = 0.0, true_last = 0.0, num_samples = 0.0;
 
@@ -58,6 +60,7 @@ void test(const weights_t& weights, const train_feature_index_t& feature_index, 
 		{
 			const uint32_t gold = sample[i].tag >> 2;
 			const uint32_t predicted = prediction[i];
+			std::cout << int(sample[i].symbol) << " " << gold << " " << predicted << std::endl;
 			if (gold == 0 and predicted == 0)
 			{
 				tn += 1;

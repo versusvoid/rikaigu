@@ -51,12 +51,15 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 
 
 var rikaiguEnabled = false;
-function onLoaded(tabId) {
+function onLoaded(initiatorTab) {
 	rikaiguEnabled = true;
-	chrome.tabs.sendMessage(tabId, {
-		"type": "enable",
-		"popup": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
-	});
+
+	if (initiatorTab) {
+		chrome.tabs.sendMessage(initiatorTab.id, {
+			"type": "enable",
+			"popup": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
+		});
+	}
 
 	var windows = chrome.windows.getAll({
 			"populate": true
@@ -64,7 +67,7 @@ function onLoaded(tabId) {
 		function(windows) {
 			for (var browserWindow of windows) {
 				for (var tab of browserWindow.tabs) {
-					if (tab.id === tabId) continue;
+					if (initiatorTab && tab.id === initiatorTab.id) continue;
 					chrome.tabs.sendMessage(tab.id, {
 						"type": "enable"
 					});
@@ -163,7 +166,7 @@ function rikaiguEnable(tab) {
 					loadFile('data/kanji.idx'),
 					loadFile('data/deinflect.dat'),
 					loadFile('data/expressions.dat'),
-				]).then(onLoaded.bind(null, tab.id), onLoadError);
+				]).then(onLoaded.bind(null, tab), onLoadError);
 		}
 	};
 	var js = document.createElement("script");
@@ -205,6 +208,7 @@ function search(request) {
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
+			console.log('enable? request. Response is ', rikaiguEnabled);
 			response(rikaiguEnabled, sender.frameId);
 			break;
 
@@ -243,3 +247,5 @@ function onMessage(request, sender, response) {
 clearState();
 chrome.browserAction.onClicked.addListener(rikaiguEnable);
 chrome.runtime.onMessage.addListener(onMessage);
+
+rikaiguEnable();

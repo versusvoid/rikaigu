@@ -11,7 +11,7 @@
 
 bool rikaigu_set_file(const char* filename, char* data, uint32_t length)
 {
-	if (0 == strcmp(filename, "data/model.bin"))
+	if (0 == strcmp(filename, "data/weights.bin") || 0 == strcmp(filename, "data/features.bin"))
 	{
 		return crf_init(filename, data, length);
 	}
@@ -32,12 +32,15 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	PROFILE
 	SearchResult res = search(utf8_text);
 	*prefix_symbols_length = 0;
+	printf("1 %zu\n", res.max_match_symbols_length);
 	if (config.smart_segmentation && utf8_prefix[0] != '\0' && config.default_dictionary == WORDS)
 	{
 		std::string extended_text = crf_extend(utf8_prefix, utf8_text, prefix_symbols_length);
+		printf("2 %zu %s %d\n", extended_text.size(), extended_text.c_str(), *prefix_symbols_length);
 		if (extended_text.size() > 0)
 		{
 			SearchResult res2 = search(extended_text.c_str());
+			printf("3 %zu\n", res2.max_match_symbols_length);
 			if (res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length)
 			{
 				res = res2;

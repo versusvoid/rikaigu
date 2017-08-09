@@ -78,7 +78,7 @@ function highlightRange(matchLength, prefixLength, selectionRange, prefixSelecti
 
 	requiredLength = matchLength;
 	i = 0;
-	while (i < selectionRange.length && selectionRange[i].endIndex - selectionRange[i].offset < requiredLength) {
+	while (i < selectionRange.length - 1 && selectionRange[i].endIndex - selectionRange[i].offset < requiredLength) {
 		requiredLength -= selectionRange[i].endIndex - selectionRange[i].offset;
 		++i;
 	}
