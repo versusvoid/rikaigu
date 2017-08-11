@@ -1,47 +1,29 @@
-#include "api.h"
-#include "deinflector.h"
-#include "dentry.h"
-#include "dictionaries.h"
-#include "html_render.h"
+#include <cassert>
+#include <sstream>
+
+#include <crfxx/encode.h>
+
 #include "utils.h"
 
-#include <crfxx/api.h>
-
-#include <cstring>
-#include <string>
-#include <cwchar>
-#include <locale>
-#include <functional>
-#include <memory>
-#include <vector>
-#include <map>
-#include <set>
-#include <algorithm>
-#include <iostream>
-#include <cstdlib>
-#include <cassert>
-
-static Tagger* tagger = nullptr;
+static Predictor<train_feature_index_t> predictor;
+static sample_t sample;
 
 bool crf_init(const char* filename, char* file_content, uint32_t length)
 {
 	printf("crf_init(%s)\n", filename);
-	if (tagger == nullptr)
-	{
-		std::locale::global(std::locale("en_US.UTF-8"));
-		printf("crf_init() making tagger\n");
-		tagger = makeTagger();
-	}
+	std::locale::global(std::locale("en_US.UTF-8"));
 
 	if (0 == strcmp(filename, "data/weights.bin"))
 	{
 		printf("%u weights\n", length / sizeof(float));
-		setWeights(tagger, file_content, length);
+		predictor.weights = (double*)file_content;
 	}
 	else
 	{
 		assert(strcmp(filename, "data/features.bin") == 0);
-		setFeatureIndex(tagger, file_content, length);
+		std::istringstream in(std::string(file_content, length));
+		free(file_content);
+		predictor.feature_index = new train_feature_index_t(load_feature_index(in));
 	}
 
 	return true;
@@ -73,7 +55,7 @@ struct AnnotateAndAddConvertor
 	{
 		if (character <= 0xffff)
 		{
-			add(tagger, (char16_t)character);
+			sample.emplace_back(symbol_t{(char16_t)character, symbolClass(character), 0});
 			printf("%d\n", int(character));
 			code_point_to_utf8_pos.push_back(current_utf8_length);
 			current_utf8_length += character_length;
@@ -86,9 +68,9 @@ struct AnnotateAndAddConvertor
 			end_utf8_pos = current_utf8_length + character_length;
 			prefix_utf8_length = 0;
 			code_point_to_utf8_pos.resize(1, 0);
-			clear(tagger);
+			sample.clear();
 			printf("-------------------------\n");
-			add(tagger, (char16_t)character);
+			sample.emplace_back(symbol_t{(char16_t)character, symbolClass(character), 0});
 			printf("%d\n", int(character));
 			return false;
 		}
@@ -101,7 +83,7 @@ struct AnnotateAndAddConvertor
 		else // if we meet it before search start
 		{
 			// we want to search after it
-			clear(tagger);
+			sample.clear();
 			printf("-------------------------\n");
 			current_utf8_length += character_length;
 			prefix_utf8_length -= current_utf8_length - start_utf8_pos;
@@ -115,10 +97,12 @@ static AnnotateAndAddConvertor annotate_and_add_convertor;
 
 std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* prefix_symbols_length)
 {
-	printf("crf_exend() tagger = %p\n", tagger);
-	if (tagger == NULL) return "";
+	if (predictor.weights == nullptr || predictor.feature_index->map.empty())
+	{
+		return "";
+	}
 
-	clear(tagger);
+	sample.clear();
 	std::string joined = utf8_prefix;
 	annotate_and_add_convertor.reset(joined.length());
 	joined.append(utf8_text);
@@ -148,7 +132,7 @@ std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* 
 
 	printf("before parse() %zu %zu\n", joined.size(), annotate_and_add_convertor.prefix_utf8_length);
 	printf("parsing %s\n", joined.c_str());
-	auto& res = parse(tagger);
+	auto& res = predict(predictor, sample);
 	for (auto& tag : res) { printf("%d ", int(tag)); }
 	printf("\n");
 

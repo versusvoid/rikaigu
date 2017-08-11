@@ -1,8 +1,8 @@
+#include "common.h"
 #include <unordered_map>
 #include <iostream>
 #include <cassert>
 
-#include "encode.h"
 #include "utf16.h"
 
 sample_t read_sample(const std::u16string& line)
@@ -60,7 +60,6 @@ void test(const weights_t& weights, const train_feature_index_t& feature_index, 
 		{
 			const uint32_t gold = sample[i].tag >> 2;
 			const uint32_t predicted = prediction[i];
-			std::cout << int(sample[i].symbol) << " " << gold << " " << predicted << std::endl;
 			if (gold == 0 and predicted == 0)
 			{
 				tn += 1;

@@ -2,10 +2,10 @@ dist
 *.bc
 *.d
 *.csv
-data/dict.*
-data/names.*
+*.png
+data/*.dat
 data/*.idx
-data/model.bin
+data/*.bin
 data/expressions.dat
 cpp/rikai.asm.*
 *.swp

@@ -1,35 +1,85 @@
 
-all: rikai.asm.js
+.PHONY: all release
 
-CXXFLAGS = -std=c++14 -O3 -Wall -I../crfxx/include
-DEBUG_FLAGS = -g3 -s SAFE_HEAP=1 -s ASSERTIONS=1 -s WARN_UNALIGNED=1
-EMCCFLAGS =  -L../crfxx/js -l crfxx \
+all: rikai.asm.js train-crf test-crf
+release: release/rikai.asm.js
+
+clean:
+	rm -rf release
+	find ./ -regex '.*\.\(bc\|d\)' -delete
+	rm -f test-crf train-crf rikai.asm.js rikai.asm.data rikai.asm.js.mem rikai.asm.js.map
+
+COMMON_CXXFLAGS = -std=c++14 -O3 -Wall -I.
+
+JS_CXXFLAGS = $(COMMON_CXXFLAGS)
+JS_DEBUG_FLAGS = -g3 -s SAFE_HEAP=1 -s ASSERTIONS=1 -s WARN_UNALIGNED=1 -s DEMANGLE_SUPPORT=1
+EMCCFLAGS = \
 		-s TOTAL_MEMORY=32MB \
 		-s TOTAL_STACK=500KB \
-		-g1 -s LZ4=1 \
+		-s LZ4=1 \
 		--preload-file ../data/dict.dat@/dict.dat \
 		--preload-file ../data/names.dat@/names.dat \
 		--preload-file ../data/kanji.dat@/kanji.dat
 
-ifndef release
-EMCCFLAGS += ${DEBUG_FLAGS}
-endif
+JS_SOURCES = \
+	client/api.cpp \
+	client/crf.cpp \
+	client/deinflector.cpp \
+	client/dentry.cpp \
+	client/dictionaries.cpp \
+	client/html_render.cpp \
+	client/word_types.cpp \
+	client/utils.cpp \
+	crfxx/encode.cpp
+JS_OBJECTS = $(JS_SOURCES:%.cpp=%.bc)
 
-OBJECTS = api.bc crf.bc deinflector.bc dentry.bc dictionaries.bc html_render.bc word_types.bc utils.bc
+rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat
+	emcc $(JS_CXXFLAGS) $(JS_OBJECTS) $(JS_DEBUG_FLAGS) $(EMCCFLAGS) -o $@
 
-rikai.asm.js: ../crfxx/js/libcrfxx.a $(OBJECTS) \
-		../data/dict.dat ../data/names.dat ../data/kanji.dat
-	emcc $(CXXFLAGS) $(^:%.dat=)  $(EMCCFLAGS) -o $@
-
-%.d : %.cpp
-	emcc $(CXXFLAGS) -MM $< -MT $(<:%.cpp=%.bc) -o $@
-	sed 's/^\($(<:%.cpp=%.bc)\)/\1 $@/g' -i $@
-
-include $(OBJECTS:%.bc=%.d)
+release/rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat
+	mkdir -p release
+	emcc $(JS_CXXFLAGS) $(JS_OBJECTS) $(EMCCFLAGS) -o $@
 
 %.bc : %.cpp
-	emcc $(CXXFLAGS) $< -o $@
+	emcc $(JS_CXXFLAGS) $< -o $@
 
-clean:
-	rm -rf *.bc *.d
-	rm -f rikai.asm.js rikai.asm.data rikai.asm.js.mem rikai.asm.js.map
+%.bc.d : %.cpp
+	emcc $(JS_CXXFLAGS) -MM $< -MT $(<:%.cpp=%.bc.d) -o $@
+	sed 's#^\($(<:%.cpp=%.bc.d)\)#\1 $@#g' -i $@
+
+ifneq ($(MAKECMDGOALS),clean)
+include $(JS_SOURCES:%.cpp=%.bc.d)
+endif
+
+
+CXXFLAGS = $(COMMON_CXXFLAGS) -flto -pthread
+
+
+TRAIN_SOURCES = \
+	crfxx/encode.cpp \
+	tools/lbfgs.cpp \
+	tools/utf16.cpp \
+	tools/common.cpp \
+	tools/train.cpp
+
+train-crf: $(TRAIN_SOURCES)
+	g++ $(CXXFLAGS) $^ -o $@
+
+
+TEST_SOURCES = \
+	crfxx/encode.cpp \
+	tools/utf16.cpp \
+	tools/common.cpp \
+	tools/test.cpp
+
+test-crf: $(TEST_SOURCES)
+	g++ $(CXXFLAGS) $^ -o $@
+
+%.d : %.cpp
+	g++ $(CXXFLAGS) -MM $< -MT $(<:%.cpp=%.d) -o $@
+	sed 's#^\($(<:%.cpp=%.d)\)#\1 $@#g' -i $@
+
+ifneq ($(MAKECMDGOALS),clean)
+include $(TRAIN_SOURCES:%.cpp=%.d)
+include $(TEST_SOURCES:%.cpp=%.d)
+endif

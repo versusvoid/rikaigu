@@ -153,18 +153,10 @@ def write_index(index, label):
 	index.sort()
 	words_bytes = bytearray()
 	offsets_bytes = bytearray()
-	weightw = 0
-	weighti = 0
-	weightw2 = 0
-	weighti2 = 0
 	offsets_index = 0
 	for w, offsets in index:
 		w_utf8 = w.encode('utf-8')
 		assert w_utf8.find(0b11111000) == -1, w
-		weightw += len(w.encode('utf-16')) + 4
-		weighti += 4*len(offsets)
-		weightw2 += len(w_utf8) + 4
-		weighti2 += 4*len(offsets)
 
 		words_bytes.extend(w_utf8)
 		assert offsets_index < 2**21
@@ -181,9 +173,6 @@ def write_index(index, label):
 		of.write(struct.pack('<I', 4 + len(offsets_bytes)))
 		of.write(offsets_bytes)
 		of.write(words_bytes)
-
-	print(weightw / 2**20, '+', weighti / 2**20)
-	print(weightw2 / 2**20, '+', weighti2 / 2**20)
 
 def prepare_names():
 	index = {}

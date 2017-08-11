@@ -1,16 +1,17 @@
-#include "common.hpp"
+#include <fstream>
+#include <iostream>
+#include <cassert>
 
-weights_t load_weights(const char* filename)
+#include "common.h"
+
+weights_t load_weights(std::istream& in)
 {
-	std::ifstream in(filename, std::ios::binary);
-	weights_t result;
-	while (!in.eof())
-	{
-		float w;
-		in.read((char*)&w, sizeof(w));
-		result.push_back(w);
-	}
-	result.pop_back();
+	in.seekg(0, std::istream::end);
+	auto length = in.tellg();
+	assert(length % sizeof(double) == 0);
+	weights_t result(length / sizeof(double));
+	in.seekg(0);
+	in.read((char*)&result[0], length);
 	return result;
 }
 
@@ -26,7 +27,8 @@ int main(int argc, char *argv[])
 
 	std::ifstream in(argv[1]);
 	train_feature_index_t feature_index = load_feature_index(in);
-	weights_t weights = load_weights(argv[2]);
+	in.open(argv[2], std::ios::binary);
+	auto weights = load_weights(in);
 	std::cout << feature_index.num_features << " " << weights.size() << std::endl;
 	assert(weights.size() == feature_index.num_features);
 	for (auto i = 3; i < argc; ++i)

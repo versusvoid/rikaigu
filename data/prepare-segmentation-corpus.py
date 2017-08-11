@@ -7,8 +7,6 @@ import os
 import lzma
 import itertools
 
-mydir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(mydir + '/../data')
 from expressions import deinflect, deinflection_rules, inflecting_pos
 from index import index_keys
 import corpus
@@ -242,11 +240,11 @@ random.shuffle(samples)
 print("Number of samples:", len(samples))
 #lsamples = lsamples[:1000000]
 
-with open('segmentation/train.csv', 'w', encoding='utf-16') as f:
+with open('data/train.csv', 'w', encoding='utf-16') as f:
 	print(*samples[0:int(0.8*len(samples))], sep='\n', end='', file=f)
 
-#with open(f'segmentation/{direction}-cv.csv', 'w', encoding='utf-16') as f:
-	#print(*samples[int(0.6*len(samples)):int(0.8*len(samples))], sep='\n', end='', file=f)
-
-with open('segmentation/test.csv', 'w', encoding='utf-16') as f:
+with open('data/test.csv', 'w', encoding='utf-16') as f:
 	print(*samples[int(0.8*len(samples)):], sep='\n', end='', file=f)
+
+with open('data/all.csv', 'w', encoding='utf-16') as f:
+	print(*samples, sep='\n', end='', file=f)

@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <numeric>
 #include <set>
-
+#include <cassert>
 #include <unordered_map>
 
 #include "lbfgs.h"
 #include "utf16.h"
-#include "common.hpp"
+#include "common.h"
 
 struct extract_feature_index_t : std::unordered_map<std::u16string, uint32_t>
 {
@@ -208,10 +208,10 @@ std::ostream& operator<<(std::ostream& out, const std::vector<std::vector<Node>>
 struct TrainPredictor : Predictor<train_feature_index_t>
 {
 	double Z_;
-	TrainPredictor(const train_feature_index_t& feature_index, const double* weights)
+	TrainPredictor(const train_feature_index_t& feature_index, const weights_t& weights)
 	{
 		this->feature_index = &feature_index;
-		this->weights = weights;
+		this->weights = weights.data();
 	}
 
 
@@ -335,7 +335,7 @@ struct TrainPredictor : Predictor<train_feature_index_t>
 int main_test(int, char*[])
 {
 	std::locale::global(std::locale("en_US.UTF-8"));
-	std::array<double, 8 + 8*8> weights = {{
+	weights_t weights{{
 		0.2277, 0.5562, -0.8271, 0.1732, 0.5766, 0.6755, 0.6696, 0.5387, -0.5272, -0.1661, 0.1718, 0.6204, -0.8499,
 		-0.1671, 0.6117, 0.1135, 0.7622, -0.0028, 0.0451, 0.2367, -0.2144, 0.6808, 0.3066, -0.2559, -0.9013, -0.2359,
 		-0.8393, 0.4544, 0.9062, 0.8766, -0.8139, 0.4308, -0.1595, -0.8759, -0.4251, -0.6401, -0.6595, 0.0779, 0.0961,
@@ -348,7 +348,7 @@ int main_test(int, char*[])
 	fake_features.map[u"Uа毲"] = 0;
 	fake_features.map[u"B"] = NUM_LABELS;
 
-	TrainPredictor p(fake_features, weights.data());
+	TrainPredictor p(fake_features, weights);
 	sample_t sample = {
 		{ u'毲', 'a', false },
 		{ u'浨', 'b', false },
@@ -431,7 +431,7 @@ bool runCRF(const samples_t& samples,
 
 	for (auto i = 0U; i < thread_num; ++i)
 	{
-		tasks.emplace_back(i, thread_num, &samples, weights.size(), TrainPredictor(feature_index, &weights[0]));
+		tasks.emplace_back(i, thread_num, &samples, weights.size(), TrainPredictor(feature_index, weights));
 	}
 
 	size_t num_labels = 0;
@@ -522,8 +522,7 @@ bool runCRF(const samples_t& samples,
 
 weights_t train(const samples_t& samples, const train_feature_index_t& feature_index)
 {
-	weights_t weights(feature_index.num_features);
-	std::fill(weights.begin(), weights.end(), 0.0);
+	weights_t weights(feature_index.num_features, 0.0);
 	runCRF(samples, feature_index, weights, 100000, 1.0, 0.0001, 8, true);
 
 	return weights;
@@ -532,11 +531,7 @@ weights_t train(const samples_t& samples, const train_feature_index_t& feature_i
 void dump_weights(const weights_t& weights, const char* filename)
 {
 	std::ofstream out(filename, std::ios::binary);
-	for (auto w : weights)
-	{
-		float float_weight = float(w);
-		out.write((char*)&float_weight, sizeof(float_weight));
-	}
+	out.write((char*)weights.data(), sizeof(double)*weights.size());
 	out.flush();
 }
 
