@@ -49,7 +49,7 @@ def record_samples(sentence_text, words):
 	words_start_index = 0
 	current_sample = None
 	for i, c in enumerate(sentence_text):
-		if not is_japanese_character(c):
+		if not is_japanese_character(c) or ord(c) > 0xffff:
 			if current_sample is not None:
 				sample, words_start_index = split_words(''.join(current_sample), sample_start_index, words, words_start_index)
 				#print(sample)

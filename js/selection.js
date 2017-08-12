@@ -65,25 +65,58 @@ function nodeFilter(node) {
 	return NodeFilter.FILTER_ACCEPT;
 }
 
+/*
+ * Checks whether character with given code is simple Japanese character (kana or kanji < 0xffff).
+ * Corresponds to is_japanese_character() in data/utils.py
+ */
+function isJapaneseCharacter(code) {
+	return ((code >= 0x4e00 && code <= 0x9fa5)
+				|| (code >= 0x3041 && code <= 0x3096)
+				|| (code >= 0x30a1 && code <= 0x30fa)
+				|| code == 0x30fc);
+}
+
+var spaceRegex = /\s/;
 function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offset) {
 	var string = rangeNode.data || rangeNode.value || "";
 	if (forward) {
 		offset = offset || 0;
 		var endIndex = Math.min(string.length, offset + maxLength);
-		outText.push(string.substring(offset, endIndex))
+		string = string.substring(offset, endIndex);
+		var spacePos = string.search(spaceRegex);
+		var isEdge = false;
+		if (spacePos !== -1) {
+			isEdge = true;
+			endIndex = offset + spacePos;
+			string = string.substring(0, spacePos);
+		}
+
+		outText.push(string);
 		outSelectionRange.push({
 			rangeNode,
 			offset,
-			endIndex
+			endIndex,
+			isEdge
 		});
 	} else {
 		offset = isNaN(offset) ? string.length : offset;
 		var startIndex = Math.max(0, offset - maxLength);
-		outText.push(string.substring(startIndex, offset));
+		string = string.substring(startIndex, offset);
+		var foundStart = false;
+		for (var i = string.length - 1; i >= 0; --i) {
+			if (!isJapaneseCharacter(string.charCodeAt(i))) {
+				startIndex += i + 1;
+				string = string.substring(i + 1);
+				foundStart = true;
+				break;
+			}
+		}
+		outText.push(string);
 		outSelectionRange.push({
 			rangeNode,
 			offset,
-			endIndex: startIndex
+			endIndex: startIndex,
+			isEdge: foundStart
 		});
 	}
 	return outText[outText.length - 1].length;
@@ -109,7 +142,7 @@ function getInlineText(node, maxLength, forward, outText, outSelectionRange) {
 	var treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, nodeFilter);
 	var currentLength = 0;
 	node = forward ? treeWalker.firstChild() : treeWalker.lastChild();
-	while (currentLength < maxLength && node !== null) {
+	while (currentLength < maxLength && node !== null && !outSelectionRange[outSelectionRange.length - 1].isEdge) {
 		currentLength += getText(node, maxLength - currentLength, forward, outText, outSelectionRange);
 		node = forward ? treeWalker.nextNode() : treeWalker.previousNode();
 	}
@@ -142,7 +175,7 @@ var startElementExpr ='boolean(parent::rp or ancestor::rt)';
 var maxWordLength = 13;
 function getTextFromRange(rangeNode, offset, forward) {
 	var text = [], fullSelectionRange = [];
-	var maxLength = forward ? maxWordLength : 65536;
+	var maxLength = forward ? maxWordLength : 1024;
 	if (isInput(rangeNode)) {
 		getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
 		return [text[0], fullSelectionRange[0]];
@@ -156,7 +189,7 @@ function getTextFromRange(rangeNode, offset, forward) {
 
 	var currentLength = getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
 	var nextNode = getNext(rangeNode, forward);
-	while (nextNode !== null && currentLength < maxLength) {
+	while (currentLength < maxLength && nextNode !== null && !fullSelectionRange[fullSelectionRange.length - 1].isEdge) {
 		currentLength += getInlineText(nextNode, maxLength - currentLength, forward, text, fullSelectionRange);
 		nextNode = getNext(nextNode, forward);
 	}
