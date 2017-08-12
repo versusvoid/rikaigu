@@ -11,7 +11,6 @@ static sample_t sample;
 bool crf_init(const char* filename, char* file_content, uint32_t length)
 {
 	printf("crf_init(%s)\n", filename);
-	std::locale::global(std::locale("en_US.UTF-8"));
 
 	if (0 == strcmp(filename, "data/weights.bin"))
 	{
@@ -154,6 +153,8 @@ std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* 
 	}
 	*prefix_symbols_length = i - symbol_start - 1;
 
+	/*
+	We could utilize inferred end for word, but it isn't requred, as forward search in dictionary is fast.
 	size_t end = joined.length();
 	for (i += 1; i < annotate_and_add_convertor.code_point_to_utf8_pos.size(); ++i)
 	{
@@ -163,7 +164,9 @@ std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* 
 			break;
 		}
 	}
-
 	return joined.substr(start, end - start);
+	*/
+
+	return joined.substr(start);
 }
 

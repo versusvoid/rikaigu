@@ -334,7 +334,7 @@ struct TrainPredictor : Predictor<train_feature_index_t>
 
 int main_test(int, char*[])
 {
-	std::locale::global(std::locale("en_US.UTF-8"));
+	main_init();
 	weights_t weights{{
 		0.2277, 0.5562, -0.8271, 0.1732, 0.5766, 0.6755, 0.6696, 0.5387, -0.5272, -0.1661, 0.1718, 0.6204, -0.8499,
 		-0.1671, 0.6117, 0.1135, 0.7622, -0.0028, 0.0451, 0.2367, -0.2144, 0.6808, 0.3066, -0.2559, -0.9013, -0.2359,
