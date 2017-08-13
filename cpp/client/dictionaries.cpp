@@ -135,7 +135,7 @@ struct KanaConvertor
 		out.resize(out_offset);
 	}
 
-	bool operator() (const size_t i, wchar_t u, const char* in, const size_t count)
+	bool operator() (const size_t i, wchar_t u, const char*, const size_t)
 	{
 		// Half & full-width katakana to hiragana conversion.
 		// Note: katakana `vu` is never converted to hiragana
@@ -175,8 +175,13 @@ struct KanaConvertor
 		{
 			out.resize(out.size() * 2);
 		}
-		memcpy(&out[0] + out_offset, in, count);
-		out_offset += size_t(count);
+		int written = wctomb(&out[0] + out_offset, u);
+		if (written < 0)
+		{
+			out.clear();
+			return false;
+		}
+		out_offset += size_t(written);
 		true_length_mapping.resize(out_offset + 1, 0);
 		true_length_mapping.at(out_offset) = i + 1; // Need to keep real length because of the half-width semi/voiced conversion
 		previous = v;
@@ -188,7 +193,7 @@ struct KanaConvertor
 std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 {
 	PROFILE
-//	std::cout << "find( " << word << " )" << std::endl;
+	printf("find(%s)\n", word.c_str());
 
 	const char* beg = index->index_start;
 	const char* end = index->index_end;
