@@ -217,17 +217,16 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						continue;
 					}
 
+					printf("%s -> %s due %s\n", candidate.word.c_str(), new_word.c_str(), rule.reason.c_str());
+
 					r.emplace_back(new_word, rule.target_type);
-					if (candidate.expected_forms.count(rule.reason) == 0)
+					if (candidate.reason.length() > 0)
 					{
-						if (candidate.reason.length() > 0)
-						{
-							r.back().reason = rule.reason + " &lt; " + candidate.reason;
-						}
-						else
-						{
-							r.back().reason = rule.reason;
-						}
+						r.back().reason = rule.reason + " &lt; " + candidate.reason;
+					}
+					else
+					{
+						r.back().reason = rule.reason;
 					}
 					r.back().expressions = candidate.expressions;
 					r.back().expressions_forms = candidate.expressions_forms;

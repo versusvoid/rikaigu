@@ -51,25 +51,29 @@ bool rikaigu_set_file(const char* filename, char* data, uint32_t length)
 	{
 		return dictionaries_init(filename, data, length);
 	}
-
 }
 
 const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 		int32_t* match_symbols_length, int32_t* prefix_symbols_length)
 {
 	PROFILE
+
+	printf("rikaigu_search(%s, %s)\n", utf8_text, utf8_prefix);
 	SearchResult res = search(utf8_text);
 	*prefix_symbols_length = 0;
-	printf("1 %zu\n", res.max_match_symbols_length);
+	printf("Plain search res.max_match_symbols_length = %zu\n", res.max_match_symbols_length);
 	if (config.smart_segmentation && utf8_prefix[0] != '\0' && config.default_dictionary == WORDS)
 	{
 		std::string extended_text = crf_extend(utf8_prefix, utf8_text, prefix_symbols_length);
-		printf("2 %zu %s %d\n", extended_text.size(), extended_text.c_str(), *prefix_symbols_length);
+		printf("crf_extend's extended_text.size() = %zu, extended_text = %s, *prefix_symbols_length = %d\n",
+			extended_text.size(), extended_text.c_str(), *prefix_symbols_length);
 		if (extended_text.size() > 0)
 		{
 			SearchResult res2 = search(extended_text.c_str());
-			printf("3 %zu\n", res2.max_match_symbols_length);
-			if (res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length)
+			printf("extended text search res2.max_match_symbols_length = %zu\n", res2.max_match_symbols_length);
+			bool bigger_match = res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length;
+			bool requested_dictionary = res.names && !res2.names;
+			if (bigger_match || requested_dictionary)
 			{
 				res = res2;
 			}

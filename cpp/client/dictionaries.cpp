@@ -274,6 +274,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 	}
 	convertor.shrink();
 	result.source = convertor.out;
+	printf("convertor.out = %s\n", convertor.out.c_str());
 
 	FILE* dict = nullptr;
 	IndexFile* index = nullptr;
