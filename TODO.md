@@ -9,6 +9,7 @@
   - [ ] FIND. MORE. DATA.
 - [x] Second content script refactoring.
 - [ ] Scoring for deinflections: -てよ is unlikely to be -ている->-てる->-てよ. よれよれ is unlikely to be 寄る(passive > masu stem) + よる(masu stem).
+  https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese2015_10000 may help
 - [ ] Generate kanji.dat. KANJIDIC is good enough, but Wiktionary (en and jp) has entries it hasn't.
 - [ ] Documentation
 - [ ] Fix double UTF conversion (to UTF-8 when calling cpp code and back to UTF-16 in cpp code)
