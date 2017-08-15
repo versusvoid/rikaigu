@@ -217,7 +217,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						continue;
 					}
 
-					printf("%s -> %s due %s\n", candidate.word.c_str(), new_word.c_str(), rule.reason.c_str());
+//					printf("%s -> %s due %s\n", candidate.word.c_str(), new_word.c_str(), rule.reason.c_str());
 
 					r.emplace_back(new_word, rule.target_type);
 					if (candidate.reason.length() > 0)
@@ -325,7 +325,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 	{
 		if (!it->expressions.empty())
 		{
-			if ((it->expressions.back()->after_type & it->type) == 0)
+			auto after_type = it->expressions.back()->after_type;
+			if (after_type != ANY_TYPE and (it->type == ANY_TYPE or (it->type & after_type) == 0))
 			{
 				it = r.erase(it);
 				continue;

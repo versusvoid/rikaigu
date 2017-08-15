@@ -23,47 +23,11 @@
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%C9%BD%A4%B9%A4%EB_vs-s
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%CA%AA%A4%C8%A4%B9%A4%EB_vs-i
 # Consider 間違いありません. It's somewhat irregular adj-i
-ありませんでした	なかった	raw	raw	polite
-いませんでした	う	raw	v5u|v5u-s|v5aru	polite past negative
-きませんでした	く	raw	v5k|v5k-s	polite past negative
-きませんでした	くる	raw	vk	polite past negative
-ぎませんでした	ぐ	raw	v5g	polite past negative
-しませんでした	す	raw	v5s	polite past negative
-しませんでした	する	raw	vs-i|vs-s	polite past negative
-ちませんでした	つ	raw	v5t	polite past negative
-にませんでした	ぬ	raw	v5n	polite past negative
-びませんでした	ぶ	raw	v5b	polite past negative
-みませんでした	む	raw	v5m	polite past negative
-りませんでした	る	raw	v5r|v5r-i	polite past negative
 ありません	ない	raw	adj-i	polite
-ませんでした	る	raw	v1|v1-s|vk	polite past negative
-いましょう	う	raw	v5u|v5u-s|v5aru	polite volitional
-きましょう	く	raw	v5k|v5k-s	polite volitional
-きましょう	くる	raw	vk	polite volitional
-ぎましょう	ぐ	raw	v5g	polite volitional
-しましょう	す	raw	v5s	polite volitional
-しましょう	する	raw	vs-i|vs-s	polite volitional
-ちましょう	つ	raw	v5t	polite volitional
-にましょう	ぬ	raw	v5n	polite volitional
-びましょう	ぶ	raw	v5b	polite volitional
-みましょう	む	raw	v5m	polite volitional
-りましょう	る	raw	v5r|v5r-i	polite volitional
-いません	う	raw	v5u|v5u-s|v5aru	polite negative
 かったら	い	raw	adj-i	-tara
 かったり	い	raw	adj-i	-tari
-きません	く	raw	v5k|v5k-s	polite negative
-きません	くる	raw	vk	polite negative
-ぎません	ぐ	raw	v5g	polite negative
 こさせる	くる	v1|v1-s	vk	causative
 こられる	くる	v1|v1-s	vk	potential or passive
-しません	す	raw	v5s	polite negative
-しません	する	raw	vs-i|vs-s	polite negative
-ちません	つ	raw	v5t	polite negative
-にません	ぬ	raw	v5n	polite negative
-びません	ぶ	raw	v5b	polite negative
-ましょう	る	raw	v1|v1-s|vk	polite volitional
-みません	む	raw	v5m	polite negative
-りません	る	raw	v5r|v5r-i	polite negative
 いちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 いちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 きちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
@@ -76,14 +40,32 @@
 いじまう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 んじゃう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 んじまう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+ましたり	ます	raw	masu	-tari
+ましょう	ます	raw	masu	volition
+でしたら	です	raw	desu	-tara
+でしたり	です	raw	desu	-tari
+ました	ます	raw	masu	past
+ません	ます	raw	masu	negative
+でした	です	raw	desu	past
 ちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 ちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
 いたら	く	raw	v5k	-tara
 いだら	ぐ	raw	v5g	-tara
 いたり	く	raw	v5k	-tari
 いだり	ぐ	raw	v5g	-tari
-います	う	v5s	v5u|v5u-s	polite
-います	る	v5s	v5aru	polite
+います	う	masu	v5u|v5u-s	polite
+います	る	masu	v5aru	polite
+きます	く	masu	v5k|v5k-s	polite
+きます	くる	masu	vk	polite
+ぎます	ぐ	masu	v5g	polite
+します	す	masu	v5s	polite
+します	する	masu	vs-i|vs-s	polite
+ちます	つ	masu	v5t	polite
+にます	ぬ	masu	v5n	polite
+びます	ぶ	masu	v5b	polite
+みます	む	masu	v5m	polite
+ります	る	masu	v5r|v5r-i	polite
+ます	る	masu	v1|v1-s|vk	polite
 # 行かせる　(potential)ー＞　行かす　(informal causative)ー＞　行く, but such chain is invalid
 かせる	く	v1|v1-s	v5k|v5k-s	causative
 がせる	ぐ	v1|v1-s	v5g	causative
@@ -94,9 +76,6 @@
 がれる	ぐ	v1|v1-s	v5g	passive
 きたら	くる	raw	vk	-tara
 きたり	くる	raw	vk	-tari
-きます	く	v5s	v5k|v5k-s	polite
-きます	くる	v5s	vk	polite
-ぎます	ぐ	v5s	v5g	polite
 くない	い	adj-i	adj-i	negative
 ければ	い	raw	adj-i	-ba
 こない	くる	adj-i	vk	negative
@@ -117,13 +96,10 @@
 したり	する	raw	vs-i|vs-s	-tari
 しない	する	adj-i	vs-i|vs-s	negative
 さない	する	adj-i	vs-s	negative
-します	す	v5s	v5s	polite
-します	する	v5s	vs-i|vs-s	polite
 しよう	する	raw	vs-i|vs-s	volitional
 たせる	つ	v1|v1-s	v5t	causative
 たない	つ	adj-i	v5t	negative
 たれる	つ	v1|v1-s	v5t	passive
-ちます	つ	v5s	v5t	polite
 ったら	く	raw	v5k-s	-tara
 ったら	う	raw	v5u	-tara
 うたら	う	raw	v5u-s	-tara
@@ -137,20 +113,15 @@
 なせる	ぬ	v1|v1-s	v5n	causative
 なない	ぬ	adj-i	v5n	negative
 なれる	ぬ	v1|v1-s	v5n	passive
-にます	ぬ	v5s	v5n	polite
 ばせる	ぶ	v1|v1-s	v5b	causative
 ばない	ぶ	adj-i	v5b	negative
 ばれる	ぶ	v1|v1-s	v5b	passive
-びます	ぶ	v5s	v5b	polite
 ませる	む	v1|v1-s	v5m	causative
-ません	る	raw	v1|v1-s|vk	polite negative
 まない	む	adj-i	v5m	negative
 まれる	む	v1|v1-s	v5m	passive
-みます	む	v5s	v5m	polite
 らせる	る	v1|v1-s	v5r|v5r-i|v5aru	causative
 らない	る	adj-i	v5r|v5aru	negative
 られる	る	v1|v1-s	v1|v1-s|v5r|v5r-i|v5aru|vk	potential or passive
-ります	る	v5s	v5r|v5r-i	polite
 わせる	う	v1|v1-s	v5u|v5u-s	causative
 わない	う	adj-i	v5u|v5u-s	negative
 われる	う	v1|v1-s	v5u|v5u-s	passive
@@ -225,7 +196,6 @@
 べば	ぶ	raw	v5b	-ba
 べる	ぶ	v1|v1-s	v5b	potential
 ぼう	ぶ	raw	v5b	volitional
-ます	る	v5s	v1|v1-s|vk	polite
 まず	む	raw	v5m	-zu
 めば	む	raw	v5m	-ba
 める	む	v1|v1-s	v5m	potential

@@ -175,13 +175,35 @@ def find_entry(k, r, d=None):
 		entries = d.get(kata_to_hira(k))
 	if entries is None:
 		return []
-	if len(entries) == 1 or r is None:
+
+	if len(entries) == 1:
 		return entries
+
+	i = -1
+	while i + 1 < len(entries):
+		i += 1
+		found = False
+		for sg in entries[i].sense_groups:
+			for sense in sg.senses:
+				if 'arch' not in sense.misc:
+					found = True
+					break
+			if found:
+				break
+
+		if not found:
+			entries.pop(i)
+			i -= 1
+
+	if r is None:
+		return entries
+
 	r = kata_to_hira(r)
 	for e in entries:
 		for reading in e.readings:
 			if kata_to_hira(reading.text) == r:
 				return [e]
+
 	raise Exception(f'Unknown entry {k}|{r}:\n{entries}')
 
 def dictionary_reader(dictionary='JMdict_e.gz', store_in_memory=False):

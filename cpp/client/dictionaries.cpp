@@ -274,7 +274,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 	}
 	convertor.shrink();
 	result.source = convertor.out;
-	printf("convertor.out = %s\n", convertor.out.c_str());
+//	printf("convertor.out = %s\n", convertor.out.c_str());
 
 	FILE* dict = nullptr;
 	IndexFile* index = nullptr;
@@ -339,6 +339,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 					std::cerr << "Too bad" << std::endl;
 					continue;
 				}
+//				printf("Line at index %u for word '%s' is '%.*s'\n", ofs, u.word.c_str(), line_length, line);
 //				std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
 
 				DEntry dentry(std::string(line, line_length - 1), names_dictionary);

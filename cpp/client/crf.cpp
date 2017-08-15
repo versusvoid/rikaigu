@@ -10,11 +10,11 @@ static sample_t sample;
 
 bool crf_init(const char* filename, char* file_content, uint32_t length)
 {
-	printf("crf_init(%s)\n", filename);
+//	printf("crf_init(%s)\n", filename);
 
 	if (0 == strcmp(filename, "data/weights.bin"))
 	{
-		printf("%u weights\n", length / sizeof(double));
+//		printf("%u weights\n", length / sizeof(double));
 		predictor.weights = (double*)file_content;
 	}
 	else
@@ -102,8 +102,7 @@ std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* 
 	annotate_and_add_convertor.reset(joined.length());
 	joined.append(utf8_text);
 
-	printf("before stream_utf8_convertor() joined.size() = %zu, annotate_and_add_convertor.prefix_utf8_length = %zu\n",
-		joined.size(), annotate_and_add_convertor.prefix_utf8_length);
+//	printf("before stream_utf8_convertor() joined.size() = %zu, annotate_and_add_convertor.prefix_utf8_length = %zu\n", joined.size(), annotate_and_add_convertor.prefix_utf8_length);
 
 	if (!stream_utf8_convertor(joined.c_str(), annotate_and_add_convertor)) {
 		return "";
@@ -128,12 +127,11 @@ std::string crf_extend(const char* utf8_prefix, const char* utf8_text, int32_t* 
 		joined = joined.substr(0, annotate_and_add_convertor.end_utf8_pos);
 	}
 
-	printf("before parse() joined.size() = %zu, annotate_and_add_convertor.prefix_utf8_length = %zu\n", joined.size(),
-		annotate_and_add_convertor.prefix_utf8_length);
-	printf("parsing %s\n", joined.c_str());
+//	printf("before parse() joined.size() = %zu, annotate_and_add_convertor.prefix_utf8_length = %zu\n", joined.size(), annotate_and_add_convertor.prefix_utf8_length);
+//	printf("parsing %s\n", joined.c_str());
 	auto& res = predict(predictor, sample);
-	for (auto& tag : res) { printf("%d ", int(tag)); }
-	printf("\n");
+//	for (auto& tag : res) { printf("%d ", int(tag)); }
+//	printf("\n");
 
 	size_t symbol_start = annotate_and_add_convertor.code_point_to_utf8_pos.size();
 	size_t start = annotate_and_add_convertor.prefix_utf8_length;

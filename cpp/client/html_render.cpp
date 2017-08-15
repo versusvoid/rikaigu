@@ -368,15 +368,12 @@ void render_entries(SearchResult& result)
 		buffer += "<td class=\"word\">";
 		entry_to_html(result.data[i], part);
 		buffer += "</td>";
-		if (!result.data[i].expressions.empty())
+		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
 		{
-			for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
-			{
-				buffer += "<td class=\"word\">+";
-				WordResult tmp_result(*it);
-				entry_to_html(tmp_result);
-				buffer += "</td>";
-			}
+			buffer += "<td class=\"word\">+";
+			WordResult tmp_result(*it);
+			entry_to_html(tmp_result);
+			buffer += "</td>";
 		}
 		buffer += "</tr>";
 	}

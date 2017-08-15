@@ -16,12 +16,40 @@ def is_katakana(c):
 	code = ord(c)
 	return code >= 0x30a1 and code <= 0x30fe
 
-def is_japanese_character(c):
-	code = ord(c)
-	return ((code >= 0x4e00 and code <= 0x9fa5) or code > 0xffff
+def _is_simple_japanese_character(code):
+	return ((code >= 0x4e00 and code <= 0x9fa5)
 				or (code >= 0x3041 and code <= 0x3096)
 				or (code >= 0x30a1 and code <= 0x30fa)
 				or code == 0x30fc)
+
+def is_simple_japanese_character(c):
+	return _is_simple_japanese_character(ord(c))
+
+def _is_supplementary_japanese_character(code):
+	# Only a small portion of this ranges has something to do with Japanese.
+	# Care to determine exact boundaries?
+	return (
+		(code >= 0x3400 and code <= 0x4D85) # CJK extension A
+		or
+		(code >= 0x20000 and code <= 0x2A6D6) # CJK extension B
+		or
+		(code >= 0x2A700 and code <= 0x2B734) # CJK extension C
+		or
+		(code >= 0x2B740 and code <= 0x2B81D) # CJK extension D
+		or
+		(code >= 0x2B820 and code <= 0x2CEA1) # CJK extension E
+		or
+		(code >= 0x2CEB0 and code <= 0x2EBE0) # CJK extension F
+		or
+		(code >= 0x2F800 and code <= 0x2FA1F) # CJK Compatibility Supplement
+	)
+
+def is_supplementary_japanese_character(c):
+	return _is_supplementary_japanese_character(ord(c))
+
+def is_japanese_character(c):
+	code = ord(c)
+	return _is_simple_japanese_character(code) or _is_supplementary_japanese_character(code)
 
 def is_english(c):
 	code = ord(c)
