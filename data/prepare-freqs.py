@@ -82,7 +82,8 @@ def mecab_pos_to_jmdict_pos(dkanji, info):
 		elif info.category1 == '接尾' and info.category2 == '特殊':
 			return set(['suf'])
 	elif info.pos == '動詞':
-		res = None
+		res = set([info.inflection_type])
+		'''
 		if info.inflection_type == '一段':
 			res = set(['v1'])
 		elif info.inflection_type.startswith('サ変'):
@@ -94,12 +95,12 @@ def mecab_pos_to_jmdict_pos(dkanji, info):
 				res = set(['v5r'])
 		elif info.inflection_type == '五段・サ行':
 			res = set(['v5s'])
+		'''
 
 		if res is not None and info.category1 in ('非自立', '接尾'):
 			res.add('aux-v')
 
-		if res is not None:
-			return res
+		return res
 
 	raise Exception(f"Don't know how to convert pos '{dkanji} {info}'")
 
@@ -110,28 +111,28 @@ def have_pos(pos, entry):
 
 	return False
 
-def have_reading(reading, entry):
+def have_reading(base_reading, entry):
 	for r in entry.readings:
-		if r.text[:len(reading)] == reading:
+		if r.text == base_reading:
 			return True
 
 	return False
 
-def filter_by_reading(entries, reading):
+def filter_by_reading(entries, base_reading):
 	longest_common_prefix = 0
 	for e in entries:
 		for r in e.readings:
 			i = longest_common_prefix + 1
-			while i <= len(reading) and r.text[:i] == reading[:i]:
+			while i <= len(base_reading) and r.text[:i] == base_reading[:i]:
 				i += 1
 			longest_common_prefix = max(longest_common_prefix, i - 1)
 	if longest_common_prefix > 0:
-		return list(filter(lambda e: have_reading(reading[:longest_common_prefix], e), entries))
+		return list(filter(lambda e: have_reading(base_reading[:longest_common_prefix], e), entries))
 	else:
 		return entries
 
 MecabInfo = namedtuple('MecabInfo', '''pos, category1, category2, category3,
-	inflection_type, form_name, base_form, reading, pronunciation''')
+	inflection_type, form_name, base_form, base_reading, pronunciation''')
 Word = namedtuple('Word', 'source, entry, info')
 
 class Word(object):
@@ -154,11 +155,11 @@ class Word(object):
 		dreading = None
 		if len(self.info.form_name) > 0:
 			dkanji = self.info.base_form
-		elif kata_to_hira(self.info.reading) != kata_to_hira(dkanji):
-			dreading = self.info.reading
+		elif kata_to_hira(self.info.base_reading) != kata_to_hira(dkanji):
+			dreading = self.info.base_reading
 
 		while dkanji[0].isdigit():
-			# TODO also slice reading
+			# TODO also slice base_reading
 			dkanji = dkanji[1:]
 
 		try:
@@ -175,10 +176,10 @@ class Word(object):
 			entries = dictionary.find_entry(dkanji[:j], None)
 			if len(entries) == 0:
 				entries.append(UnknownEntry)
-			words.insert(i + 1, (source[j:], info._replace(base_form=info.base_form[j:], reading=info.reading[j:],
+			words.insert(i + 1, (source[j:], info._replace(base_form=info.base_form[j:], base_reading=info.base_reading[j:],
 				pronunciation=info.pronunciation[j:])))
 			source = source[:j]
-			info = info._replace(base_form=info.base_form[:j], reading=info.reading[:j],
+			info = info._replace(base_form=info.base_form[:j], base_reading=info.base_reading[:j],
 				pronunciation=info.pronunciation[:j])
 		'''
 
@@ -188,7 +189,7 @@ class Word(object):
 			entries = list(filter(lambda e: have_pos(pos, e), entries))
 
 		if len(entries) > 1:
-			entries = filter_by_reading(entries, kata_to_hira(self.info.reading))
+			entries = filter_by_reading(entries, kata_to_hira(self.info.base_reading))
 
 		'''
 		if len(entries) != 1 and i + 1 < len(words):
@@ -197,14 +198,14 @@ class Word(object):
 				if next_source == 'な' and next_info.form_name[-1] == '--mecab suffix--':
 					source = 'ような'
 					entries = dictionary.find_entry(source, None)
-					info = MecabInfo('連体詞', '*', '*', '*', '*', [], source, info.reading+next_info.reading,
-						info.reading+next_info.reading)
+					info = MecabInfo('連体詞', '*', '*', '*', '*', [], source, info.base_reading+next_info.base_reading,
+						info.base_reading+next_info.base_reading)
 					words.pop(i + 1)
 				elif next_source == 'に' and next_info.category1 == '副詞化':
 					source = 'ように'
 					entries = dictionary.find_entry('様に', source)
-					info = MecabInfo('副詞', '*', '*', '*', '*', [], source, info.reading+next_info.reading,
-						info.reading+next_info.reading)
+					info = MecabInfo('副詞', '*', '*', '*', '*', [], source, info.base_reading+next_info.base_reading,
+						info.base_reading+next_info.base_reading)
 					words.pop(i + 1)
 
 		if len(entries) == 0 and i - 1 >= 0:
@@ -215,7 +216,7 @@ class Word(object):
 				entries = dictionary.find_entry('である', None)
 				source = prev_source + source
 				info = info._replace(base_form='である', inflection_type=(info.inflection_type[:-2] + 'デアル'),
-					reading=('デ' + info.reading), pronunciation=('デ' + info.pronunciation))
+					base_reading=('デ' + info.base_reading), pronunciation=('デ' + info.pronunciation))
 
 		if len(entries) == 0 and dkanji in article_titles:
 			entries.append(UnknownEntry)
@@ -282,7 +283,7 @@ def load_masu_stem_rules():
 	return rules
 masu_stem_rules = load_masu_stem_rules()
 
-def check_and_change_if_masu_stem(word):
+def check_if_masu_stem(word):
 	if word.info.pos == '名詞':
 		masu_stem_verb_variants = masu_stem_rules.get(word.source[-1])
 		if masu_stem_verb_variants is None:
@@ -290,17 +291,28 @@ def check_and_change_if_masu_stem(word):
 		for to, _, pos, _ in masu_stem_verb_variants:
 			pos = set(pos.split('|'))
 			try:
-				entries = dictionary.find_entry(word.source[:-1] + to, kata_to_hira(word.info.reading[:-1]) + to)
+				entries = dictionary.find_entry(word.source[:-1] + to, kata_to_hira(word.info.base_reading[:-1]) + to)
+				print('Fond masu stems:', entries)
 			except:
 				continue
 			if len(entries) == 1:
-				word.info = word.info._replace(pos='動詞', form_name=['masu stem'], base_form=(word.source[:-1] + to))
+				return to
 
-				return
+def change_to_masu_stem(word, suffix):
+	word.info = word.info._replace(pos='動詞', form_name=['masu stem'], base_form=(word.source[:-1] + suffix))
 
-def meets_requirements(word, per_expression_requirements):
+def check_and_change_if_masu_stem(word):
+	suffix = check_if_masu_stem(word)
+	if suffix:
+		change_to_masu_stem(word, suffix)
+
+def meets_requirements(word, per_expression_requirements, uninflectable):
 	checked_masu_stem = False
 	for requirements in per_expression_requirements:
+
+		if uninflectable and requirements['pos'] != 'raw':
+			continue
+
 		if 'masu stem' in requirements['after_form'] and not checked_masu_stem:
 			check_and_change_if_masu_stem(word)
 			checked_masu_stem = True
@@ -375,44 +387,53 @@ class InflectionSuffix(object):
 			form_name.append(self.additional_form_name)
 		form_name.extend(w2.info.form_name[self.drop_form_names_from_w2:])
 		w1.source += w2.source
-		w1.info = w1.info._replace(form_name=form_name, reading=(w1.info.reading+w2.info.reading),
+		w1.info = w1.info._replace(form_name=form_name, base_reading=(w1.info.base_reading+w2.info.base_reading),
 			pronunciation=(w1.info.pronunciation+w2.info.pronunciation))
+
+	def __str__(self):
+		return 'InflectionSuffix(' + ', '.join('{}={}'.format(k, getattr(self, k)) for k in InflectionSuffix.default_args) + ')'
 
 suf2form_name = {
 	'ます': InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
-		w2_pos='助動詞', w2_inflection_type='特殊・マス',
+		w2_pos='助動詞', w2_inflection_type='masu',
 		drop_form_names_from_w1=1, additional_form_name='polite'),
 
 	'ない': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='助動詞', w2_inflection_type='特殊・ナイ',
+		w2_pos='助動詞', w2_inflection_type='nai',
 		drop_form_names_from_w1=1, additional_form_name='negative'),
-	'ん': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='助動詞', w2_inflection_type='不変化型',
-		drop_form_names_from_w1=1, additional_form_name='negative'),
-	'ぬ': [
+	'ず': [
 		InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-			w2_pos='助動詞', w2_inflection_type='特殊・ヌ', w2_source='ぬ',
+			w2_pos='助動詞', w2_inflection_type='nu', w2_source='ぬ',
 			drop_form_names_from_w1=1, additional_form_name='archaic negative'),
 		InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-			w2_pos='助動詞', w2_inflection_type='特殊・ヌ', w2_source='ず',
+			w2_pos='助動詞', w2_inflection_type='nu', w2_source='ず',
 			drop_form_names_from_w1=1, additional_form_name='-zu'),
+		# TODO mark as casual negative for verbs other than ます
+		InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
+			w2_pos='助動詞', w2_inflection_type='nu', w2_source='ん',
+			drop_form_names_from_w1=1, additional_form_name='negative'),
 	],
 
 	'た': [
 		InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
-			w2_pos='助動詞', w2_inflection_type='特殊・タ',
+			w2_pos='助動詞', w2_inflection_type='copula',
 			drop_form_names_from_w1=1, additional_form_name='past'),
 		InflectionSuffix(w1_pos='動詞', w1_form_name='past',
-			w2_pos='助動詞', w2_inflection_type='特殊・タ'),
+			w2_pos='助動詞', w2_inflection_type='copula'),
 	],
-	'だ': InflectionSuffix(w1_pos='動詞', w1_form_name='past',
-		w2_pos='助動詞', w2_inflection_type='特殊・タ'),
+	'だ': [
+		InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
+			w2_pos='助動詞', w2_inflection_type='copula',
+			drop_form_names_from_w1=1, additional_form_name='past'),
+		InflectionSuffix(w1_pos='動詞', w1_form_name='past',
+			w2_pos='助動詞', w2_inflection_type='copula'),
+	],
 
 	'たら': InflectionSuffix(w1_pos='動詞', w1_form_name=set(['masu stem', 'past']),
-		w2_pos='助動詞', w2_inflection_type='特殊・タ',
+		w2_pos='助動詞', w2_inflection_type='copula',
 		drop_form_names_from_w1=1, additional_form_name='-tara'),
 	'だら': InflectionSuffix(w1_pos='動詞', w1_form_name=set(['masu stem', 'past']),
-		w2_pos='助動詞', w2_inflection_type='特殊・タ',
+		w2_pos='助動詞', w2_inflection_type='copula',
 		drop_form_names_from_w1=1, additional_form_name='-tara'),
 
 	'て': [
@@ -430,28 +451,24 @@ suf2form_name = {
 		w2_pos='助詞', w2_category1='接続助詞'),
 
 	'られる': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='動詞', w2_category1='接尾',
+		w2_pos='助動詞', w2_inflection_type='v1',
 		drop_form_names_from_w1=1, additional_form_name='potential or passive'),
 	'れる': [
 		InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-			w2_pos='動詞', w2_category1='接尾',
+			w2_pos='助動詞', w2_inflection_type='v1',
 			drop_form_names_from_w1=1, additional_form_name='passive'),
 		InflectionSuffix(w1_pos='動詞', w1_form_name='passive',
 			w2_pos='動詞', w2_category1='接尾'),
 	],
 
-	'させる': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='動詞', w2_category1='接尾',
+	'させる': InflectionSuffix(w1_pos='動詞', w1_form_name=set(['masu stem', 'negative stem']),
+		w2_pos='助動詞', w2_inflection_type='v1',
 		drop_form_names_from_w1=1, additional_form_name='causative'),
 	'せる': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='動詞', w2_category1='接尾',
+		w2_pos='助動詞', w2_inflection_type='v1',
 		drop_form_names_from_w1=1, additional_form_name='causative'),
-	'す': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem',
-		w2_pos='動詞', w2_category1='接尾',
-		drop_form_names_from_w1=1, additional_form_name='informal causative'),
-
-	'さ': InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
-		w2_pos='名詞', w2_category1='接尾',
+	'為る': InflectionSuffix(w1_pos='動詞', w1_form_name='negative stem', w1_inflection_type=(lambda s: s.startswith('v5')),
+		w2_pos='動詞', w2_category1='非自立可能',
 		drop_form_names_from_w1=1, additional_form_name='informal causative'),
 
 	'する': [
@@ -473,7 +490,7 @@ suf2form_name = {
 
 	'たり': [
 		InflectionSuffix(w1_pos='動詞', w1_form_name=set(['masu stem', 'past']),
-			w2_pos='助詞', w2_category1='並立助詞',
+			w2_pos='助詞', w2_category1='副助詞',
 			drop_form_names_from_w1=1, additional_form_name='-tari'),
 		InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
 			w2_pos='助動詞', w2_inflection_type='文語・ナリ',
@@ -484,6 +501,13 @@ suf2form_name = {
 		drop_form_names_from_w1=1, additional_form_name='-tari'),
 }
 def try_join(w1, w2):
+
+	if w2.info.base_form == 'ます' and w2.info.pos == '名詞' and w1.info.pos == '名詞':
+		suffix = check_if_masu_stem(w1)
+		if suffix:
+			change_to_masu_stem(w1, suffix)
+			w2.info = w2.info._replace(pos='助動詞', category1='*', category2='*', inflection_type='masu')
+
 	cases = suf2form_name.get(w2.info.base_form)
 	if type(cases) == InflectionSuffix:
 		if cases.satisfy(w1, w2):
@@ -491,17 +515,25 @@ def try_join(w1, w2):
 			return True
 	elif type(cases) == list:
 		for case in cases:
+			print('Trying', case, 'on', w1, 'and', w2, sep='\n')
 			if case.satisfy(w1, w2):
 				case.combine(w1, w2)
 				return True
 
 	exp = w2.info.base_form
+	uninflectable = False
+	if exp not in known_expressions:
+		exp = w2.source
+		uninflectable = True
 	if exp in known_expressions: # TODO check entry match
-		if meets_requirements(w1, known_expressions[exp]):
+		print('Checking', exp)
+		if meets_requirements(w1, known_expressions[exp], uninflectable):
+			if uninflectable:
+				print("WARNING: matched expression", exp, "by source, while base form is", w2.info.base_form)
 			# TODO record?
 			w1.source += w2.source
 			w1.info = w1.info._replace(form_name=(w1.info.form_name + ['expr=' + exp] + w2.info.form_name),
-					reading=(w1.info.reading+w2.info.reading),
+					base_reading=(w1.info.base_reading+w2.info.base_reading),
 					pronunciation=(w1.info.pronunciation+w2.info.pronunciation))
 			return True
 
@@ -510,9 +542,48 @@ def try_join(w1, w2):
 
 	raise Exception(f"Don't know if should join\n{w1}\nand\n{w2}")
 
+def try_join_into_expression(words, i):
+	source = words[i].source
+	base_reading = words[i].info.base_reading
+	pronunciation = words[i].info.pronunciation
+	candidate = words[i].info.base_form
+	candidates = set(exp for exp in known_expressions if exp.startswith(candidate))
+	j = i
+	while j + 1 < len(words) and len(candidate) < max_expression_length:
+		new_candidate = candidate + words[j + 1].info.base_form
+		new_candidates = set(exp for exp in known_expressions if exp.startswith(new_candidate))
+		if len(new_candidates) == 0:
+			new_candidate = candidate + kata_to_hira(words[j + 1].info.base_reading)
+			new_candidates = set(exp for exp in known_expressions if exp.startswith(new_candidate))
+
+		if len(new_candidates) == 0:
+			break
+		else:
+			j += 1
+			source += words[j].source
+			base_reading += words[j].info.base_reading
+			pronunciation += words[j].info.pronunciation
+			candidate = new_candidate
+			candidates = new_candidates
+
+	if j == i or candidate not in candidates:
+		return None
+
+	words[i].source = source
+	words[i].info = words[j].info._replace(base_form=candidate,
+		base_reading=base_reading,
+		pronunciation=pronunciation)
+	words[i]._entry = None
+
+	for _ in range(i + 1, j + 1):
+		words.pop(i + 1)
+
 mecab_form_name2rikaigu_form_name = {
 	'*': [],
 	'基本形': [],
+	'連体形-一般': [],
+	'終止形-一般': [],
+	'終止形-撥音便': [],
 	'連用デ接続': [],
 	'連用形': ['masu stem'],
 	'未然レル接続': ['passive'],
@@ -523,41 +594,28 @@ mecab_form_name2rikaigu_form_name = {
 	'連用テ接続': ['-te'],
 	'連用ニ接続': ['whatever'],	#assert source == 'ず'
 	'未然ウ接続': ['volitional'],
+	'意志推量形': ['volitional'],
 	'命令ｒｏ': ['imperative'],
+	'命令形': ['imperative'],
 	'命令ｉ': [],
 }
-def try_join_into_expression(words, i):
-	source = words[i].source
-	reading = words[i].info.reading
-	pronunciation = words[i].info.pronunciation
-	candidate = words[i].info.base_form
-	candidates = set(exp for exp in known_expressions if exp.startswith(candidate))
-	j = i
-	while j + 1 < len(words) and len(candidate) < max_expression_length:
-		new_candidate = candidate + words[j + 1].info.base_form
-		new_candidates = set(exp for exp in known_expressions if exp.startswith(new_candidate))
-		if len(new_candidates) == 0:
-			break
-		else:
-			j += 1
-			source += words[j].source
-			reading += words[j].info.reading
-			pronunciation += words[j].info.pronunciation
-			candidate = new_candidate
-			candidates = new_candidates
-
-	if j == i or candidate not in candidates:
-		return None
-
-	words[i].source = source
-	words[i].info = words[j].info._replace(base_form=candidate,
-		reading=reading,
-		pronunciation=pronunciation)
-	words[i]._entry = None
-
-	for _ in range(i + 1, j + 1):
-		words.pop(i + 1)
-
+mecab_inflection_type2rikaigu_inflection_type = {
+	'*': None,
+	'下一段': 'v1',
+	'五段-サ行': 'v5s',
+	'五段-ラ行': 'v5r',
+	'五段-バ行': 'v5b',
+	'五段-ガ行': 'v5g',
+	'サ行変格': 'vs',
+	'助動詞-マス': 'masu',
+	'助動詞-ナイ': 'nai',
+	'助動詞-ヌ': 'nu',
+	'助動詞-タ': 'copula',
+	'助動詞-ダ': 'copula',
+	'助動詞-デス': 'desu',
+	'助動詞-レル': 'v1',
+	'助動詞-マイ': 'mai',
+}
 
 def transform_sample(words, recurse=True):
 	print('--------------------------------')
@@ -565,10 +623,24 @@ def transform_sample(words, recurse=True):
 	for i in range(len(words)):
 		source, info = words[i]
 		info = info.split(',')
-		if info[6] in ('た', 'だ') and info[4] in ('特殊・タ', '特殊・ダ'):
+		for j, v in enumerate(info):
+			if v == '':
+				info[j] = '*'
+
+		if info[6] in ('た', 'だ') and info[4] in ('助動詞-タ', '助動詞-ダ'):
 			info[6] = source
+			info[7] = source
 			info[5] = '*'
+
+		inflection_type = mecab_inflection_type2rikaigu_inflection_type.get(info[4])
+		if inflection_type is None:
+			inflection_type = mecab_inflection_type2rikaigu_inflection_type[info[4].split('-')[0]]
+		info[4] = inflection_type
+
 		form_name = mecab_form_name2rikaigu_form_name.get(info[5])
+		if form_name is None:
+			form_name = mecab_form_name2rikaigu_form_name.get(info[5].split('-')[0])
+
 		if form_name is not None:
 			info[5] = form_name[:]
 		else:
@@ -609,7 +681,9 @@ def main():
 	with open('tmp/raw-corpus.txt', 'w') as of:
 		#mecab = subprocess.Popen([f'unxz -c {extracted_dump} | mecab -d /usr/lib/mecab/dic/mecab-ipadic-neologd'],
 		#mecab = subprocess.Popen([f'cat data/inflection-samples.dat | mecab -d /usr/lib/mecab/dic/mecab-ipadic-neologd'],
-		mecab = subprocess.Popen([f'cat data/inflection-samples3.dat | mecab'],
+		#mecab = subprocess.Popen([f'cat data/inflection-samples.dat | mecab'],
+		unidic2ipadic_format = '%m\\t%f[0],%f[1],%f[2],%f[3],%f[4],%f[5],%f[7],%f[6],%f[9]\\n'
+		mecab = subprocess.Popen([f'cat data/inflection-samples4.dat | mecab -O "" -F "{unidic2ipadic_format}" -d /usr/lib/mecab/dic/mecab-unidic-neologd'],
 				shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True)
 		continuous_japanese = []
 		for line_no, l in enumerate(mecab.stdout):
