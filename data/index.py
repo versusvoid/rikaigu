@@ -2,6 +2,7 @@
 import sys
 import re
 import os
+from collections import defaultdict
 from utils import *
 
 # Mapping from kanji to set of it's readings
@@ -223,16 +224,21 @@ def is_variable_word(w):
 	return True
 
 
-def index_keys(entry, variate=True, convert_to_hiragana=True):
+def index_keys(entry, variate=True, convert_to_hiragana=True, with_source=False):
 	transform = kata_to_hira if convert_to_hiragana else (lambda x: x)
-	res = set()
+	res = defaultdict(set)
 	for k in entry.kanjis:
-		res.add(transform(k.text))
+		res[transform(k.text)].add(k.text)
 	for r in entry.readings:
-		res.add(transform(r.text))
+		res[transform(r.text)].add(r.text)
 		if variate:
 			for ki in r.kanjis:
 				k = entry.kanjis[ki]
-				if is_variable_word(k.text):
-					res.update(compute_variations(k.text, r.text))
-	return res
+				if not is_variable_word(k.text): continue
+				for key in compute_variations(k.text, r.text):
+					res[key].add(k.text)
+
+	if with_source:
+		return res
+	else:
+		return set(res)

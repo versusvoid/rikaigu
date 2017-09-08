@@ -159,15 +159,11 @@ def make_entry(elem, entities):
 	return entry
 
 _dictionary = {}
-#record_entry_hooks = []
 def _record_entry(entry):
-	for key in index_keys(entry, variate=False):
-		_dictionary.setdefault(key, []).append(entry)
+	for key, key_sources in index_keys(entry, variate=False, with_source=True).items():
+		_dictionary.setdefault(key, []).append((key_sources, entry))
 
-	#for hook in record_entry_hooks:
-		#hook(entry)
-
-def find_entry(k, r, d=None):
+def find_entry(k, r, d=None, with_keys=False):
 	if d is None:
 		d = _dictionary
 	entries = d.get(k)
@@ -177,13 +173,13 @@ def find_entry(k, r, d=None):
 		return []
 
 	if len(entries) == 1:
-		return entries
+		return (entries if with_keys else [entries[0][1]])
 
 	i = -1
 	while i + 1 < len(entries):
 		i += 1
 		found = False
-		for sg in entries[i].sense_groups:
+		for sg in entries[i][1].sense_groups:
 			for sense in sg.senses:
 				if 'arch' not in sense.misc:
 					found = True
@@ -196,13 +192,13 @@ def find_entry(k, r, d=None):
 			i -= 1
 
 	if r is None:
-		return entries
+		return (entries if with_keys else list(map(lambda p: p[1], entries)))
 
 	r = kata_to_hira(r)
-	for e in entries:
+	for key_sources, e in entries:
 		for reading in e.readings:
 			if kata_to_hira(reading.text) == r:
-				return [e]
+				return ([(key_sources, e)] if with_keys else [e])
 
 	raise Exception(f'Unknown entry {k}|{r}:\n{entries}')
 

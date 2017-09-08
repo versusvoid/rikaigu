@@ -10,6 +10,7 @@
 
 Deinflector::Deinflector(const string_view& deinflect, const string_view& expressions)
 {
+	assert(!"FIXME only one られる->る survives. Why?");
 	const char* p = deinflect.data;
 	const char* end = deinflect.data + deinflect.length;
 	while (p < end)
@@ -242,6 +243,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						continue;
 					}
 
+					assert(!"Process past stem");
 					size_t numSpecials = 0;
 					if (rule.after_form.count("negative stem") > 0)
 					{
