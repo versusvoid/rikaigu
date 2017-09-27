@@ -69,7 +69,7 @@ def deinflect(w, targets=None):
 	return res
 
 assert deinflect('して', ['する']) == {'vs-i': [('する', ['-te'])], 'vs-s': [('する', ['-te'])]}, deinflect('して', ['する'])
-assert deinflect('戻ります', {'戻る', 'もどる'}) == {'v5r': [('戻る', ['polite'])], 'v5r-i': [('戻る', ['polite'])]}
+assert deinflect('戻り', {'戻る', 'もどる'}) == {'v5r': [('戻る', ['masu stem'])], 'v5r-i': [('戻る', ['masu stem'])]}
 
 def deinflect_stems(w, targets):
 	'''

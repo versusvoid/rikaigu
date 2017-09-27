@@ -144,7 +144,7 @@ known_expressions = load_expressions()
 dictionary.load_dictionary()
 words_by_pos = {}
 for entries in dictionary._dictionary.values():
-	for entry in entries:
+	for _, entry in entries:
 		for sg in entry.sense_groups:
 			pos_key = '-'.join(sg.pos)
 			words_by_pos.setdefault(pos_key, []).append(entry)

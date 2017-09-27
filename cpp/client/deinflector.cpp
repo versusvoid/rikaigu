@@ -10,7 +10,6 @@
 
 Deinflector::Deinflector(const string_view& deinflect, const string_view& expressions)
 {
-	assert(!"FIXME only one られる->る survives. Why?");
 	const char* p = deinflect.data;
 	const char* end = deinflect.data + deinflect.length;
 	while (p < end)
@@ -99,8 +98,7 @@ Deinflector::Deinflector(const string_view& deinflect, const string_view& expres
 					rule.source_type = inflection_type_to_int(p, column_end);
 					break;
 				case 3:
-					rule.after_type = *p == '*'? ANY_TYPE
-					                           : inflection_type_to_int(p, column_end);
+					rule.after_type = *p == '*'? ANY_TYPE : inflection_type_to_int(p, column_end);
 					break;
 				case 4:
 					while (p < column_end)
@@ -132,6 +130,9 @@ Deinflector::Deinflector(const string_view& deinflect, const string_view& expres
 						));
 						p = part_end + 1;
 					}
+					break;
+				case 7:
+					rule.reason = std::string(p, column_end);
 					break;
 				default:
 					std::cerr << "Invalid expression: " << std::string(p, line_end) << std::endl;
@@ -170,12 +171,9 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 //	std::cout << "deinflect( " << word << " )" << std::endl;
 
 	std::list<Candidate> r;
-	std::map<std::string, Candidate*> have;
 	r.emplace_back(word,
 	// Original word can have any type
 		ANY_TYPE);
-	have[word] = &*r.begin();
-
 
 	for (auto candidate_it = r.begin(); candidate_it != r.end(); ++candidate_it)
 	{
@@ -194,7 +192,10 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 			{
 				const Rule& rule = it->second;
 				// If rule isn't applicable to this word
-				if ((candidate.type & rule.source_type) == 0) continue;
+				if ((candidate.type & rule.source_type) == 0)
+				{
+					continue;
+				}
 				if (!candidate.expected_forms.empty()
 						&& candidate.expected_forms.count(rule.reason) == 0
 						&& candidate.expected_forms.count("*") == 0)
@@ -208,15 +209,6 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					// Inflection
 					new_word += rule.to;
 					if (new_word.length() <= 1) continue;
-					auto have_it = have.find(new_word);
-					if (have_it != have.end())
-					{
-						// If we have already obtained this new word through other
-						// chain of deinflections - update only it's type.
-						// We union types to denote that it can have any of these types
-						have_it->second->type |= rule.target_type;
-						continue;
-					}
 
 //					printf("%s -> %s due %s\n", candidate.word.c_str(), new_word.c_str(), rule.reason.c_str());
 
@@ -231,7 +223,6 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					}
 					r.back().expressions = candidate.expressions;
 					r.back().expressions_forms = candidate.expressions_forms;
-					have[new_word] = &r.back();
 
 				}
 				else if (g.suffix_length < candidate.word.length() && config.deinflect_expressions)
@@ -243,7 +234,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						continue;
 					}
 
-					assert(!"Process past stem");
+//					printf("Expression %s\n", end.c_str());
+
 					size_t numSpecials = 0;
 					if (rule.after_form.count("negative stem") > 0)
 					{
@@ -253,70 +245,54 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						{
 							new_special = u8"しない";
 						}
-						if (have.count(new_special) > 0)
-						{
-//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
-							continue;
-						}
 
 						r.emplace_back(new_special, INFLECTION_TYPES["adj-i"],
 							candidate.expressions_forms, end,
 							candidate.expressions, &rule,
 							std::set<std::string>{"negative", "masu stem"}
 						);
-						have[new_special] = &r.back();
 					}
 
 					if (rule.after_form.count("provisional stem") > 0)
 					{
 						numSpecials += 1;
-						auto new_special = new_word + u8"ば";
-						if (have.count(new_special) > 0)
-						{
-//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
-							continue;
-						}
-
-						r.emplace_back(new_special, INFLECTION_TYPES["raw"],
+						r.emplace_back(new_word + u8"ば", INFLECTION_TYPES["raw"],
 							candidate.expressions_forms, end,
 							candidate.expressions, &rule,
 							std::set<std::string>{"-ba"}
 						);
-						have[new_special] = &r.back();
 					}
 
 					if (rule.after_form.count("adjective stem") > 0)
 					{
 						numSpecials += 1;
-						auto new_special = new_word + u8"い";
-						if (have.count(new_special) > 0)
-						{
-//							std::cerr << "Well, that's strange: " << word << " " << new_special << std::endl;
-							continue;
-						}
-
-						r.emplace_back(new_special, INFLECTION_TYPES["adj-i"],
+						r.emplace_back(new_word + u8"い", INFLECTION_TYPES["adj-i"],
 							candidate.expressions_forms, end,
 							candidate.expressions, &rule,
 							std::set<std::string>{"negative"}
 						);
-						have[new_special] = &r.back();
+					}
+
+					if (rule.after_form.count("past stem") > 0)
+					{
+						numSpecials += 1;
+						for (auto& copula : {u8"た", u8"だ"})
+						{
+							r.emplace_back(new_word + copula, INFLECTION_TYPES["raw"],
+								candidate.expressions_forms, end,
+								candidate.expressions, &rule,
+								std::set<std::string>{"past"}
+							);
+						}
 					}
 
 					if (numSpecials < rule.after_form.size())
 					{
-						if (have.count(new_word) > 0)
-						{
-//							std::cerr << "Well, that's strange: " << word << " " << new_word << std::endl;
-							continue;
-						}
-
-						r.emplace_back(new_word, ANY_TYPE,
+						r.emplace_back(new_word, rule.after_type,
 							candidate.expressions_forms, end,
 							candidate.expressions, &rule,
 							rule.after_form
 						);
-						have[new_word] = &r.back();
 					}
 				}
 			}
@@ -328,12 +304,12 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 		if (!it->expressions.empty())
 		{
 			auto after_type = it->expressions.back()->after_type;
-			if (after_type != ANY_TYPE and (it->type == ANY_TYPE or (it->type & after_type) == 0))
+			if ((it->type & after_type) == 0)
 			{
 				it = r.erase(it);
 				continue;
 			}
-			it->type &= it->expressions.back()->after_type;
+			it->type &= after_type;
 		}
 		++it;
 	}
