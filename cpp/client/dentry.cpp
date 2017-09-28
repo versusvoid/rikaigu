@@ -8,7 +8,7 @@
 #include <cassert>
 
 DEntry::DEntry(const std::string& dictionary_line, bool name)
-	: name(name)
+	: _name(name)
 	, _freq(1e9)
 	, _all_pos(0)
 {
@@ -38,7 +38,13 @@ DEntry::DEntry(const std::string& dictionary_line, bool name)
 	}
 }
 
-int DEntry::freq() {
+bool DEntry::name()
+{
+	return _name;
+}
+
+int DEntry::freq()
+{
 	return _freq;
 }
 
@@ -177,7 +183,7 @@ void DEntry::parse_sense_groups()
 			split(sense_group.substr(0, p), ','),
 			split(sense_group.substr(p + 1), '`')
 		});
-		if (name)
+		if (_name)
 		{
 			for(auto& type : _sense_groups.back().types)
 			{

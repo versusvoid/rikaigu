@@ -248,6 +248,10 @@ static bool compare(WordResult& a, WordResult& b)
 	{
 		return a.match_symbols_length > b.match_symbols_length;
 	}
+	if (a.dentry.name() != b.dentry.name())
+	{
+		return a.dentry.name() < b.dentry.name();
+	}
 	if (a.reason.empty() != b.reason.empty())
 	{
 		return a.reason.empty() > b.reason.empty();
@@ -261,6 +265,16 @@ static bool compare(WordResult& a, WordResult& b)
 
 static size_t line_buffer_size = 0;
 static char* line = nullptr;
+
+inline void sort_and_limit(SearchResult& res)
+{
+	// Sort by match length and then by commonnesss
+	std::sort(res.data.begin(), res.data.end(), compare);
+	if (res.data.size() > 5) {
+		res.more = true;
+	}
+	res.data.erase(res.data.begin() + std::min(5L, long(res.data.size())), res.data.end());
+}
 
 SearchResult word_search(const char* word, bool names_dictionary)
 {
@@ -398,9 +412,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 
 	if (!names_dictionary)
 	{
-		// Sort by match length and then by commonness
-		std::sort(result.data.begin(), result.data.end(), compare);
-		result.data.erase(result.data.begin() + std::min(5L, long(result.data.size())), result.data.end());
+		sort_and_limit(result);
 	}
 
 	result.max_match_symbols_length = max_length;
@@ -525,9 +537,9 @@ SearchResult search(const char* text)
 				if (dictionary == config.default_dictionary)
 				{
 					SearchResult res2 = word_search(text, true);
-					if (res2.max_match_symbols_length > res.max_match_symbols_length) {
-						return res2;
-					}
+					res.data.insert(res.data.end(), res2.data.begin(), res2.data.end());
+					res.max_match_symbols_length = std::max(res.max_match_symbols_length, res2.max_match_symbols_length);
+					sort_and_limit(res);
 				}
 				break;
 			case NAMES:

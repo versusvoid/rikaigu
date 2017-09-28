@@ -28,7 +28,6 @@ struct KanjiGroup
 
 class DEntry
 {
-	bool name;
 	std::string kanji_string;
 	std::string reading_string;
 	std::string definition_string;
@@ -39,6 +38,7 @@ class DEntry
 	std::vector<KanjiGroup> _kanji_groups;
 	std::vector<Writing> _readings;
 
+	bool _name;
 	int _freq;
 	uint32_t _all_pos;
 
@@ -49,6 +49,7 @@ public:
 
 	DEntry(const std::string& dictionaryLine, bool name);
 
+	bool name();
 	int freq();
 	uint32_t all_pos();
 
