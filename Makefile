@@ -1,9 +1,6 @@
 CSS = css/options.css css/popup-common.css css/popup-black.css css/popup-blue.css css/popup-lightblue.css css/popup-yellow.css
 DICT_STATIC = data/kanji.dat data/radicals.dat data/deinflect.dat
 DICT_DYNAMIC = data/dict.dat data/dict.idx data/names.dat data/names.idx data/kanji.idx data/expressions.dat
-SEGMENTATION_CORPUS = data/train.csv data/test.csv data/all.csv
-SEGMENTATION_MODEL_DEV = data/weights.bin data/features.bin
-SEGMENTATION_MODEL_RELEASE = data/release/weights.bin data/release/features.bin
 IMG = images/ba.png images/icon128.png images/icon48.png
 HTML = html/background.html html/options.html html/scratchpad.html html/popup.html
 JS = js/background.js js/config.js js/options.js js/rikaicontent.js js/selection.js js/highlight.js js/scratchpad.js js/popup.js
@@ -12,7 +9,7 @@ CPP_RELEASE = cpp/release/rikai.asm.js cpp/release/rikai.asm.js.mem cpp/release/
 
 .PHONY: all release dicts clean
 
-all: cpp/rikai.asm.js $(SEGMENTATION_MODEL_DEV)
+all: cpp/rikai.asm.js
 release: dist/rikaigu.zip
 
 $(DICT_DYNAMIC): data/dictionary.py data/expressions.py data/prepare-dict.py data/utils.py data/index.py data/freqs.py data/romaji.py
@@ -24,25 +21,14 @@ $(CPP_DEV): $(DICT_DYNAMIC)
 $(CPP_RELEASE): $(DICT_DYNAMIC)
 	cd cpp && make release
 
-$(SEGMENTATION_CORPUS): data/prepare-segmentation-corpus.py data/expressions.py data/index.py data/dictionary.py data/corpus.py data/utils.py
-	data/prepare-segmentation-corpus.py
-
-$(SEGMENTATION_MODEL_DEV): cpp/train-crf $(SEGMENTATION_CORPUS)
-	cd data && ../cpp/train-crf train.csv test.csv
-
-$(SEGMENTATION_MODEL_RELEASE): cpp/train-crf $(SEGMENTATION_CORPUS)
-	mkdir -p data/release
-	cd data/release && ../../cpp/train-crf ../all.csv ../test.csv
-
-dist/rikaigu.zip: manifest.json $(CSS) $(DICT_STATIC) $(IMG) $(HTML) $(JS) $(DICT_DYNAMIC) $(CPP_RELEASE) $(SEGMENTATION_MODEL_RELEASE)
+dist/rikaigu.zip: manifest.json $(CSS) $(DICT_STATIC) $(IMG) $(HTML) $(JS) $(DICT_DYNAMIC) $(CPP_RELEASE)
 	mkdir -p dist/rikaigu/{css,data,images,html,js,cpp}
 	ln -sfr $(CSS) dist/rikaigu/css
 	ln -sfr $(IMG) dist/rikaigu/images
 	ln -sfr $(HTML) dist/rikaigu/html
 	ln -sfr $(JS) dist/rikaigu/js
 	ln -sfr $(CPP_RELEASE) dist/rikaigu/cpp
-	ln -sfr $(SEGMENTATION_MODEL_RELEASE) \
-		data/radicals.dat data/deinflect.dat \
+	ln -sfr data/radicals.dat data/deinflect.dat \
 		data/dict.idx data/names.idx data/kanji.idx data/expressions.dat \
 		dist/rikaigu/data
 	ln -sfr manifest.json dist/rikaigu
@@ -50,4 +36,4 @@ dist/rikaigu.zip: manifest.json $(CSS) $(DICT_STATIC) $(IMG) $(HTML) $(JS) $(DIC
 
 clean:
 	cd cpp && make clean
-	rm -rf data/release data/__pycache__ tmp dist $(DICT_DYNAMIC) $(SEGMENTATION_CORPUS) $(SEGMENTATION_MODEL_DEV)
+	rm -rf data/release data/__pycache__ tmp dist $(DICT_DYNAMIC)

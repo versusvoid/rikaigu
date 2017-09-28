@@ -241,6 +241,7 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 	text = text.trim();
 	if (!text) return reset();
 
+	/* Not used currently.
 	var [prefix, prefixSelectionRange] = getTextFromRange(rangeNode, rangeOffset, false);
 	var trimmedPrefix = prefix.trim();
 	if (prefix.endsWith(trimmedPrefix)) {
@@ -248,6 +249,9 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 	} else {
 		prefix = "";
 	}
+	*/
+	var prefix = '';
+	var prefixSelectionRange = [{rangeNode, offset: rangeOffset, endIndex: rangeOffset, isEdge: true}];
 
 	chrome.runtime.sendMessage({
 			"type": "xsearch",

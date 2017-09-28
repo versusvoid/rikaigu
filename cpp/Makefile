@@ -1,13 +1,13 @@
 
 .PHONY: all release
 
-all: rikai.asm.js train-crf test-crf
+all: rikai.asm.js
 release: release/rikai.asm.js
 
 clean:
 	rm -rf release
 	find ./ -regex '.*\.\(bc\|d\)' -delete
-	rm -f test-crf train-crf rikai.asm.js rikai.asm.data rikai.asm.js.mem rikai.asm.js.map
+	rm -f rikai.asm.js rikai.asm.data rikai.asm.js.mem rikai.asm.js.map
 
 COMMON_CXXFLAGS = -std=c++14 -O3 -Wall -I.
 
@@ -23,14 +23,12 @@ EMCCFLAGS = \
 
 JS_SOURCES = \
 	client/api.cpp \
-	client/crf.cpp \
 	client/deinflector.cpp \
 	client/dentry.cpp \
 	client/dictionaries.cpp \
 	client/html_render.cpp \
 	client/word_types.cpp \
-	client/utils.cpp \
-	crfxx/encode.cpp
+	client/utils.cpp
 JS_OBJECTS = $(JS_SOURCES:%.cpp=%.bc)
 
 rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat
@@ -49,37 +47,4 @@ release/rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/k
 
 ifneq ($(MAKECMDGOALS),clean)
 include $(JS_SOURCES:%.cpp=%.bc.d)
-endif
-
-
-CXXFLAGS = $(COMMON_CXXFLAGS) -flto -pthread
-
-
-TRAIN_SOURCES = \
-	crfxx/encode.cpp \
-	tools/lbfgs.cpp \
-	tools/utf16.cpp \
-	tools/common.cpp \
-	tools/train.cpp
-
-train-crf: $(TRAIN_SOURCES)
-	g++ $(CXXFLAGS) $^ -o $@
-
-
-TEST_SOURCES = \
-	crfxx/encode.cpp \
-	tools/utf16.cpp \
-	tools/common.cpp \
-	tools/test.cpp
-
-test-crf: $(TEST_SOURCES)
-	g++ $(CXXFLAGS) $^ -o $@
-
-%.d : %.cpp
-	g++ $(CXXFLAGS) -MM $< -MT $(<:%.cpp=%.d) -o $@
-	sed 's#^\($(<:%.cpp=%.d)\)#\1 $@#g' -i $@
-
-ifneq ($(MAKECMDGOALS),clean)
-include $(TRAIN_SOURCES:%.cpp=%.d)
-include $(TEST_SOURCES:%.cpp=%.d)
 endif

@@ -34,7 +34,7 @@ std::vector<std::string> split(const std::string& str, char sep)
 
 
 Config config = {
-	false, true, false, true,
+	false, true, true,
 	WORDS,
 	// see `kanji_numbers` in html_render.cpp
 	{"H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"}
@@ -43,14 +43,12 @@ Config config = {
 void rikaigu_set_config(
 		bool only_reading,
 		bool kanji_components,
-		bool smart_segmentation,
 		bool deinflect_expressions,
 		int default_dictionary,
 		const char* kanji_info)
 {
 	config.only_reading = only_reading;
 	config.kanji_components = kanji_components;
-	config.smart_segmentation = smart_segmentation;
 	config.deinflect_expressions = deinflect_expressions;
 	config.default_dictionary = Dictionary(default_dictionary);
 

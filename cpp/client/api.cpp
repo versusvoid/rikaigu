@@ -1,5 +1,4 @@
 #include "api.h"
-#include "crf.h"
 #include "dictionaries.h"
 #include "html_render.h"
 #include "utils.h"
@@ -39,11 +38,7 @@ bool rikaigu_set_file(const char* filename, char* data, uint32_t length)
 {
 	initialize_locale();
 
-	if (0 == strcmp(filename, "data/weights.bin") || 0 == strcmp(filename, "data/features.bin"))
-	{
-		return crf_init(filename, data, length);
-	}
-	else if (0 == strcmp(filename, "data/radicals.dat"))
+	if (0 == strcmp(filename, "data/radicals.dat"))
 	{
 		return render_init(data, length);
 	}
@@ -62,30 +57,6 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	SearchResult res = search(utf8_text);
 	*prefix_symbols_length = 0;
 //	printf("Plain search res.max_match_symbols_length = %zu\n", res.max_match_symbols_length);
-	if (config.smart_segmentation && utf8_prefix[0] != '\0' && config.default_dictionary == WORDS)
-	{
-		std::string extended_text = crf_extend(utf8_prefix, utf8_text, prefix_symbols_length);
-//		printf("crf_extend's extended_text.size() = %zu, extended_text = %s, *prefix_symbols_length = %d\n", extended_text.size(), extended_text.c_str(), *prefix_symbols_length);
-		if (extended_text.size() > 0)
-		{
-			SearchResult res2 = search(extended_text.c_str());
-//			printf("extended text search res2.max_match_symbols_length = %zu\n", res2.max_match_symbols_length);
-			bool bigger_match = res2.max_match_symbols_length >= res.max_match_symbols_length + *prefix_symbols_length;
-			bool requested_dictionary = res.names && !res2.names;
-			if (bigger_match || requested_dictionary)
-			{
-				res = res2;
-			}
-			else
-			{
-				*prefix_symbols_length = 0;
-			}
-		}
-		else
-		{
-			assert(*prefix_symbols_length == 0);
-		}
-	}
 	*match_symbols_length = int32_t(res.max_match_symbols_length) - *prefix_symbols_length;
 	return  make_html(res);
 }

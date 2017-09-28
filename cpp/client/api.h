@@ -7,7 +7,6 @@ extern "C" {
 void EMSCRIPTEN_KEEPALIVE rikaigu_set_config(
 	bool only_reading,
 	bool kanji_components,
-	bool smart_segmentation,
 	bool deinflect_expressions,
 	int default_dictionary,
 	const char* kanji_info);

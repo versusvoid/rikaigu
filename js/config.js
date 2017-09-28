@@ -38,10 +38,10 @@ if (localStorage.length > 0) {
 }
 
 var config = null;
-var cppConfig = ['onlyReadings', 'showKanjiComponents', 'smartSegmentation', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
+var cppConfig = ['onlyReadings', 'showKanjiComponents', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
-	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'number', 'number', 'string'],
+	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'number', 'string'],
 		cppConfig.map(key => config[key]));
 }
 
@@ -59,7 +59,6 @@ function onConfigChange(configChange) {
 
 function initConfig(config) {
 	const defaultConfig = {
-		"smartSegmentation": false,
 		"deinflectExpressions": true,
 		"popupColor": "blue",
 		"matchHighlight": true,

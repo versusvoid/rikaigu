@@ -42,7 +42,6 @@ struct Config
 {
 	bool only_reading;
 	bool kanji_components;
-	bool smart_segmentation;
 	bool deinflect_expressions;
 	Dictionary default_dictionary;
 	std::set<std::string> kanji_info;
