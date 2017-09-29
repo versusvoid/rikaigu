@@ -1,3 +1,12 @@
+Coming in 1.0.0
+============
+
+* Most background rewritten in C++ and transpiled into asm.js.
+* Three(!) times memory consumption reduction.
+* Suffixoid expressions are recognaized and shown alongside words (can be turned off).
+* Text grabbing from more HTML interface elements.
+* Autostart option.
+
 Version 0.9.4
 =============
 
