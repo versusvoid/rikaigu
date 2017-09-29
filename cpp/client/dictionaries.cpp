@@ -252,13 +252,13 @@ static bool compare(WordResult& a, WordResult& b)
 	{
 		return a.dentry.name() < b.dentry.name();
 	}
-	if (a.reason.empty() != b.reason.empty())
-	{
-		return a.reason.empty() > b.reason.empty();
-	}
 	if (a.expressions.empty() != b.expressions.empty())
 	{
 		return a.expressions.empty() > b.expressions.empty();
+	}
+	if (a.reason.empty() != b.reason.empty())
+	{
+		return a.reason.empty() > b.reason.empty();
 	}
 	return a.dentry.freq() < b.dentry.freq();
 }
@@ -357,6 +357,10 @@ SearchResult word_search(const char* word, bool names_dictionary)
 //				std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
 
 				DEntry dentry(std::string(line, line_length - 1), names_dictionary);
+				if (names_dictionary)
+				{
+					dentry.filter_writings(convertor.out);
+				}
 
 				// > second and further - a de-inflected word.
 				// Each type has associated bit. If bit-and gives 0
@@ -382,24 +386,25 @@ SearchResult word_search(const char* word, bool names_dictionary)
 					max_length = true_length;
 				}
 
-				std::vector<DEntry> expressions;
+				std::vector<ExpressionResult> expressions;
 				for (auto i = 0U; i < u.expressions.size(); ++i)
 				{
-					fseek(dict, u.expressions[i]->offset, SEEK_SET);
+					const CandidateExpression& expr = u.expressions[i];
+					fseek(dict, expr.expression_rule->offset, SEEK_SET);
 					ssize_t line_length = getline(&line, &line_buffer_size, dict);
 					if (line_length == -1)
 					{
 						std::cerr << "Too bad" << std::endl;
 						continue;
 					}
-					DEntry expression(std::string(line, line_length - 1), names_dictionary);
-					expression.filter_writings(u.expressions_forms[i]);
-					expression.filter_senses(u.expressions[i]->sense_indices);
-					expressions.emplace_back(expression);
+					DEntry expression_dentry(std::string(line, line_length - 1), names_dictionary);
+					expression_dentry.filter_writings(expr.expression_writing);
+					expression_dentry.filter_senses(expr.expression_rule->sense_indices);
+					expressions.emplace_back(ExpressionResult{expression_dentry, expr.reason});
 				}
 				result.data.emplace_back(dentry, u.reason,
 					true_length, convertor.out.length(),
-					expressions);
+					std::move(expressions));
 			}
 		}
 		if (count >= maxTrim) break;

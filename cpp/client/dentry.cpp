@@ -109,8 +109,6 @@ void DEntry::filter_writings(const std::string &the_only_writing)
 			return;
 		}
 	}
-
-	assert(false);
 }
 
 void DEntry::filter_senses(const std::vector<std::pair<int, int> > &sense_indices)

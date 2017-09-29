@@ -42,14 +42,19 @@ struct SuffixLengthRulesGroup
 	{}
 };
 
+struct CandidateExpression
+{
+	const Rule* expression_rule;
+	std::string expression_writing;
+	std::string reason;
+};
+
 struct Candidate
 {
 	std::string word;
 	uint32_t type;
 	std::string reason;
-	std::vector<std::string> expressions_forms;
-	std::vector<const Rule*> expressions;
-	// TODO per-expression reason
+	std::vector<CandidateExpression> expressions;
 	std::set<std::string> expected_forms;
 
 	Candidate(const std::string& word, uint32_t type)
@@ -58,17 +63,17 @@ struct Candidate
 	{}
 
 	Candidate(const std::string& word, uint32_t type,
-			const std::vector<std::string>& expressions_forms, const std::string& new_expression_form,
-			const std::vector<const Rule*>& expressions, const Rule* new_expression,
+			const Rule* new_expression,
+			const std::string& new_expression_writing,
+			const std::string& new_expression_reason,
+			const std::vector<CandidateExpression>& expressions,
 			const std::set<std::string>& expected_forms)
 		: word(word)
 		, type(type)
-		, expressions_forms(expressions_forms)
 		, expressions(expressions)
 		, expected_forms(expected_forms)
 	{
-		this->expressions_forms.push_back(new_expression_form);
-		this->expressions.push_back(new_expression);
+		this->expressions.push_back({new_expression, new_expression_writing, new_expression_reason});
 	}
 };
 

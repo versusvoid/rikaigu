@@ -46,11 +46,11 @@ var rikaigu = null;
 var frameId = null;
 
 function updateConfig() {
-	if (rikaigu !== null) {
-		chrome.storage.local.get(null, function(config) {
+	chrome.storage.local.get(null, function(config) {
+		if (rikaigu !== null) {
 			rikaigu.config = config;
-		});
-	}
+		}
+	});
 }
 
 function enableTab(config, popup) {
@@ -315,6 +315,12 @@ function onKeyDown(ev) {
 			rikaigu.altView = 0;
 			updatePopupPosition(rikaigu.shownX, rikaigu.shownY + 20);
 			break;
+		case 'KeyE':
+			chrome.storage.local.set({deinflectExpressions: !rikaigu.config.deinflectExpressions}, function() {
+				rikaigu.shownMatch = null;
+				extractTextAndSearch();
+			});
+			break
 		default:
 			return;
 	}

@@ -371,7 +371,7 @@ void render_entries(SearchResult& result)
 		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
 		{
 			buffer += "<td class=\"word\">+";
-			WordResult tmp_result(*it);
+			WordResult tmp_result(it->dentry, it->reason);
 			entry_to_html(tmp_result);
 			buffer += "</td>";
 		}

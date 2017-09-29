@@ -4,10 +4,10 @@ DICT_DYNAMIC = data/dict.dat data/dict.idx data/names.dat data/names.idx data/ka
 IMG = images/ba.png images/icon128.png images/icon48.png
 HTML = html/background.html html/options.html html/scratchpad.html html/popup.html
 JS = js/background.js js/config.js js/options.js js/rikaicontent.js js/selection.js js/highlight.js js/scratchpad.js js/popup.js
-CPP_DEV = cpp/rikai.asm.js cpp/rikai.asm.js.mem cpp/rikai.asm.data cpp/train-crf
+CPP_DEV = cpp/rikai.asm.js cpp/rikai.asm.js.mem cpp/rikai.asm.data
 CPP_RELEASE = cpp/release/rikai.asm.js cpp/release/rikai.asm.js.mem cpp/release/rikai.asm.data
 
-.PHONY: all release dicts clean
+.PHONY: all $(CPP_DEV) release dicts clean
 
 all: cpp/rikai.asm.js
 release: dist/rikaigu.zip

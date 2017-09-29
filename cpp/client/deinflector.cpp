@@ -222,14 +222,14 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						r.back().reason = rule.reason;
 					}
 					r.back().expressions = candidate.expressions;
-					r.back().expressions_forms = candidate.expressions_forms;
 
 				}
 				else if (g.suffix_length < candidate.word.length() && config.deinflect_expressions)
 				{
 					// Expression
-					if (!candidate.expressions.empty() &&
-							(candidate.expressions.back()->after_type & rule.source_type) == 0)
+					auto after_type = candidate.expressions.empty() ? ANY_TYPE
+						: candidate.expressions.back().expression_rule->after_type;
+					if ((after_type & rule.source_type) == 0)
 					{
 						continue;
 					}
@@ -247,8 +247,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						}
 
 						r.emplace_back(new_special, INFLECTION_TYPES["adj-i"],
-							candidate.expressions_forms, end,
-							candidate.expressions, &rule,
+							&rule, end, candidate.reason,
+							candidate.expressions,
 							std::set<std::string>{"negative", "masu stem"}
 						);
 					}
@@ -257,8 +257,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					{
 						numSpecials += 1;
 						r.emplace_back(new_word + u8"ば", INFLECTION_TYPES["raw"],
-							candidate.expressions_forms, end,
-							candidate.expressions, &rule,
+							&rule, end, candidate.reason,
+							candidate.expressions,
 							std::set<std::string>{"-ba"}
 						);
 					}
@@ -267,8 +267,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 					{
 						numSpecials += 1;
 						r.emplace_back(new_word + u8"い", INFLECTION_TYPES["adj-i"],
-							candidate.expressions_forms, end,
-							candidate.expressions, &rule,
+							&rule, end, candidate.reason,
+							candidate.expressions,
 							std::set<std::string>{"negative"}
 						);
 					}
@@ -279,8 +279,8 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 						for (auto& copula : {u8"た", u8"だ"})
 						{
 							r.emplace_back(new_word + copula, INFLECTION_TYPES["raw"],
-								candidate.expressions_forms, end,
-								candidate.expressions, &rule,
+								&rule, end, candidate.reason,
+								candidate.expressions,
 								std::set<std::string>{"past"}
 							);
 						}
@@ -288,9 +288,9 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 
 					if (numSpecials < rule.after_form.size())
 					{
-						r.emplace_back(new_word, rule.after_type,
-							candidate.expressions_forms, end,
-							candidate.expressions, &rule,
+						r.emplace_back(new_word, rule.after_type | INFLECTION_TYPES["raw"],
+							&rule, end, candidate.reason,
+							candidate.expressions,
 							rule.after_form
 						);
 					}
@@ -303,7 +303,7 @@ std::list<Candidate> Deinflector::deinflect(const std::string& word)
 	{
 		if (!it->expressions.empty())
 		{
-			auto after_type = it->expressions.back()->after_type;
+			auto after_type = it->expressions.back().expression_rule->after_type;
 			if ((it->type & after_type) == 0)
 			{
 				it = r.erase(it);
