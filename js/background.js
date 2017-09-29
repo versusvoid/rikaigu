@@ -188,6 +188,7 @@ function rikaiguDisable() {
 				}
 			}
 		});
+	chrome.storage.local.set({'reload': true});
 	location.reload();
 }
 
@@ -242,8 +243,16 @@ function onMessage(request, sender, response) {
 	}
 }
 
+function onConfigReady() {
+	if (config.reload) {
+		chrome.storage.local.remove('reload');
+		return;
+	}
+	if (config.autostart && !rikaiguEnabled) {
+		rikaiguEnable();
+	}
+}
+
 clearState();
 chrome.browserAction.onClicked.addListener(rikaiguEnable);
 chrome.runtime.onMessage.addListener(onMessage);
-
-rikaiguEnable();

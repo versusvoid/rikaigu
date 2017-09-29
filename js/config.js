@@ -71,6 +71,7 @@ function initConfig(config) {
 		"defaultDict": 0,
 		'kanjiInfo': 'H L E DK N V Y P IN I U',
 		'configVersion': 'v1.0.0',
+		'autostart': false,
 	};
 
 	var needUpdate = false;
@@ -86,5 +87,7 @@ function initConfig(config) {
 
 	window.config = config;
 	chrome.storage.onChanged.addListener(onConfigChange);
+
+	onConfigReady();
 }
 chrome.storage.local.get(null, initConfig);
