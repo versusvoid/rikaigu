@@ -9,7 +9,11 @@ function clearHighlight() {
 	}
 
 	if (rikaigu.oldActiveElement) {
-		rikaigu.oldActiveElement.focus();
+		if (rikaigu.oldActiveElement === document.body) {
+			document.activeElement.blur();
+		} else {
+			rikaigu.oldActiveElement.focus();
+		}
 		if ('oldActiveElementSelectionStart' in rikaigu) {
 			rikaigu.oldActiveElement.selectionStart = rikaigu.oldActiveElementSelectionStart;
 			delete rikaigu.oldActiveElementSelectionStart;
