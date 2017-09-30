@@ -8,6 +8,7 @@ data/*.idx
 data/*.bin
 data/expressions.dat
 cpp/rikai.asm.*
+cpp/release
 *.swp
 __pycache__
 tmp

@@ -208,7 +208,6 @@ function search(request) {
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
-			console.log('enable? request. Response is ', rikaiguEnabled);
 			response(rikaiguEnabled, sender.frameId);
 			break;
 

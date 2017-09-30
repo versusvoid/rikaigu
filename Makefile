@@ -12,7 +12,7 @@ CPP_RELEASE = cpp/release/rikai.asm.js cpp/release/rikai.asm.js.mem cpp/release/
 all: cpp/rikai.asm.js
 release: dist/rikaigu.zip
 
-$(DICT_DYNAMIC): data/dictionary.py data/expressions.py data/prepare-dict.py data/utils.py data/index.py data/freqs.py data/romaji.py
+$(DICT_DYNAMIC): data/dictionary.py data/expressions.py data/prepare-dict.py data/utils.py data/index.py data/freqs.py data/romaji.py data/expressions.dat.in
 	data/prepare-dict.py
 
 $(CPP_DEV): $(DICT_DYNAMIC)

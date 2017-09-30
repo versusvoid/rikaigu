@@ -193,7 +193,7 @@ struct KanaConvertor
 std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 {
 	PROFILE
-	printf("find(%s)\n", word.c_str());
+//	printf("find(%s)\n", word.c_str());
 
 	const char* beg = index->index_start;
 	const char* end = index->index_end;
