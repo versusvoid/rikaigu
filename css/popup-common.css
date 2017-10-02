@@ -71,10 +71,14 @@
 
 #rikaigu-window td.word {
 	vertical-align: top !important;
-	border-width: 2px 0px 2px 2px !important;
 	border-style: solid !important;
 	padding-left: 4px !important;
 	max-width: 400px !important;
+	border-width: 0 !important;
+}
+
+#rikaigu-window td.expression {
+	border-width: 2px 0px 2px 2px !important;
 }
 
 #rikaigu-window .w-kanji {

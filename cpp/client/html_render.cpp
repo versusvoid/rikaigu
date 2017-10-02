@@ -365,12 +365,17 @@ void render_entries(SearchResult& result)
 			part = result.source.substr(0, result.data[i].match_bytes_length);
 		}
 
-		buffer += "<td class=\"word\">";
+		buffer += "<td class=\"word";
+		if (!result.data[i].expressions.empty())
+		{
+			buffer += " expression";
+		}
+		buffer += "\">";
 		entry_to_html(result.data[i], part);
 		buffer += "</td>";
 		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
 		{
-			buffer += "<td class=\"word\">+";
+			buffer += "<td class=\"word expression\">+";
 			WordResult tmp_result(it->dentry, it->reason);
 			entry_to_html(tmp_result);
 			buffer += "</td>";
