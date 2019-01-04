@@ -62,7 +62,7 @@ function onLoaded(initiatorTab) {
 		});
 	}
 
-	var windows = chrome.windows.getAll({
+	chrome.windows.getAll({
 			"populate": true
 		},
 		function(windows) {
@@ -151,8 +151,7 @@ function rikaiguEnable(tab) {
 	}
 	window.Module = {
 		print: function(text) { console.log('stdout:', text); },
-		memoryInitializerPrefixURL: '/cpp/',
-		filePackagePrefixURL: '/cpp/',
+		locateFile: function(path, prefix) { return '/cpp/' + path; },
 		onRuntimeInitialized: function() {
 			updateCppConfig();
 			Promise.all([

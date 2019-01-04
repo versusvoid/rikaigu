@@ -6,7 +6,7 @@ function loadValues() {
 			if (input.getAttribute('type') === 'checkbox') {
 				input.checked = config[input.id];
 			} else {
-				 input.value = config[input.id];
+				input.value = config[input.id];
 			}
 		}
 
@@ -20,7 +20,7 @@ function loadValues() {
 }
 
 function saveValues() {
-	var newConfig = {}
+	var newConfig = {};
 	for (var input of document.querySelectorAll('[bind]')) {
 		switch (input.getAttribute('type')) {
 		case 'checkbox':
@@ -35,7 +35,7 @@ function saveValues() {
 		}
 	}
 
-	var kanjiinfoarray = []
+	var kanjiinfoarray = [];
 	for (var k of kanjiInfoKeys) {
 		if(document.getElementById(k).checked) {
 			kanjiinfoarray.push(k);

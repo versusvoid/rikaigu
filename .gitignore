@@ -12,3 +12,5 @@ cpp/release
 *.swp
 __pycache__
 tmp
+rikaigu.code-workspace
+.vscode

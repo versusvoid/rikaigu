@@ -36,6 +36,8 @@
 		"all_frames": true
 	}],
 
+	"content_security_policy": "script-src 'self' 'wasm-eval'; object-src 'self'",
+
 	"web_accessible_resources": [
 		"css/popup-black.css",
 		"css/popup-blue.css",

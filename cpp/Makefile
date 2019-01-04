@@ -7,7 +7,9 @@ release: release/rikai.asm.js
 clean:
 	rm -rf release
 	find ./ -regex '.*\.\(bc\|d\)' -delete
-	rm -f rikai.asm.js rikai.asm.data rikai.asm.js.mem rikai.asm.js.map
+	rm -f \
+		rikai.asm.js rikai.asm.data \
+		rikai.asm.wasm rikai.asm.wasm.pre rikai.asm.wast
 
 COMMON_CXXFLAGS = -std=c++14 -O3 -Wall -I.
 
@@ -17,6 +19,7 @@ EMCCFLAGS = \
 		-s TOTAL_MEMORY=32MB \
 		-s TOTAL_STACK=500KB \
 		-s LZ4=1 \
+		-s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "getValue"]' \
 		--preload-file ../data/dict.dat@/dict.dat \
 		--preload-file ../data/names.dat@/names.dat \
 		--preload-file ../data/kanji.dat@/kanji.dat
@@ -31,7 +34,7 @@ JS_SOURCES = \
 	client/utils.cpp
 JS_OBJECTS = $(JS_SOURCES:%.cpp=%.bc)
 
-rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat
+rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat Makefile
 	emcc $(JS_CXXFLAGS) $(JS_OBJECTS) $(JS_DEBUG_FLAGS) $(EMCCFLAGS) -o $@
 
 release/rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/kanji.dat

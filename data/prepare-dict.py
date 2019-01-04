@@ -251,7 +251,7 @@ def prepare_dict(process_expressions):
 					continue
 
 				offset = expression_ids.get(parts[4])
-				assert offset != '?', parts
+				assert offset != '?', "Can't find expression in dictionary: " + str(parts)
 				parts[4] = offset
 				print(*parts, sep='\t', file=of)
 
