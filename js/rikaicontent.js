@@ -321,6 +321,10 @@ function onKeyDown(ev) {
 				extractTextAndSearch();
 			});
 			break
+		case 'KeyF':
+			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
+				el.classList.toggle('rikaigu-hidden');
+			}
 		default:
 			return;
 	}

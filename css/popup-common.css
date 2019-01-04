@@ -49,6 +49,14 @@
 	border-width: 1px !important;
 }
 
+.rikaigu-hidden {
+	display: none !important;
+}
+
+span.rikaigu-second-and-further {
+	font-style: italic !important;
+}
+
 
 /* used for word definitions */
 
@@ -245,8 +253,6 @@
 
 
 /* manual query */
-
-#rikaigu-window .q-tb td {}
 
 #rikaigu-window .q-w {
 	border-right: 1px dotted #B0B0B0 !important;

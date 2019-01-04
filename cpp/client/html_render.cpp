@@ -358,7 +358,13 @@ void render_entries(SearchResult& result)
 
 	for (auto i = 0u; i < result.data.size(); ++i)
 	{
-		buffer += "<tr>";
+		buffer += "<tr class=\"";
+		if (i > 0)
+		{
+			buffer += " rikaigu-second-and-further rikaigu-hidden";
+		}
+		buffer += "\">";
+
 		std::string part;
 		if (result.data[i].match_symbols_length < result.max_match_symbols_length)
 		{
@@ -370,9 +376,14 @@ void render_entries(SearchResult& result)
 		{
 			buffer += " expression";
 		}
+		else
+		{
+			buffer += "\" colspan=\"10";
+		}
 		buffer += "\">";
 		entry_to_html(result.data[i], part);
 		buffer += "</td>";
+		
 		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
 		{
 			buffer += "<td class=\"word expression\">+";
@@ -380,14 +391,24 @@ void render_entries(SearchResult& result)
 			entry_to_html(tmp_result);
 			buffer += "</td>";
 		}
+		
 		buffer += "</tr>";
 	}
 	buffer += "</table>";
-	if (result.more)
+	if (result.data.size() > 1)
 	{
-		buffer += "...<br/>";
+		if (result.more)
+		{
+			buffer += "...";
+		}
+		buffer += "<span class=\"rikaigu-second-and-further\">";
+		if (!result.more)
+		{
+			buffer += "...";
+		}
+		
+		buffer += " (F)</span>";
 	}
-
 }
 
 const char* make_html(SearchResult& result)
