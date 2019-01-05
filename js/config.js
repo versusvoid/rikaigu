@@ -1,3 +1,5 @@
+"use strict";
+
 if (localStorage.length > 0) {
 	// Update from old config
 	// TODO remove after couple of months/versions
@@ -41,8 +43,10 @@ var config = null;
 var cppConfig = ['onlyReadings', 'showKanjiComponents', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
-	Module.ccall('rikaigu_set_config', null, ['number', 'number', 'number', 'number', 'string'],
-		cppConfig.map(key => config[key]));
+	var cppConfigValues = cppConfig.map(key => config[key]);
+	cppConfigValues.push(Object.entries(config['reviewList']).map(kv => kv.join(',')).join('|'));
+	Module.ccall('rikaigu_set_config', null,
+		['number', 'number', 'number', 'number', 'string', 'string'], cppConfigValues);
 }
 
 function onConfigChange(configChange) {
@@ -72,6 +76,7 @@ function initConfig(config) {
 		'kanjiInfo': 'H L E DK N V Y P IN I U',
 		'configVersion': 'v1.0.0',
 		'autostart': false,
+		'reviewList': {},
 	};
 
 	var needUpdate = false;

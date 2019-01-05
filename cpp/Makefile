@@ -11,7 +11,7 @@ clean:
 		rikai.asm.js rikai.asm.data \
 		rikai.asm.wasm rikai.asm.wasm.pre rikai.asm.wast
 
-COMMON_CXXFLAGS = -std=c++14 -O3 -Wall -I.
+COMMON_CXXFLAGS = -std=c++17 -O3 -Wall -I.
 
 JS_CXXFLAGS = $(COMMON_CXXFLAGS)
 JS_DEBUG_FLAGS = -g3 -s SAFE_HEAP=1 -s ASSERTIONS=1 -s WARN_UNALIGNED=1 -s DEMANGLE_SUPPORT=1

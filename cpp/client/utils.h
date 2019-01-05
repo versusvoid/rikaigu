@@ -6,6 +6,7 @@
 #include <iostream>
 #include <chrono>
 #include <set>
+#include <map>
 #include <vector>
 
 struct string_view
@@ -45,10 +46,11 @@ struct Config
 	bool deinflect_expressions;
 	Dictionary default_dictionary;
 	std::set<std::string> kanji_info;
+	std::map<uint32_t, std::string> review_list;
 };
 extern Config config;
 
-std::vector<std::string> split(const std::string& str, char sep);
+std::vector<std::string> split(const std::string_view& str, char sep, bool add_empty = true);
 
 extern "C" {
 void EMSCRIPTEN_KEEPALIVE rikaigu_dump_profile_info();

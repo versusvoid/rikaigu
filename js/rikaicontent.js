@@ -134,11 +134,7 @@ function showPopup(text, x, y) {
 		popup.setAttribute('id', 'rikaigu-window');
 		document.documentElement.appendChild(popup);
 
-		popup.addEventListener('dblclick',
-			function(ev) {
-				requestHidePopup();
-				ev.stopPropagation();
-			}, true);
+		document.addEventListener('click', onClick, false);
 	} else {
 		var href = chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css');
 		var css = document.getElementById('rikaigu-css');
@@ -165,6 +161,32 @@ function showPopup(text, x, y) {
 
 	popup.style.display = '';
 	updatePopupPosition(x, y, popup);
+}
+
+function toggleHiddenReviewListEntryInfo(node) {
+	for (var child of node.children) {
+		if (child.classList.contains('rikaigu-review-listed')) {
+			child.classList.toggle('rikaigu-hidden');
+		}
+	}
+}
+
+function toggleHiddenAllReviewListEntriesInfo(popup) {
+	for (var child of popup.getElementsByTagName('td')) {
+		if (rikaigu.config.reviewList[child.getAttribute('id')]) toggleHiddenReviewListEntryInfo(child);
+	}
+}
+
+function onClick(ev) {
+	if (!rikaigu.isVisible) return;
+	if (!ev.target.classList.contains('rikaigu-add-to-review-list')) {
+		return requestHidePopup();
+	}
+	var wordNode = ev.target.parentNode;
+	rikaigu.config.reviewList[wordNode.getAttribute('id')] = getCurrentWordContext();
+	chrome.storage.local.set({reviewList: rikaigu.config.reviewList}, function() {
+		wordNode.removeChild(ev.target);
+	});
 }
 
 function updatePopupPosition(x, y, popup) {
@@ -206,6 +228,7 @@ function updatePopupPosition(x, y, popup) {
 		}
 
 		// Below the mouse
+		// TODO compute from font-size
 		const verticalOffset = 25;
 
 		// Under the popup title
@@ -325,6 +348,8 @@ function onKeyDown(ev) {
 			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
 				el.classList.toggle('rikaigu-hidden');
 			}
+		case 'KeyR':
+			toggleHiddenAllReviewListEntriesInfo(document.getElementById('rikaigu-window'));
 		default:
 			return;
 	}
@@ -406,9 +431,10 @@ function onMouseMove(ev) {
 		});
 	}
 
-	if ((rikaigu.config.showOnKey.includes("Alt") && !ev.altKey) ||
-		(rikaigu.config.showOnKey.includes("Ctrl") && !ev.ctrlKey)) {
-		return reset();
+	if (rikaigu.config.showOnKey !== 'None' &&
+		((rikaigu.config.showOnKey.includes("Alt") && !ev.altKey) ||
+		(rikaigu.config.showOnKey.includes("Ctrl") && !ev.ctrlKey))) {
+		return;
 	}
 
 	var rangeEnd = 0;
@@ -482,7 +508,7 @@ function onMouseMove(ev) {
 	var dx = rikaigu.shownX - ev.screenX;
 	var dy = rikaigu.shownY - ev.screenY;
 	var distance = Math.sqrt(dx * dx + dy * dy);
-	if (distance > 4) {
+	if (distance > 4 && rikaigu.config.showOnKey === 'None') {
 		reset();
 	}
 }

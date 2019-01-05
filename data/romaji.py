@@ -106,10 +106,7 @@ conversion_table = {
 	"め": ["me"],
 	"も": ["mo"],
 	"や": ["ya"],
-	"や": ["ya"],
 	"ゆ": ["yu"],
-	"ゆ": ["yu"],
-	"よ": ["yo"],
 	"よ": ["yo"],
 	"ら": ["ra"],
 	"り": ["ri"],
@@ -148,7 +145,7 @@ def is_romajination(hiragana, word):
 	global skip, count
 	if len(word) < len(hiragana):
 		return False
-	original_hiragana = hiragana
+	# original_hiragana = hiragana
 	word = word.lower()
 	original_word = word
 	while len(hiragana) > 0 and len(word) > 0:

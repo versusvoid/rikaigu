@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "api.h"
 
+#include <cassert>
 #include <unordered_map>
 #include <map>
 #include <vector>
@@ -8,26 +9,26 @@
 #include <algorithm>
 
 
-std::vector<std::string> split(const std::string& str, char sep)
+std::vector<std::string> split(const std::string_view& str, char sep, bool add_empty)
 {
 	PROFILE
 	std::vector<std::string> res;
 	if (str.length() == 0)
 	{
-		res.push_back(str);
+		if (add_empty) res.emplace_back(str);
 		return res;
 	}
 
 	std::size_t start = 0, end = str.find(sep);
 	while (end != std::string::npos)
 	{
-		res.push_back(str.substr(start, end - start));
+		if (add_empty || end > start) res.emplace_back(str.substr(start, end - start));
 		start = end + 1;
 		end = str.find(sep, start);
 	}
 	if (start < str.length())
 	{
-		res.push_back(str.substr(start));
+		res.emplace_back(str.substr(start));
 	}
 	return res;
 }
@@ -45,7 +46,8 @@ void rikaigu_set_config(
 		bool kanji_components,
 		bool deinflect_expressions,
 		int default_dictionary,
-		const char* kanji_info)
+		const char* kanji_info,
+		const char* review_list)
 {
 	config.only_reading = only_reading;
 	config.kanji_components = kanji_components;
@@ -53,9 +55,23 @@ void rikaigu_set_config(
 	config.default_dictionary = Dictionary(default_dictionary);
 
 	config.kanji_info.clear();
-	for (auto& kanji_info_key : split(kanji_info, ' '))
+	for (auto& kanji_info_key : split(kanji_info, ' ', false))
 	{
-		config.kanji_info.insert(kanji_info_key);
+		config.kanji_info.emplace(kanji_info_key);
+	}
+
+	config.review_list.clear();
+	std::cout << "review list: " << review_list << std::endl;
+	for (auto& kv : split(review_list, '|', false))
+	{
+		auto sep = kv.find(',');
+		assert(sep != std::string::npos);
+		uint32_t id;
+		// auto res = std::from_chars(kv.c_str(), kv.c_str() + sep, id);
+		// assert(res.ec == std::errc());
+		id = std::stoi(kv.substr(0, sep));
+		std::cout << "Review entry: " << id << " - " << kv.substr(sep + 1) << std::endl;
+		config.review_list.emplace(id, kv.substr(sep + 1));
 	}
 }
 

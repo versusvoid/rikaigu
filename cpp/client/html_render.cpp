@@ -219,8 +219,24 @@ void render_kanji(const KanjiResult& kanji)
 	buffer += "</td></tr></table>";
 }
 
+inline void conditionaly_add_class(bool add, const std::string_view& class_name)
+{
+	if (add)
+	{
+		buffer += ' ';
+		buffer += class_name;
+	}
+}
+
 void entry_to_html(WordResult& word, const std::string& partial = "")
 {
+	const auto& review_list_entry = config.review_list.find(word.dentry.id());
+	bool from_review_list = review_list_entry != config.review_list.end();
+	if (!from_review_list)
+	{
+		buffer += "<div class=\"rikaigu-add-to-review-list\"></div>";
+	}
+
 	if (!word.dentry.readings().empty())
 	{
 		for (auto j = 0U; j < word.dentry.kanji_groups().size(); ++j)
@@ -234,10 +250,7 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 					buffer += u8"、";
 				}
 				buffer += "<span class=\"w-kanji";
-				if (!k.common)
-				{
-					buffer += " uncommon";
-				}
+				conditionaly_add_class(!k.common, "uncommon");
 				buffer += "\">";
 				buffer += k.text;
 				buffer += "</span>";
@@ -252,14 +265,13 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 					buffer += u8"、";
 				}
 				buffer += "<span class=\"w-kana";
-				if (!r.common)
-				{
-					buffer += " uncommon";
-				}
+				conditionaly_add_class(!r.common, "uncommon");
+				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
 				buffer += "\">";
 				buffer += r.text;
 				buffer += "</span>";
 			}
+
 			if (j == 0 && !word.reason.empty())
 			{
 				buffer += " <span class=\"w-conj\">(";
@@ -285,10 +297,7 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 			}
 			buffer += "<span class=\"w-kana";
 			assert(g.kanjis.size() > 0);
-			if (!g.kanjis.at(0).common)
-			{
-				buffer += " uncommon";
-			}
+			conditionaly_add_class(!g.kanjis.at(0).common, "uncommon");
 			buffer += "\">";
 			buffer += g.kanjis.at(0).text;
 			buffer += "</span>";
@@ -307,6 +316,13 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 		buffer += "<br />";
 	}
 
+	if (from_review_list)
+	{
+		buffer += "<span class=\"w-review-context rikaigu-review-listed\">";
+		buffer += review_list_entry->second;
+		buffer += "<br /></span>";
+	}
+
 	if (!config.only_reading)
 	{
 		for (auto sense_group : word.dentry.sense_groups())
@@ -321,8 +337,11 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 				buffer += sense_group.types[i];
 			}
 			buffer += "</span>";
-			if (sense_group.senses.size() > 1) {
-				buffer += "<ul class=\"w-def\"><li>";
+			if (sense_group.senses.size() > 1)
+			{
+				buffer += "<ul class=\"w-def";
+				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
+				buffer += "\"><li>";
 				for (auto i = 0U; i < sense_group.senses.size(); ++i)
 				{
 					if (i > 0)
@@ -332,10 +351,14 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 					buffer += sense_group.senses[i];
 				}
 				buffer += "</li></ul>";
-			} else {
+			}
+			else
+			{
 				// TODO? generate readings for names
 				assert(sense_group.senses.size() == 1);
-				buffer += " <span class=\"w-def\">";
+				buffer += " <span class=\"w-def";
+				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
+				buffer += "\">";
 				buffer += sense_group.senses.at(0);
 				buffer += "</span><br />";
 			}
@@ -380,18 +403,23 @@ void render_entries(SearchResult& result)
 		{
 			buffer += "\" colspan=\"10";
 		}
-		buffer += "\">";
+		buffer += "\" id=";
+		buffer += std::to_string(result.data[i].dentry.id());
+		buffer += '>';
+
 		entry_to_html(result.data[i], part);
 		buffer += "</td>";
-		
+
 		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
 		{
-			buffer += "<td class=\"word expression\">+";
+			buffer += "<td class=\"word expression\" id=";
+			buffer += std::to_string(it->dentry.id());
+			buffer += ">+";
 			WordResult tmp_result(it->dentry, it->reason);
 			entry_to_html(tmp_result);
 			buffer += "</td>";
 		}
-		
+
 		buffer += "</tr>";
 	}
 	buffer += "</table>";
@@ -406,7 +434,7 @@ void render_entries(SearchResult& result)
 		{
 			buffer += "...";
 		}
-		
+
 		buffer += " (F)</span>";
 	}
 }

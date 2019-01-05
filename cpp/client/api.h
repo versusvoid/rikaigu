@@ -9,7 +9,8 @@ void EMSCRIPTEN_KEEPALIVE rikaigu_set_config(
 	bool kanji_components,
 	bool deinflect_expressions,
 	int default_dictionary,
-	const char* kanji_info);
+	const char* kanji_info,
+	const char* review_list);
 
 bool EMSCRIPTEN_KEEPALIVE rikaigu_set_file(const char* filename, char* data, uint32_t length);
 

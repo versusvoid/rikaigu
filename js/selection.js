@@ -76,19 +76,19 @@ function isJapaneseCharacter(code) {
 				|| code == 0x30fc);
 }
 
-var spaceRegex = /\s/;
+const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc])/;
 function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offset) {
 	var string = rangeNode.data || rangeNode.value || "";
 	if (forward) {
 		offset = offset || 0;
 		var endIndex = Math.min(string.length, offset + maxLength);
 		string = string.substring(offset, endIndex);
-		var spacePos = string.search(spaceRegex);
+		var endPos = string.search(endOfContinuousJapaneseTextRegex);
 		var isEdge = false;
-		if (spacePos !== -1) {
+		if (endPos !== -1) {
 			isEdge = true;
-			endIndex = offset + spacePos;
-			string = string.substring(0, spacePos);
+			endIndex = offset + endPos;
+			string = string.substring(0, endPos);
 		}
 
 		outText.push(string);
@@ -134,7 +134,6 @@ function getInlineText(node, maxLength, forward, outText, outSelectionRange) {
 		return 0;
 	}
 
-	var partialText, endIndex, offset;
 	if (node.nodeType === Node.TEXT_NODE) {
 		return getText(node, maxLength, forward, outText, outSelectionRange);
 	}
@@ -171,11 +170,11 @@ function getNext(node, forward) {
 // then rikaigu will not start looking for text in this text node.
 // Ignore text in RT elements
 // https://jsperf.com/xpath-vs-traversal-parent-test
-var startElementExpr ='boolean(parent::rp or ancestor::rt)';
-var maxWordLength = 13;
-function getTextFromRange(rangeNode, offset, forward) {
+const startElementExpr ='boolean(parent::rp or ancestor::rt)';
+const maxWordLength = 13;
+function getTextFromRange(rangeNode, offset, forward, forwardMaxLength = maxWordLength) {
 	var text = [], fullSelectionRange = [];
-	var maxLength = forward ? maxWordLength : 1024;
+	var maxLength = forward ? forwardMaxLength : 1024;
 	if (isInput(rangeNode)) {
 		getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
 		return [text[0], fullSelectionRange[0]];
@@ -199,6 +198,21 @@ function getTextFromRange(rangeNode, offset, forward) {
 	}
 
 	return [text.join(''), fullSelectionRange];
+}
+
+function getCurrentWordContext() {
+	const rangeNode = rikaigu.lastShownRangeNode,
+		rangeOffset = rikaigu.lastShownRangeOffset;
+
+	var text = getTextFromRange(rangeNode, rangeOffset, true, 100)[0].trim();
+	var prefix = getTextFromRange(rangeNode, rangeOffset, false)[0];
+	var trimmedPrefix = prefix.trim();
+	if (prefix.endsWith(trimmedPrefix)) {
+		prefix = trimmedPrefix;
+	} else {
+		prefix = "";
+	}
+	return prefix + text;
 }
 
 var spacePrefixRegexp = /^\s/;

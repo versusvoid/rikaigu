@@ -7,8 +7,9 @@
 #include <algorithm>
 #include <cassert>
 
-DEntry::DEntry(const std::string& dictionary_line, bool name)
-	: _name(name)
+DEntry::DEntry(uint32_t offset, const std::string& dictionary_line, bool name)
+	: offset_aka_id(offset)
+	, _name(name)
 	, _freq(1e9)
 	, _all_pos(0)
 {
@@ -36,6 +37,11 @@ DEntry::DEntry(const std::string& dictionary_line, bool name)
 			reading_string = parts.at(1);
 		}
 	}
+}
+
+uint32_t DEntry::id()
+{
+	return offset_aka_id;
 }
 
 bool DEntry::name()

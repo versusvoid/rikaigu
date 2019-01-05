@@ -356,7 +356,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 //				printf("Line at index %u for word '%s' is '%.*s'\n", ofs, u.word.c_str(), line_length, line);
 //				std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
 
-				DEntry dentry(std::string(line, line_length - 1), names_dictionary);
+				DEntry dentry(ofs, std::string(line, line_length - 1), names_dictionary);
 				if (names_dictionary)
 				{
 					dentry.filter_writings(convertor.out);
@@ -397,7 +397,8 @@ SearchResult word_search(const char* word, bool names_dictionary)
 						std::cerr << "Too bad" << std::endl;
 						continue;
 					}
-					DEntry expression_dentry(std::string(line, line_length - 1), names_dictionary);
+					DEntry expression_dentry(expr.expression_rule->offset, std::string(line, line_length - 1),
+						names_dictionary);
 					expression_dentry.filter_writings(expr.expression_writing);
 					expression_dentry.filter_senses(expr.expression_rule->sense_indices);
 					expressions.emplace_back(ExpressionResult{expression_dentry, expr.reason});

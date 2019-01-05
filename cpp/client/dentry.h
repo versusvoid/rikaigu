@@ -5,8 +5,6 @@
 #include <vector>
 #include <string>
 
-std::vector<std::string> split(const std::string& str, char sep);
-
 struct SenseGroup
 {
 	std::vector<std::string> types;
@@ -28,6 +26,7 @@ struct KanjiGroup
 
 class DEntry
 {
+	uint32_t offset_aka_id;
 	std::string kanji_string;
 	std::string reading_string;
 	std::string definition_string;
@@ -46,9 +45,9 @@ class DEntry
 	void parse_kanji_groups();
 	void parse_readings();
 public:
+	DEntry(uint32_t offset, const std::string& dictionaryLine, bool name);
 
-	DEntry(const std::string& dictionaryLine, bool name);
-
+	uint32_t id();
 	bool name();
 	int freq();
 	uint32_t all_pos();
