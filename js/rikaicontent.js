@@ -348,8 +348,13 @@ function onKeyDown(ev) {
 			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
 				el.classList.toggle('rikaigu-hidden');
 			}
+			break;
 		case 'KeyR':
 			toggleHiddenAllReviewListEntriesInfo(document.getElementById('rikaigu-window'));
+			break;
+		case 'KeyS':
+			alert('Здесь мог бы быть ваш код для отображения слов из review-list из текущего предложения.');
+			break;
 		default:
 			return;
 	}
