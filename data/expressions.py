@@ -13,7 +13,7 @@ import pickle
 import xml.etree.ElementTree as ET
 from collections import namedtuple
 from enum import Enum
-from utils import *
+from utils import kata_to_hira
 import dictionary
 import corpus
 
@@ -29,7 +29,7 @@ max_deinflection_len = 0
 for filename in ('data/deinflect.dat', 'data/tanaka-deinflect.dat'):
 	with open(filename) as f:
 		for l in f:
-			l = l.strip().split('\t');
+			l = l.strip().split('\t')
 			if len(l) == 1 or l[0][0] == '#': continue
 			d = Deinflection(l[1], set(l[2].split('|')), set(l[3].split('|')), l[4])
 			max_deinflection_len = max(max_deinflection_len, len(l[0]))
@@ -174,7 +174,7 @@ def record_expression_form(expression, word):
 
 	deinflections = deinflect(word.form, expression.base_forms)
 	for p, reasons in deinflections.items():
-		for form, reason_chain in reasons:
+		for form, _ in reasons:
 			expression.seen_forms.setdefault(form, set()).add(p)
 
 	if len(deinflections) == 0:

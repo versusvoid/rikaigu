@@ -1,5 +1,5 @@
 
-from utils import *
+from utils import download, is_hiragana, is_katakana, is_kanji
 
 freqlist1_path = download('https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese', 'freqs-0-10000')
 freqlist2_path = download('https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese10001-20000', 'freqs-10001-20000')

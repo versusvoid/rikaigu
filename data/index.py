@@ -3,7 +3,7 @@ import sys
 import re
 import os
 from collections import defaultdict
-from utils import *
+from utils import is_katakana, is_kanji, is_hiragana, kata_to_hira
 
 # Mapping from kanji to set of it's readings
 kanji_dict = {}
@@ -175,7 +175,7 @@ def compute_variations(w, reading):
 		return
 
 	# ======== Phase 3: replace every type of kanji one by one ==========
-	for kanji, occurances in kanjis.items():
+	for _, occurances in kanjis.items():
 		assert all(map(anchors.__contains__, occurances))
 
 		# Writing variation with all instances of this

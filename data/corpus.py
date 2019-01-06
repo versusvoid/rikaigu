@@ -3,7 +3,9 @@ import gzip
 import sys
 import traceback
 import io
-from utils import *
+import os
+from collections import namedtuple
+from utils import download
 
 sentences_file = "tmp/examples.utf.gz"
 if not os.path.exists(sentences_file):
@@ -52,8 +54,8 @@ def corpus_reader():
 	since = 0
 	shit = 0
 
-	sample = '''A: 首相の辞任のニュースは私たちを驚かせた。	The news of the prime minister's resignation took us by surprise.#ID=266140_148419
-B: 首相 の 辞任[02] の ニュース は 私たち を[02] 驚かせる{驚かせた}'''
+# 	sample = '''A: 首相の辞任のニュースは私たちを驚かせた。	The news of the prime minister's resignation took us by surprise.#ID=266140_148419
+# B: 首相 の 辞任[02] の ニュース は 私たち を[02] 驚かせる{驚かせた}'''
 	with gzip.open(sentences_file, 'rt') as f, open('shit.log', 'w') as shit_of:
 	#with io.StringIO(sample) as f, open('shit.log', 'w') as shit_of:
 		sentence_plain_text = None

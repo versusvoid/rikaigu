@@ -3,7 +3,8 @@
 import os
 import re
 import xml.etree.ElementTree as ET
-from utils import *
+from utils import kata_to_hira
+from dictionary import dictionary_reader
 
 files = {}
 for filename in [

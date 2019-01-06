@@ -5,7 +5,7 @@ import re
 import sys
 import struct
 from collections import OrderedDict
-from utils import *
+from utils import kata_to_hira
 from freqs import max_freq, get_frequency
 from index import index_keys
 from romaji import is_romajination
@@ -69,7 +69,7 @@ def format_entry(entry):
 	parts = []
 	if len(entry.kanjis) > 0:
 		'''
-		Inverse restrictions, because it's easier to show entries this way.
+		Inverse kanjis-readings restrictions, because it's easier to show entries this way.
 		'''
 		kanji_index_to_readings = {}
 		for ri, r in enumerate(entry.readings):

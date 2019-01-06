@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-from utils import *
+
+from utils import download, kata_to_hira
+from collections import namedtuple
 from index import index_keys
 import xml.etree.ElementTree as ET
 import gzip
@@ -215,7 +217,7 @@ def dictionary_reader(dictionary='JMdict_e.gz', store_in_memory=False):
 
 	entry_no = 0
 	source = gzip.open(dictionary_path, 'rt')
-	for ev, elem in ET.iterparse(source):
+	for _, elem in ET.iterparse(source):
 		if elem.tag == 'entry':
 			entry_no += 1
 			if entry_no % 1000 == 0:

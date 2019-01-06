@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-from utils import *
+from utils import kata_to_hira, is_kanji, is_japanese_character, download
 import dictionary
 
+from collections import namedtuple
 import xml.etree.ElementTree as ET
 import bz2
 import os
@@ -171,7 +172,7 @@ def parse_jawiktionary_word(title, content):
 	try:
 		p = MW.parse(content)
 	except:
-		print(f"Error parsing page {title}: {traceback.fmt_exc()}", file=sys.stderr)
+		print(f"Error parsing page {title}: {traceback.format_exc()}", file=sys.stderr)
 		return None
 
 	japanese_words = p.get_sections(levels=[2], matches="(日本語|{{jpn}}|{{ja}})")
@@ -197,7 +198,7 @@ def parse_jawiktionary_word(title, content):
 	for subsection, heading_title in pos_sections:
 		try:
 			extract_entry_from_subsection(title, subsection, heading_title, carry_info, entries)
-		except Exception as e:
+		except Exception:
 			print(f"Wasn't able to extract entry from {subsection.nodes[0]} on page {title}:\n",
 				traceback.format_exc(), file=sys.stderr)
 			print('-------------------------------', f"All candidates:", *carry_info['candidates'].values(), sep='\n')
@@ -214,7 +215,7 @@ def filter_candidates_by_pos(candidates, poses):
 	to_remove = set()
 	for key, c in candidates.items():
 		found = False
-		for j, sg in enumerate(c.sense_groups):
+		for sg in c.sense_groups:
 			for pos in poses:
 				if pos in sg.pos:
 					found = True
@@ -668,7 +669,7 @@ def tag_in_sense(page_title, element, subsection_info, i, subsection, carry_info
 		else:
 			end_sense(subsection_info)
 	elif element.tag == 'dd':
-		assert len(subsection_info.get('current sense', '')) == 0, f'Stray `dd`: {elemen} on page {page_title}'
+		assert len(subsection_info.get('current sense', '')) == 0, f'Stray `dd`: {element} on page {page_title}'
 		subsection_info['is example'] = True
 	else:
 		if element.contents is None:
@@ -741,7 +742,7 @@ def japanese_dictionary_reader():
 
 	try:
 		source = bz2.open(dictionary_path, 'rt')
-		for ev, elem in ET.iterparse(source):
+		for _, elem in ET.iterparse(source):
 			if elem.tag == 'page':
 				if elem.find("ns").text != '0':
 					elem.clear()

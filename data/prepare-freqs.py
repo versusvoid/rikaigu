@@ -10,7 +10,7 @@ from collections import namedtuple, defaultdict
 import traceback
 import pickle
 
-from utils import *
+from utils import download, kata_to_hira, is_japanese_character
 import dictionary
 
 extracted_dump = 'tmp/jawiki-text.xz'
@@ -212,7 +212,7 @@ def have_reading(reading, entry):
 
 def filter_by_reading(entries, reading):
 	longest_common_prefix = 0
-	for key_sources, e in entries:
+	for _, e in entries:
 		for r in e.readings:
 			i = longest_common_prefix + 1
 			while i <= len(reading) and r.text[:i] == reading[:i]:
@@ -375,7 +375,6 @@ def try_correct_verb_form_as_base_form_error(word, pos, inflection_type, form_na
 		entries = list(filter(lambda e: any(len(expected_pos.intersection(sg.pos)) > 0 for sg in e.sense_groups),
 			entries))
 		if len(entries) > 0:
-			dreading = entries[0].readings[0].text
 			for sg in entries[0].sense_groups:
 				for pos in expected_pos.intersection(sg.pos):
 					expected_pos = pos
@@ -469,7 +468,6 @@ def try_correct_vs_s_potential(word, next_word):
 			pass
 		entries = list(filter(lambda e: any(('vs-s' in sg.pos) for sg in e.sense_groups), entries))
 		if len(entries) > 0:
-			dreading = entries[0].readings[0].text
 			word.source += next_word.source
 			word.info = word.info._replace(inflection_type='vs-s', form_name=['potential'],
 					base_form=(word.info.base_form + 'る'), reading=None, pronunciation=None)
@@ -890,9 +888,14 @@ suf2form_name = {
 		w2_pos='動詞', w2_category1='接尾',
 		drop_form_names_from_w1=1, additional_form_name='informal causative'),
 
-	'さ': InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
-		w2_pos='名詞', w2_category1='接尾',
-		drop_form_names_from_w1=1, additional_form_name='informal causative'),
+	'さ': [
+		InflectionSuffix(w1_pos='動詞', w1_form_name='masu stem',
+			w2_pos='名詞', w2_category1='接尾',
+			drop_form_names_from_w1=1, additional_form_name='informal causative'),
+		InflectionSuffix(w1_pos='形容詞', w1_form_name='adjective stem',
+			w2_pos='名詞', w2_category1='接尾',
+			drop_form_names_from_w1=1, additional_form_name='noun')
+	],
 
 	'する': [
 		InflectionSuffix(w1_pos='動詞', w1_form_name='informal causative',
@@ -922,11 +925,6 @@ suf2form_name = {
 	'だり': InflectionSuffix(w1_pos='動詞', w1_form_name=set(['masu stem', 'past']),
 		w2_pos='助詞', w2_category1='並立助詞',
 		drop_form_names_from_w1=1, additional_form_name='-tari'),
-
-	'さ': InflectionSuffix(w1_pos='形容詞', w1_form_name='adjective stem',
-		w2_pos='名詞', w2_category1='接尾',
-		drop_form_names_from_w1=1, additional_form_name='noun'),
-
 }
 class JoinException(Exception):
 	pass
@@ -982,7 +980,7 @@ def try_join(w1, w2):
 		if len(entries) > 0:
 			w1.info = w2.info._replace(base_form=w1.source+w2.info.base_form)
 			w1.source += w2.source
-			w1.entry = entries[0] if len(entries) == 1 else OneOff(entities)
+			w1.entry = entries[0] if len(entries) == 1 else OneOff(entries)
 			return True
 
 	resolve(w1)
