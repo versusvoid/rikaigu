@@ -5,12 +5,13 @@ import re
 import sys
 import struct
 from collections import OrderedDict
-from utils import kata_to_hira
-from freqs import max_freq, get_frequency
-from index import index_keys
-from romaji import is_romajination
+
 import expressions
 import dictionary
+import freqs
+from utils import kata_to_hira
+from index import index_keys
+from romaji import is_romajination
 
 control_sense_symbols = re.compile('[\\`]')
 def format_sense(sense, entry):
@@ -65,7 +66,6 @@ def format_entry(entry):
 	any_common_kanji = any(map(lambda k: k.common, entry.kanjis))
 	any_common_kana = any(map(lambda r: r.common, entry.readings))
 
-	freq = max_freq
 	parts = []
 	if len(entry.kanjis) > 0:
 		'''
@@ -91,7 +91,6 @@ def format_entry(entry):
 				seen.add(ki)
 				k = entry.kanjis[ki]
 				assert control_kanji_symbols.search(k.text) is None
-				freq = min(freq, get_frequency(k.text))
 				kanji_offsets[i] = k.text
 				if any_common_kanji and not k.common:
 					kanji_offsets[i] += '|U'
@@ -106,7 +105,6 @@ def format_entry(entry):
 		for ki, k in enumerate(entry.kanjis):
 			if ki in seen: continue
 			assert control_kanji_symbols.search(k.text) is None
-			freq = min(freq, get_frequency(k.text))
 			groups.append(k.text)
 			if any_common_kanji and not k.common:
 				groups[-1] += '|U'
@@ -120,7 +118,6 @@ def format_entry(entry):
 	readings = []
 	for r in entry.readings:
 		assert control_reading_symbols.search(r.text) is None
-		freq = min(freq, get_frequency(r.text))
 		readings.append(r.text)
 		if any_common_kana and not r.common:
 			readings[-1] += '|U'
@@ -137,7 +134,8 @@ def format_entry(entry):
 		parts.append('\\'.join(sense_groups))
 		del sense_groups
 
-		if freq != max_freq:
+		freq = freqs.get_frequency(entry)
+		if freq is not None:
 			parts.append(str(freq))
 	else:
 		transes = []
@@ -146,9 +144,14 @@ def format_entry(entry):
 		parts.append('\\'.join(transes))
 		del transes
 
+		freq = freqs.get_name_frequency(entry)
+		if freq is not None:
+			parts.append(str(freq))
+
 	return '\t'.join(parts)
 
 def write_index(index, label):
+	# try trie
 	index = list(index.items())
 	index.sort()
 	words_bytes = bytearray()

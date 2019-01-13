@@ -59,6 +59,30 @@ class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 	def __repr__(self):
 		return self._format()
 
+	def is_archaic(self):
+		for sg in self.sense_groups:
+			for s in sg.senses:
+				if 'arch' in s.misc:
+					return True
+		return False
+
+	def get_uk_readings(self):
+		usually_kana = set()
+		for sg in self.sense_groups:
+			for s in sg.senses:
+				if 'uk' in s.misc:
+					if s.reading_restriction != ():
+						usually_kana.update(s.reading_restriction)
+					else:
+						usually_kana.update(range(0, len(self.readings)))
+						break
+			else:
+				continue
+
+			break
+		for i in usually_kana:
+			yield self.readings[i]
+
 Name = namedtuple('Name', 'kanjis, readings, transes')
 def make_entry(elem, entities):
 	entry = None

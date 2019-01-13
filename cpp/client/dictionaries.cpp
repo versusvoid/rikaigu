@@ -244,6 +244,10 @@ std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 
 static bool compare(WordResult& a, WordResult& b)
 {
+	if (a.dentry.freq() != b.dentry.freq())
+	{
+		return a.dentry.freq() < b.dentry.freq();
+	}
 	if (a.match_symbols_length != b.match_symbols_length)
 	{
 		return a.match_symbols_length > b.match_symbols_length;
@@ -256,11 +260,7 @@ static bool compare(WordResult& a, WordResult& b)
 	{
 		return a.expressions.empty() > b.expressions.empty();
 	}
-	if (a.reason.empty() != b.reason.empty())
-	{
-		return a.reason.empty() > b.reason.empty();
-	}
-	return a.dentry.freq() < b.dentry.freq();
+	return a.reason.empty() > b.reason.empty();
 }
 
 static size_t line_buffer_size = 0;
