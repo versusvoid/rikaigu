@@ -60,7 +60,7 @@ def mecab_parse_no_neolog(string):
 counts = defaultdict(int)
 num_samples = 0
 num_words = 0
-def record_sample(sample, of):
+def record_sample(sample):
 	global num_samples
 	global num_words
 
@@ -321,11 +321,6 @@ def try_correct_v5g(word, next_word):
 				dkanji = entries[0].kanjis[0].text
 
 			word.info = MecabInfo('動詞', '*', '*', '*', '五段・ガ行', ['negative stem'], dkanji, dreading, dreading)
-
-			# 叫ばさない ('さ', '動詞,接尾,*,*,五段・サ行,未然形,す,サ,サ')
-			# 仰がさない ('さ', '動詞,自立,*,*,サ変・スル,未然レル接続,する,サ,サ')
-			if next_word.source == 'さ' and next_word.info.base_form == 'する' and next_word.info.form_name == ['passive']:
-				next_word.info = MecabInfo('動詞', '接尾', '*', '*', '五段・サ行', ['negative stem'], 'す', 'サ', 'サ')
 
 			return True
 
@@ -1174,7 +1169,7 @@ def main():
 
 			if l.startswith('EOS'):
 				transform_sample(continuous_japanese)
-				record_sample(continuous_japanese, of)
+				record_sample(continuous_japanese)
 				continuous_japanese = []
 				continue
 
@@ -1184,7 +1179,7 @@ def main():
 			japanese_characters_flags = [is_japanese_character(c) for c in source]
 			if not any(japanese_characters_flags):
 				transform_sample(continuous_japanese)
-				record_sample(continuous_japanese, of)
+				record_sample(continuous_japanese)
 				continuous_japanese = []
 				continue
 			continuous_japanese.append((source, info))
