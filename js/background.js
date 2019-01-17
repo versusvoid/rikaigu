@@ -204,6 +204,10 @@ function search(request) {
 	return [html, {matchLength, prefixLength}];
 }
 
+function getReviewEntriesForSentence(text) {
+	return Module.ccall('rikaigu_review_entries_for_sentence', 'string', ['string'], [text]);
+}
+
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
@@ -226,6 +230,12 @@ function onMessage(request, sender, response) {
 			}
 
 			break;
+
+		case 'review':
+			var result = getReviewEntriesForSentence(request.text);
+			response(result.split('\n').map(s => s.split('\t')));
+			break;
+
 		case 'close':
 			chrome.tabs.sendMessage(sender.tab.id, request);
 			break;

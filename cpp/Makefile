@@ -16,13 +16,13 @@ COMMON_CXXFLAGS = -std=c++17 -O3 -Wall -I.
 JS_CXXFLAGS = $(COMMON_CXXFLAGS)
 JS_DEBUG_FLAGS = -g3 -s SAFE_HEAP=1 -s ASSERTIONS=1 -s WARN_UNALIGNED=1 -s DEMANGLE_SUPPORT=1
 EMCCFLAGS = \
-		-s TOTAL_MEMORY=32MB \
-		-s TOTAL_STACK=500KB \
+		-s TOTAL_MEMORY=40MB \
 		-s LZ4=1 \
 		-s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "getValue"]' \
 		--preload-file ../data/dict.dat@/dict.dat \
 		--preload-file ../data/names.dat@/names.dat \
 		--preload-file ../data/kanji.dat@/kanji.dat
+		# -s TOTAL_STACK=500KB \
 
 JS_SOURCES = \
 	client/api.cpp \

@@ -232,7 +232,7 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 {
 	const auto& review_list_entry = config.review_list.find(word.dentry.id());
 	bool from_review_list = review_list_entry != config.review_list.end();
-	if (!from_review_list)
+	if (!from_review_list && !word.dentry.name())
 	{
 		buffer += "<div class=\"rikaigu-add-to-review-list\"></div>";
 	}

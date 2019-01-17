@@ -26,6 +26,7 @@ struct KanjiGroup
 
 class DEntry
 {
+	// TODO persistent id's
 	uint32_t offset_aka_id;
 	std::string kanji_string;
 	std::string reading_string;

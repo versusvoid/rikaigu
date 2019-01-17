@@ -61,4 +61,4 @@ def get_name_frequency(name):
 	for kanji in name.kanjis:
 		min_freq_order = min(min_freq_order, _freq_order.get(kanji.text, min_freq_order))
 	if min_freq_order < len(_freq_order):
-		return min_freq_order
+		return len(_freq_order) + min_freq_order

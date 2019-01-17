@@ -77,6 +77,7 @@ function isJapaneseCharacter(code) {
 }
 
 const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc])/;
+const endOfJapaneseSentence = /(\s|[。？！．｡])/;
 function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offset) {
 	var string = rangeNode.data || rangeNode.value || "";
 	if (forward) {

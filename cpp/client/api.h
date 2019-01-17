@@ -16,5 +16,7 @@ bool EMSCRIPTEN_KEEPALIVE rikaigu_set_file(const char* filename, char* data, uin
 
 const char* EMSCRIPTEN_KEEPALIVE rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	int32_t* match_symbols_length, int32_t* prefix_symbols_length);
+
+const char* EMSCRIPTEN_KEEPALIVE rikaigu_review_entries_for_sentence(const char* utf8_text);
 }
 #endif // API_H

@@ -58,5 +58,38 @@ const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
 	*prefix_symbols_length = 0;
 //	printf("Plain search res.max_match_symbols_length = %zu\n", res.max_match_symbols_length);
 	*match_symbols_length = int32_t(res.max_match_symbols_length) - *prefix_symbols_length;
-	return  make_html(res);
+	return make_html(res);
+}
+
+const char* rikaigu_review_entries_for_sentence(const char* utf8_text)
+{
+	PROFILE
+
+	mbstate_t ps;
+	memset(&ps, 0, sizeof(ps));
+
+	size_t pos = 0;
+	const auto end = strlen(utf8_text);
+	std::string buffer;
+	while (pos < end)
+	{
+		auto res = word_search(utf8_text + pos, false);
+		for (auto& w : res.data)
+		{
+			const auto& it = config.review_list.find(w.dentry.id());
+			if (it != config.review_list.end())
+			{
+				if (!buffer.empty())
+				{
+					buffer += '\n';
+				}
+				buffer += std::string(utf8_text + pos, w.match_bytes_length);
+				buffer += '\t';
+				buffer += it->second;
+			}
+		}
+
+		pos += mbrlen(utf8_text + pos, end - pos, &ps);
+	}
+	return buffer.c_str();
 }

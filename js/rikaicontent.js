@@ -518,6 +518,11 @@ function onMouseMove(ev) {
 	}
 }
 
+function processReviewResult(result) {
+	console.log('Review results:');
+	result.forEach(p => console.log(p[0], p[1]));
+}
+
 //Event Listeners
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
@@ -544,6 +549,15 @@ chrome.runtime.onMessage.addListener(
 					}
 				}
 				rikaigu.isVisible = true;
+				if (request.html.indexOf('rikaigu-review-listed') !== -1) {
+					chrome.runtime.sendMessage(
+						{
+							"type": "review",
+							"text": getCurrentWordContext(),
+						},
+						processReviewResult
+					);
+				}
 				break;
 			case 'close':
 				if (window.self === window.top) {

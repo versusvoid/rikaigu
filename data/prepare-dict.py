@@ -134,6 +134,7 @@ def format_entry(entry):
 		parts.append('\\'.join(sense_groups))
 		del sense_groups
 
+		# TODO per kanji/reading freq
 		freq = freqs.get_frequency(entry)
 		if freq is not None:
 			parts.append(str(freq))
