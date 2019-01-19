@@ -9,6 +9,7 @@
 #include <cassert>
 #include <bitset>
 #include <array>
+#include <cmath>
 
 struct IndexFile
 {
@@ -246,7 +247,7 @@ static bool compare(WordResult& a, WordResult& b)
 {
 	if (a.dentry.freq() != b.dentry.freq())
 	{
-		return a.dentry.freq() < b.dentry.freq();
+		return std::log(a.dentry.freq() + 1) - a.match_bytes_length < std::log(b.dentry.freq() + 1) - b.match_symbols_length;
 	}
 	if (a.match_symbols_length != b.match_symbols_length)
 	{

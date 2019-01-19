@@ -29,9 +29,11 @@ def _load_freqs():
 			freq, lemma = l.strip().split()[1:]
 			assert lemma not in _freq_order
 			freq = int(freq)
-			if freq < 1000:
+			if freq < 77:
 				break
 			_freq_order[lemma] = len(_freq_order)
+	with open('cpp/client/config.h', 'w') as of:
+		print('#define UNKNOWN_WORD_FREQ_ORDER', len(_freq_order), file=of)
 _load_freqs()
 
 def get_frequency(entry):

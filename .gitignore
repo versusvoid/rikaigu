@@ -9,6 +9,7 @@ data/*.bin
 data/expressions.dat
 cpp/rikai.asm.*
 cpp/release
+cpp/client/config.h
 *.swp
 __pycache__
 tmp

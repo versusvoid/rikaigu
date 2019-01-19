@@ -1,6 +1,7 @@
 #include "dentry.h"
 #include "word_types.h"
 #include "utils.h"
+#include "config.h"
 
 #include <iostream>
 #include <map>
@@ -10,7 +11,7 @@
 DEntry::DEntry(uint32_t offset, const std::string& dictionary_line, bool name)
 	: offset_aka_id(offset)
 	, _name(name)
-	, _freq(1e9)
+	, _freq(UNKNOWN_WORD_FREQ_ORDER)
 	, _all_pos(0)
 {
 	PROFILE
