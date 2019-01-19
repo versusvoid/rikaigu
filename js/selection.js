@@ -75,16 +75,29 @@ function isJapaneseCharacter(code) {
 				|| (code >= 0x30a1 && code <= 0x30fa)
 				|| code == 0x30fc);
 }
-
 const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc])/;
+const japaneseCharacterBoundaryCondition = {
+	endRegex: endOfContinuousJapaneseTextRegex,
+	predicate: isJapaneseCharacter,
+};
+
+const endOfJapaneseSentenceCharacters = '\t\n\r 　。？！．｡'.split('').map(c => c.charCodeAt(0));
+function isJapaneseCharacterOrInSentencePunctuation(code) {
+	return isJapaneseCharacter(code) || endOfJapaneseSentenceCharacters.indexOf(code) === -1;
+}
 const endOfJapaneseSentence = /(\s|[。？！．｡])/;
-function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offset) {
+const japaneseSentenceBoundaryCondition = {
+	endRegex: endOfJapaneseSentence,
+	predicate: isJapaneseCharacterOrInSentencePunctuation,
+}
+
+function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offset, boundaryCondition) {
 	var string = rangeNode.data || rangeNode.value || "";
 	if (forward) {
 		offset = offset || 0;
 		var endIndex = Math.min(string.length, offset + maxLength);
 		string = string.substring(offset, endIndex);
-		var endPos = string.search(endOfContinuousJapaneseTextRegex);
+		var endPos = string.search(boundaryCondition.endRegex);
 		var isEdge = false;
 		if (endPos !== -1) {
 			isEdge = true;
@@ -105,7 +118,7 @@ function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offs
 		string = string.substring(startIndex, offset);
 		var foundStart = false;
 		for (var i = string.length - 1; i >= 0; --i) {
-			if (!isJapaneseCharacter(string.charCodeAt(i))) {
+			if (!boundaryCondition.predicate(string.charCodeAt(i))) {
 				startIndex += i + 1;
 				string = string.substring(i + 1);
 				foundStart = true;
@@ -130,20 +143,21 @@ function getText(rangeNode, maxLength, forward, outText, outSelectionRange, offs
 // maxLength: the maximum length of returned string
 // xpathExpr: an XPath expression, which evaluates to text nodes, will be evaluated
 // relative to "node" argument
-function getInlineText(node, maxLength, forward, outText, outSelectionRange) {
+function getInlineText(node, maxLength, forward, outText, outSelectionRange, boundaryCondition) {
 	if (node.nodeType === Node.COMMENT_NODE || node.nodeName === 'RP' || node.nodeName === 'RT') {
 		return 0;
 	}
 
 	if (node.nodeType === Node.TEXT_NODE) {
-		return getText(node, maxLength, forward, outText, outSelectionRange);
+		return getText(node, maxLength, forward, outText, outSelectionRange, 0, boundaryCondition);
 	}
 
 	var treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, nodeFilter);
 	var currentLength = 0;
 	node = forward ? treeWalker.firstChild() : treeWalker.lastChild();
 	while (currentLength < maxLength && node !== null && !outSelectionRange[outSelectionRange.length - 1].isEdge) {
-		currentLength += getText(node, maxLength - currentLength, forward, outText, outSelectionRange);
+		currentLength += getText(node, maxLength - currentLength, forward, outText, outSelectionRange, 0,
+			boundaryCondition);
 		node = forward ? treeWalker.nextNode() : treeWalker.previousNode();
 	}
 
@@ -173,7 +187,7 @@ function getNext(node, forward) {
 // https://jsperf.com/xpath-vs-traversal-parent-test
 const startElementExpr ='boolean(parent::rp or ancestor::rt)';
 const maxWordLength = 13;
-function getTextFromRange(rangeNode, offset, forward, forwardMaxLength = maxWordLength) {
+function getTextFromRange(rangeNode, offset, forward, forwardMaxLength, boundaryCondition) {
 	var text = [], fullSelectionRange = [];
 	var maxLength = forward ? forwardMaxLength : 1024;
 	if (isInput(rangeNode)) {
@@ -187,10 +201,11 @@ function getTextFromRange(rangeNode, offset, forward, forwardMaxLength = maxWord
 	if (document.evaluate(startElementExpr, rangeNode, null, XPathResult.BOOLEAN_TYPE, null).booleanValue)
 		return ['', null];
 
-	var currentLength = getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
+	var currentLength = getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset, boundaryCondition);
 	var nextNode = getNext(rangeNode, forward);
 	while (currentLength < maxLength && nextNode !== null && !fullSelectionRange[fullSelectionRange.length - 1].isEdge) {
-		currentLength += getInlineText(nextNode, maxLength - currentLength, forward, text, fullSelectionRange);
+		currentLength += getInlineText(nextNode, maxLength - currentLength, forward, text, fullSelectionRange,
+			boundaryCondition);
 		nextNode = getNext(nextNode, forward);
 	}
 
@@ -201,12 +216,12 @@ function getTextFromRange(rangeNode, offset, forward, forwardMaxLength = maxWord
 	return [text.join(''), fullSelectionRange];
 }
 
-function getCurrentWordContext() {
+function getCurrentWordContext(boundaryCondition = japaneseCharacterBoundaryCondition) {
 	const rangeNode = rikaigu.lastShownRangeNode,
 		rangeOffset = rikaigu.lastShownRangeOffset;
 
-	var text = getTextFromRange(rangeNode, rangeOffset, true, 100)[0].trim();
-	var prefix = getTextFromRange(rangeNode, rangeOffset, false)[0];
+	var text = getTextFromRange(rangeNode, rangeOffset, true, 100, boundaryCondition)[0].trim();
+	var prefix = getTextFromRange(rangeNode, rangeOffset, false, maxWordLength, boundaryCondition)[0];
 	var trimmedPrefix = prefix.trim();
 	if (prefix.endsWith(trimmedPrefix)) {
 		prefix = trimmedPrefix;
@@ -214,6 +229,11 @@ function getCurrentWordContext() {
 		prefix = "";
 	}
 	return prefix + text;
+}
+
+function getCurrentWordSentence() {
+	// TODO cache result by rangeNode, rangeOffset boundaries
+	return getCurrentWordContext(japaneseSentenceBoundaryCondition);
 }
 
 var spacePrefixRegexp = /^\s/;
@@ -252,7 +272,8 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 	}
 
 	// Selection end data
-	var [text, fullSelectionRange] = getTextFromRange(rangeNode, rangeOffset, true);
+	var [text, fullSelectionRange] = getTextFromRange(rangeNode, rangeOffset, true, maxWordLength,
+		japaneseCharacterBoundaryCondition);
 	text = text.trim();
 	if (!text) return reset();
 

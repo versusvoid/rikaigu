@@ -120,21 +120,27 @@ function getContentType() {
 	return null;
 }
 
+function makePopup() {
+	var css = document.createElementNS('http://www.w3.org/1999/xhtml', 'link');
+	css.setAttribute('rel', 'stylesheet');
+	css.setAttribute('type', 'text/css');
+	css.setAttribute('href', chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css'));
+	css.setAttribute('id', 'rikaigu-css');
+	document.getElementsByTagName('head')[0].appendChild(css);
+
+	const popup = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+	popup.setAttribute('id', 'rikaigu-window');
+	popup.classList.add('rikaigu-window');
+	document.documentElement.appendChild(popup);
+
+	document.addEventListener('click', onClick, false);
+	return popup;
+}
+
 function showPopup(text, x, y) {
 	var popup = document.getElementById('rikaigu-window');
 	if (!popup) {
-		var css = document.createElementNS('http://www.w3.org/1999/xhtml', 'link');
-		css.setAttribute('rel', 'stylesheet');
-		css.setAttribute('type', 'text/css');
-		css.setAttribute('href', chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css'));
-		css.setAttribute('id', 'rikaigu-css');
-		document.getElementsByTagName('head')[0].appendChild(css);
-
-		popup = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-		popup.setAttribute('id', 'rikaigu-window');
-		document.documentElement.appendChild(popup);
-
-		document.addEventListener('click', onClick, false);
+		popup = makePopup();
 	} else {
 		var href = chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css');
 		var css = document.getElementById('rikaigu-css');
@@ -518,9 +524,39 @@ function onMouseMove(ev) {
 	}
 }
 
+function makeReviewPopup() {
+	const popup = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+	popup.setAttribute('id', 'rikaigu-review-window');
+	popup.classList.add('rikaigu-window');
+	popup.classList.add('rikaigu-hidden');
+	document.documentElement.appendChild(popup);
+
+	return popup;
+}
+
+function getEmptyReviewPopup() {
+	var popup = document.getElementById('rikaigu-review-window');
+	if (!popup) {
+		popup = makeReviewPopup();
+	} else {
+		popup.innerHTML = '';
+	}
+	return popup;
+}
+
+function addToReviewPopup(popup, entry) {
+	popup.innerHTML += `<p>${entry[0]}<br />${entry[1]}</p>`;
+}
+
 function processReviewResult(result) {
-	console.log('Review results:');
-	result.forEach(p => console.log(p[0], p[1]));
+	console.log('processReviewResult', result);
+	const reviewPopup = getEmptyReviewPopup();
+	if (result) {
+		result.forEach(addToReviewPopup.bind(window, reviewPopup));
+		reviewPopup.classList.remove('rikaigu-hidden');
+	} else {
+		reviewPopup.classList.add('rikaigu-hidden');
+	}
 }
 
 //Event Listeners
@@ -549,15 +585,13 @@ chrome.runtime.onMessage.addListener(
 					}
 				}
 				rikaigu.isVisible = true;
-				if (request.html.indexOf('rikaigu-review-listed') !== -1) {
-					chrome.runtime.sendMessage(
-						{
-							"type": "review",
-							"text": getCurrentWordContext(),
-						},
-						processReviewResult
-					);
-				}
+				chrome.runtime.sendMessage(
+					{
+						"type": "review",
+						"text": getCurrentWordSentence(),
+					},
+					processReviewResult
+				);
 				break;
 			case 'close':
 				if (window.self === window.top) {

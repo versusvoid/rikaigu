@@ -233,7 +233,7 @@ function onMessage(request, sender, response) {
 
 		case 'review':
 			var result = getReviewEntriesForSentence(request.text);
-			response(result.split('\n').map(s => s.split('\t')));
+			response(result ? result.split('\n').map(s => s.split('\t')) : null);
 			break;
 
 		case 'close':

@@ -5,11 +5,11 @@
  * 	color: red !important;
  * }
  * This approach however, should not affect content of pages,
- * because every rule is prefixed with `#rikaigu-window`.
+ * because every rule is prefixed with `.rikaigu-window`.
  * */
 
-#rikaigu-window,
-#rikaigu-window * {
+.rikaigu-window,
+.rikaigu-window * {
 	width: auto !important;
 	height: auto !important;
 	background: transparent !important;
@@ -27,11 +27,16 @@
 	visibility: visible !important;
 }
 
-#rikaigu-window div {
+#rikaigu-review-window {
+	position: sticky !important;
+	bottom: 10px !important;
+}
+
+.rikaigu-window div {
 	display: block !important;
 }
 
-#rikaigu-window {
+.rikaigu-window {
 	display: block !important;
 	position: absolute !important;
 	z-index: 99992 !important;
@@ -43,41 +48,41 @@
 	border-radius: 5px !important;
 }
 
-#rikaigu-window hr {
+.rikaigu-window hr {
 	display: block !important;
 	border-style: inset !important;
 	border-width: 1px !important;
 }
 
-#rikaigu-window .rikaigu-hidden {
+.rikaigu-window.rikaigu-hidden {
 	display: none !important;
 }
 
-#rikaigu-window span.rikaigu-second-and-further {
+.rikaigu-window span.rikaigu-second-and-further {
 	font-style: italic !important;
 }
 
 
 /* used for word definitions */
 
-#rikaigu-window table {
+.rikaigu-window table {
 	border-collapse: collapse;
 }
 
-#rikaigu-window tr:first-of-type td.word {
+.rikaigu-window tr:first-of-type td.word {
 	border-top: 0px none black !important;
 }
 
-#rikaigu-window tr:last-of-type td.word {
+.rikaigu-window tr:last-of-type td.word {
 	border-bottom: 0px none black !important;
 }
 
-#rikaigu-window td.word:first-of-type {
+.rikaigu-window td.word:first-of-type {
 	border-left: 0px none black !important;
 	padding-left: 0px !important;
 }
 
-#rikaigu-window td.word {
+.rikaigu-window td.word {
 	vertical-align: top !important;
 	border-style: solid !important;
 	padding-left: 4px !important;
@@ -85,56 +90,56 @@
 	border-width: 0 !important;
 }
 
-#rikaigu-window td.expression {
+.rikaigu-window td.expression {
 	border-width: 2px 0px 2px 2px !important;
 }
 
-#rikaigu-window .w-kanji {
+.rikaigu-window .w-kanji {
 	font-size: 18px !important;
 }
 
-#rikaigu-window .spacer {
+.rikaigu-window .spacer {
 	margin-right: 0.7em !important;
 }
 
 
-#rikaigu-window .w-kana {
+.rikaigu-window .w-kana {
 	font-size: 18px !important;
 }
 
 
-#rikaigu-window .w-conj {
+.rikaigu-window .w-conj {
 	font-size: 12px !important;
 }
 
-#rikaigu-window .w-pos {
+.rikaigu-window .w-pos {
 	font-weight: bold !important;
 }
 
-#rikaigu-window ul {
+.rikaigu-window ul {
 	padding-left: 20px !important;
 }
 
-#rikaigu-window .w-def, #rikaigu-window .w-def * {
+.rikaigu-window .w-def, .rikaigu-window .w-def * {
 	font-size: 13px !important;
 }
 
-#rikaigu-window .w-title {
+.rikaigu-window .w-title {
 	font-size: 10px !important;
 	padding: 2px !important;
 }
 
-#rikaigu-window .w-na-tb td {
+.rikaigu-window .w-na-tb td {
 	vertical-align: top !important;
 	padding-right: 0.8em !important;
 }
 
-#rikaigu-window .note {
+.rikaigu-window .note {
 	font-size: 10px !important;
 	float: right !important;
 }
 
-#rikaigu-window .clearfix {
+.rikaigu-window .clearfix {
 	display: block !important;
 	clear: both !important;
 	width: 100% !important;
@@ -143,60 +148,60 @@
 
 /* used for kanji information */
 
-#rikaigu-window .k-main-tb {
+.rikaigu-window .k-main-tb {
 	width: 300px !important;
 }
 
-#rikaigu-window .k-kanji {
+.rikaigu-window .k-kanji {
 	font-family: serif !important;
 	font-size: 48px !important;
 }
 
-#rikaigu-window .k-eigo {
+.rikaigu-window .k-eigo {
 	font-size: 12px !important;
 }
 
 
 /* kanji: readings */
 
-#rikaigu-window .k-yomi {
+.rikaigu-window .k-yomi {
 	font-size: 14px !important;
 	margin: 4px 0px !important;
 }
 
-#rikaigu-window .k-yomi-ti {
+.rikaigu-window .k-yomi-ti {
 	font-size: 11px !important;
 }
 
 
 /* kanji radical, grade, freq, strokes box */
 
-#rikaigu-window .k-abox-tb {
+.rikaigu-window .k-abox-tb {
 	width: 120px !important;
 	margin-bottom: 4px !important;
 	float: right !important;
 	clear: right !important;
 }
 
-#rikaigu-window .k-abox-r {
+.rikaigu-window .k-abox-r {
 	font-size: 12px !important;
 	text-align: center !important;
 	padding: 1px 4px !important;
 }
 
-#rikaigu-window .k-abox-g {
+.rikaigu-window .k-abox-g {
 	font-size: 12px !important;
 	text-align: center !important;
 	padding: 1px 4px !important;
 }
 
-#rikaigu-window .k-abox-f {
+.rikaigu-window .k-abox-f {
 	font-size: 12px !important;
 	text-align: center !important;
 	padding: 1px 4px !important;
 }
 
-#rikaigu-window .k-abox-s {
+.rikaigu-window .k-abox-s {
 	font-size: 12px !important;
 	text-align: center !important;
 	padding: 1px 4px !important;
@@ -205,32 +210,32 @@
 
 /* kanji components box */
 
-#rikaigu-window .k-bbox-tb {
+.rikaigu-window .k-bbox-tb {
 	width: 120px !important;
 	margin-bottom: 4px !important;
 	float: right !important;
 	clear: right !important;
 }
 
-#rikaigu-window .k-bbox-0a {
+.rikaigu-window .k-bbox-0a {
 	vertical-align: top !important;
 	font-size: 11px !important;
 	padding: 1px 3px !important;
 }
 
-#rikaigu-window .k-bbox-0b {
+.rikaigu-window .k-bbox-0b {
 	vertical-align: top !important;
 	font-size: 11px !important;
 	padding: 1px 3px !important;
 }
 
-#rikaigu-window .k-bbox-1a {
+.rikaigu-window .k-bbox-1a {
 	vertical-align: top !important;
 	font-size: 11px !important;
 	padding: 1px 3px !important;
 }
 
-#rikaigu-window .k-bbox-1b {
+.rikaigu-window .k-bbox-1b {
 	vertical-align: top !important;
 	font-size: 11px !important;
 	padding: 1px 3px !important;
@@ -239,19 +244,19 @@
 
 /* kanji: misc index */
 
-#rikaigu-window .k-mix-tb {
+.rikaigu-window .k-mix-tb {
 	width: 100%
 }
 
-#rikaigu-window .k-mix-td0 {
+.rikaigu-window .k-mix-td0 {
 	font-size: 12px !important;
 }
 
-#rikaigu-window .k-mix-td1 {
+.rikaigu-window .k-mix-td1 {
 	font-size: 12px !important;
 }
 
-#rikaigu-window .rikaigu-add-to-review-list {
+.rikaigu-window .rikaigu-add-to-review-list {
 	float: right !important;
 	top: 5px !important;
 
@@ -263,7 +268,7 @@
 	cursor: pointer !important;
 }
 
-#rikaigu-window .rikaigu-add-to-review-list:before {
+.rikaigu-window .rikaigu-add-to-review-list:before {
 	color: #fff !important;
 	padding-left: 3.5px !important;
 	line-height: 21px !important;
@@ -274,14 +279,14 @@
 
 /* manual query */
 
-#rikaigu-window .q-w {
+.rikaigu-window .q-w {
 	border-right: 1px dotted #B0B0B0 !important;
 	padding: 0px 2px !important;
 	vertical-align: top !important;
 	min-width: 300px !important;
 }
 
-#rikaigu-window .q-k {
+.rikaigu-window .q-k {
 	padding: 0px 2px !important;
 	vertical-align: top !important;
 }
