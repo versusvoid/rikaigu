@@ -216,23 +216,57 @@ function getTextFromRange(rangeNode, offset, forward, forwardMaxLength, boundary
 	return [text.join(''), fullSelectionRange];
 }
 
+var _cache = [];
+function _getCacheEntry(boundaryCondition) {
+	for (var c of _cache) {
+		if (c.boundaryCondition == boundaryCondition) {
+			return c;
+		}
+	}
+	_cache.push({
+		boundaryCondition: boundaryCondition,
+		range: new Range(),
+		value: null
+	});
+	return _cache[_cache.length - 1];
+}
+
 function getCurrentWordContext(boundaryCondition = japaneseCharacterBoundaryCondition) {
 	const rangeNode = rikaigu.lastShownRangeNode,
 		rangeOffset = rikaigu.lastShownRangeOffset;
+	const cacheEntry = _getCacheEntry(boundaryCondition);
+	if (cacheEntry.range.isPointInRange(rangeNode, rangeOffset)) {
+		return cacheEntry.value;
+	}
 
-	var text = getTextFromRange(rangeNode, rangeOffset, true, 100, boundaryCondition)[0].trim();
-	var prefix = getTextFromRange(rangeNode, rangeOffset, false, maxWordLength, boundaryCondition)[0];
-	var trimmedPrefix = prefix.trim();
+	const [text, tailRanges] = getTextFromRange(rangeNode, rangeOffset, true, 100, boundaryCondition);
+	var [prefix, headRanges] = getTextFromRange(rangeNode, rangeOffset, false, maxWordLength, boundaryCondition);
+	const trimmedPrefix = prefix.trim();
 	if (prefix.endsWith(trimmedPrefix)) {
 		prefix = trimmedPrefix;
 	} else {
 		prefix = "";
 	}
-	return prefix + text;
+
+	if (tailRanges.constructor === Array) {
+		cacheEntry.range.setStart(
+			headRanges[headRanges.length - 1].rangeNode,
+			headRanges[headRanges.length - 1].endIndex
+		);
+		cacheEntry.range.setEnd(
+			tailRanges[tailRanges.length - 1].rangeNode,
+			tailRanges[tailRanges.length - 1].endIndex
+		);
+	} else {
+		cacheEntry.range.setStart(headRanges.rangeNode, headRanges.endIndex);
+		cacheEntry.range.setEnd(tailRanges.rangeNode, tailRanges.endIndex);
+	}
+
+	cacheEntry.value = prefix + text.trim();
+	return cacheEntry.value;
 }
 
 function getCurrentWordSentence() {
-	// TODO cache result by rangeNode, rangeOffset boundaries
 	return getCurrentWordContext(japaneseSentenceBoundaryCondition);
 }
 
