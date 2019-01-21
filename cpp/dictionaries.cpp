@@ -1,0 +1,573 @@
+#include "dictionaries.h"
+#include "deinflector.h"
+#include "utils.h"
+
+#include <emscripten.h>
+#include <algorithm>
+#include <memory>
+#include <cstring>
+#include <cassert>
+#include <bitset>
+#include <array>
+
+struct IndexFile
+{
+	const char* content;
+	uint32_t length;
+
+	const uint32_t* indices_start;
+	const uint32_t* indices_end;
+	const char* index_start;
+	const char* index_end;
+
+	IndexFile()
+		: content(nullptr)
+		, length(0)
+		, indices_start(nullptr)
+		, indices_end(nullptr)
+		, index_start(nullptr)
+		, index_end(nullptr)
+	{}
+
+	void reset()
+	{
+		if (content != nullptr)
+		{
+			free((void*)content);
+		}
+		content = nullptr;
+		length = 0;
+		index_end = index_start = nullptr;
+		indices_start = indices_end = nullptr;
+	}
+
+	void assign(const char* content, uint32_t length)
+	{
+		reset();
+
+		this->content = content;
+		this->length = length;
+
+		uint32_t indices_length = *reinterpret_cast<const uint32_t*>(this->content);
+		indices_start = reinterpret_cast<const uint32_t*>(this->content) + 1;
+		indices_end = reinterpret_cast<const uint32_t*>(this->content + indices_length);
+
+		index_start = this->content + indices_length;
+		index_end = this->content + this->length;
+	}
+};
+
+
+static IndexFile dictionary_index;
+
+static IndexFile names_index;
+
+static string_view kanji_file;
+
+static string_view deinflect;
+static string_view expressions;
+static std::shared_ptr<Deinflector> deinflector;
+
+
+SearchResult::SearchResult()
+	: max_match_symbols_length(0)
+	, names(false)
+	, more(false)
+{}
+SearchResult::SearchResult(const KanjiResult& kanji)
+	: max_match_symbols_length(kanji.kanji.length() > 0 ? 1 : 0)
+	, kanji(kanji)
+{}
+
+	// Katakana -> hiragana conversion tables
+static wchar_t ch[] = {
+	0x3092, 0x3041, 0x3043, 0x3045, 0x3047, 0x3049, 0x3083, 0x3085, 0x3087, 0x3063, 0x30FC, 0x3042, 0x3044, 0x3046,
+	0x3048, 0x304A, 0x304B, 0x304D, 0x304F, 0x3051, 0x3053, 0x3055, 0x3057, 0x3059, 0x305B, 0x305D, 0x305F, 0x3061,
+	0x3064, 0x3066, 0x3068, 0x306A, 0x306B, 0x306C, 0x306D, 0x306E, 0x306F, 0x3072, 0x3075, 0x3078, 0x307B, 0x307E,
+	0x307F, 0x3080, 0x3081, 0x3082, 0x3084, 0x3086, 0x3088, 0x3089, 0x308A, 0x308B, 0x308C, 0x308D, 0x308F, 0x3093
+};
+static wchar_t cv[] = {
+	0x30F4, 0xFF74, 0xFF75, 0x304C, 0x304E, 0x3050, 0x3052, 0x3054, 0x3056, 0x3058, 0x305A, 0x305C, 0x305E, 0x3060,
+	0x3062, 0x3065, 0x3067, 0x3069, 0xFF85, 0xFF86, 0xFF87, 0xFF88, 0xFF89, 0x3070, 0x3073, 0x3076, 0x3079, 0x307C
+};
+static wchar_t cs[] = {0x3071, 0x3074, 0x3077, 0x307A, 0x307D};
+
+struct KanaConvertor
+{
+	wchar_t previous;
+	std::string out;
+	size_t out_offset;
+	std::vector<size_t> true_length_mapping;
+
+	KanaConvertor()
+		: previous(0)
+		, out_offset(0)
+		, true_length_mapping({0})
+	{}
+
+	void reserve(const size_t bytes)
+	{
+		out.resize(bytes);
+	}
+
+	void drop_last()
+	{
+		size_t j = out_offset - 1;
+		while ((out.at(j) & 0b11000000) == 0b10000000) {
+			j -= 1;
+		}
+		out_offset = j;
+	}
+
+	void shrink()
+	{
+		out.resize(out_offset);
+	}
+
+	bool operator() (const size_t i, wchar_t u, const char*, const size_t)
+	{
+		wchar_t v = u;
+
+		if (u <= 0x3000) return false;
+
+		// Full-width katakana to hiragana
+		if ((u >= 0x30A1) && (u <= 0x30F3)) {
+			u -= 0x60;
+		}
+		// Half-width katakana to hiragana
+		else if ((u >= 0xFF66) && (u <= 0xFF9D)) {
+			u = ch[u - 0xFF66];
+		}
+		// Voiced (used in half-width katakana) to hiragana
+		else if (u == 0xFF9E) {
+			if ((previous >= 0xFF73) && (previous <= 0xFF8E)) {
+				drop_last();
+				u = cv[previous - 0xFF73];
+			}
+		}
+		// Semi-voiced (used in half-width katakana) to hiragana
+		else if (u == 0xFF9F) {
+			if ((previous >= 0xFF8A) && (previous <= 0xFF8E)) {
+				drop_last();
+				u = cs[previous - 0xFF8A];
+			}
+		}
+		// Ignore J~
+		else if (u == 0xFF5E) {
+			previous = 0;
+			return true;
+		}
+
+		if (out_offset + 4 > out.size())
+		{
+			out.resize(out.size() * 2);
+		}
+		int written = wctomb(&out[0] + out_offset, u);
+		if (written < 0)
+		{
+			out.clear();
+			return false;
+		}
+		out_offset += size_t(written);
+		true_length_mapping.resize(out_offset + 1, 0);
+		true_length_mapping.at(out_offset) = i + 1; // Need to keep real length because of the half-width semi/voiced conversion
+		previous = v;
+
+		return true;
+	}
+};
+
+std::vector<uint32_t> find(IndexFile* index, const std::string& word)
+{
+	PROFILE
+//	std::cout << "find( " << word << " )" << std::endl;
+
+	const char* beg = index->index_start;
+	const char* end = index->index_end;
+
+	long indices_offset = -1;
+	while (beg < end) {
+		const char* mi = reinterpret_cast<const char*>((intptr_t(beg) + intptr_t(end)) >> 1);
+		const char* word_start = std::find(
+				std::make_reverse_iterator(mi),
+				std::make_reverse_iterator(beg),
+				char(0b11111000)
+			).base();
+		if (word_start > beg)
+		{
+			word_start += 3;
+		}
+		const char* word_end = std::find(mi, end, char(0b11111000));
+
+		int order = word.compare(0, word.length(), word_start, size_t(word_end - word_start));
+		if (order < 0) {
+			end = word_start;
+		} else if (order > 0) {
+			beg = word_end + 4;
+		} else {
+			beg = word_end + 4;
+			indices_offset = word_end[1] | (word_end[2] << 7) | (word_end[3] << 14);
+			break;
+		}
+	}
+	if (indices_offset == -1)
+	{
+		return std::vector<uint32_t>();
+	}
+
+	const uint32_t* indices_start = index->indices_start + indices_offset;
+	const uint32_t* indices_end = index->indices_end;
+
+	if (beg < index->index_end)
+	{
+		// wtf? why do i need to cast? is std::find even safe?
+		const char* next_word_end = std::find(beg, index->index_end, char(0b11111000));
+		indices_end = index->indices_start + (
+			next_word_end[1] | (next_word_end[2] << 7) | (next_word_end[3] << 14)
+		);
+	}
+
+	return std::vector<uint32_t>(indices_start, indices_end);
+}
+
+static bool compare(WordResult& a, WordResult& b)
+{
+	if (a.match_symbols_length != b.match_symbols_length)
+	{
+		return a.match_symbols_length > b.match_symbols_length;
+	}
+	if (a.reason.empty() != b.reason.empty())
+	{
+		return a.reason.empty() > b.reason.empty();
+	}
+	if (a.expression.empty() != b.expression.empty())
+	{
+		return a.expression.empty() > b.expression.empty();
+	}
+	return a.dentry.freq() < b.dentry.freq();
+}
+
+static size_t line_buffer_size = 0;
+char* line = nullptr;
+
+SearchResult word_search(const char* word, bool names_dictionary, int max)
+{
+	PROFILE
+//	std::cout << "word_search( " << word << " )" << std::endl;
+	// Half & full-width katakana to hiragana conversion.
+	// Note: katakana `vu` is never converted to hiragana
+	KanaConvertor convertor;
+	SearchResult result;
+	if (!stream_utf8_convertor(word, convertor))
+	{
+		return result;
+	}
+	convertor.shrink();
+	result.source = convertor.out;
+
+	FILE* dict = nullptr;
+	IndexFile* index = nullptr;
+	int maxTrim = 0;
+
+	if (names_dictionary)
+	{
+		dict = fopen("names.dat", "r");
+		index = &names_index;
+		maxTrim = 20;
+		result.names = true;
+//		std::cout << "doNames" << std::endl;
+	}
+	else
+	{
+		dict = fopen("dict.dat", "r");
+		index = &dictionary_index;
+		maxTrim = 7;
+	}
+
+	if (line == nullptr)
+	{
+		line_buffer_size = 1024;
+		line = reinterpret_cast<char*>(malloc(line_buffer_size));
+	}
+
+	if (max > 0) maxTrim = max;
+	size_t max_length = 0;
+	std::map<std::string, std::vector<uint32_t>> cache;
+	std::set<size_t> have;
+	int count = 0;
+	while (convertor.out.length() > 0)
+	{
+		std::list<Candidate> trys;
+
+		if (names_dictionary)
+		{
+			trys.emplace_back(convertor.out, 0);
+		}
+		else
+		{
+			trys = deinflector->deinflect(convertor.out);
+		}
+
+		for (auto candidate_it = trys.begin(); candidate_it != trys.end(); ++candidate_it)
+		{
+			Candidate& u = *candidate_it;
+
+			auto it = cache.find(u.word);
+			if (it == cache.end()) {
+				std::vector<uint32_t> ix = find(index, u.word);
+				it = cache.insert(std::make_pair(u.word, ix)).first;
+			}
+
+			for (auto ofs : it->second)
+			{
+				if (have.count(ofs) > 0) continue;
+
+				fseek(dict, ofs, SEEK_SET);
+				ssize_t line_length = getline(&line, &line_buffer_size, dict);
+				if (line_length == -1)
+				{
+					std::cerr << "Too bad" << std::endl;
+					continue;
+				}
+
+				DEntry dentry(std::string(line, line_length - 1), names_dictionary);
+
+				// > second and further - a de-inflected word.
+				// Each type has associated bit. If bit-and gives 0
+				// than deinflected word does not match this dentry.
+				if (candidate_it != trys.begin() && (dentry.all_pos() & u.type) == 0) {
+					continue;
+				}
+				// TODO confugirable number of entries
+				if (count >= 5) {
+					result.more = true;
+					if (names_dictionary) break;
+				}
+
+				have.insert(ofs);
+				++count;
+
+				size_t true_length = convertor.true_length_mapping.at(convertor.out.length());
+				if (max_length == 0)
+				{
+					max_length = true_length;
+				}
+
+				result.data.push_back({dentry, u.reason,
+					true_length, convertor.out.length(),
+					u.expression});
+			} // for j < ix.length
+		} // for i < trys.length
+		if (count >= maxTrim || count >= 5) break;
+
+		convertor.drop_last();
+		convertor.shrink();
+	} // while word.length > 0
+
+	fclose(dict);
+
+	if (!names_dictionary)
+	{
+		// Sort by match length and then by commonness
+		std::sort(result.data.begin(), result.data.end(), compare);
+		result.data.erase(result.data.begin() + std::min(5L, long(result.data.size())), result.data.end());
+	}
+
+	result.max_match_symbols_length = max_length;
+	return result;
+}
+
+std::string find_kanji(const std::string& kanji)
+{
+//	std::cout << "find_kanji( " << kanji << " )" << std::endl;
+	const char* beg = kanji_file.data;
+	const char* end = beg + kanji_file.length;
+
+	while (beg < end) {
+		const char* mi = reinterpret_cast<const char*>((intptr_t(beg) + intptr_t(end)) >> 1);
+		const char* p = std::find(
+			std::make_reverse_iterator(mi),
+			std::make_reverse_iterator(beg),
+			'\n'
+		).base();
+		const char* kanji_end = std::find(p, end, '|');
+
+		int order = kanji.compare(0, kanji.length(), p, size_t(kanji_end - p));
+		if (order < 0)
+		{
+			end = p;
+		}
+		else if (order > 0)
+		{
+			beg = std::find(kanji_end, end, '\n') + 1;
+		}
+		else
+		{
+			return std::string(p, std::find(kanji_end, end, '\n'));
+		}
+	}
+	return "";
+}
+
+static const char* hex = "0123456789ABCDEF";
+KanjiResult kanji_search(const char* kanji)
+{
+
+	KanjiResult result;
+
+	wchar_t kanji_code;
+	mbstate_t ps;
+	memset(&ps, 0, sizeof(ps));
+	size_t len = mbrtowc(&kanji_code, kanji, strlen(kanji), &ps);
+	if (len == size_t(-1) || len == size_t(-2))
+	{
+		std::cerr << "Invalid utf8: " << kanji << std::endl;
+		return result;
+	}
+
+	std::string kanji_str(kanji, len);
+	if (kanji_code < 0x3000)
+	{
+		return result;
+	}
+
+	std::string kanji_definition = find_kanji(kanji_str);
+	if (kanji_definition.empty())
+	{
+		return result;
+	}
+
+	auto parts = split(kanji_definition, '|');
+	if (parts.size() != 6)
+	{
+		return result;
+	}
+
+	result.kanji = parts.at(0);
+	std::string& code = result.misc["U"];
+	for (int i = (kanji_code > 0xFFFF ? (kanji_code > 0xFFFFF ? 20 : 16) : 12); i >= 0; i -= 4)
+	{
+		code.push_back(hex[(kanji_code >> i) & 15]);
+	}
+
+	for (auto& b : split(parts.at(1), ' '))
+	{
+		size_t i = 0;
+		while (i < b.length() and b[i] >= 'A' and b[i] <= 'Z')
+		{
+			i += 1;
+		}
+		if (i == 0) continue;
+		std::string key = b.substr(0, i);
+		auto it = result.misc.find(key);
+		if (it == result.misc.end())
+		{
+			result.misc[key] = b.substr(i);
+		}
+		else
+		{
+			it->second.push_back(' ');
+			it->second.append(b.substr(i));
+		}
+	}
+
+
+	result.onkun = split(parts.at(2), ' ');
+	for (auto& part : split(parts.at(3), ' '))
+	{
+		if (!result.nanori.empty())
+		{
+			result.nanori += u8"、 ";
+		}
+		result.nanori += part;
+	}
+	for (auto& part : split(parts.at(4), ' '))
+	{
+		if (!result.bushumei.empty())
+		{
+			result.bushumei += u8"、 ";
+		}
+		result.bushumei += part;
+	}
+	result.eigo = parts.at(5);
+
+	return result;
+}
+
+static int show_mode = 0;
+static std::array<std::string, 3> dictionaries{{"words", "kanji", "names"}};
+SearchResult search(const char* text, SearchMode search_mode)
+{
+	PROFILE
+
+	switch (search_mode) {
+		case FORCE_KANJI:
+			return kanji_search(text);
+		case DEFAULT_DICT:
+			show_mode = (std::find(dictionaries.begin(), dictionaries.end(), config.default_dictionary) -
+				dictionaries.begin()) % dictionaries.size();
+			break;
+		case NEXT_DICT:
+			show_mode = (show_mode + 1) % dictionaries.size();
+			break;
+	}
+	const int first_show_mode = show_mode;
+
+	SearchResult res;
+	do {
+		switch (show_mode) {
+		case 0:
+			res = word_search(text, false);
+			if (search_mode == DEFAULT_DICT) {
+				SearchResult res2 = word_search(text, true);
+				if (res2.max_match_symbols_length > res.max_match_symbols_length) {
+					return res2;
+				}
+			}
+			break;
+		case 1:
+			res = kanji_search(text);
+			break;
+		case 2:
+			res = word_search(text, true);
+			break;
+		}
+		if (res.max_match_symbols_length > 0) break;
+		show_mode = (show_mode + 1) % dictionaries.size();
+	} while (show_mode != first_show_mode);
+
+	return res;
+}
+
+bool dictionaries_init(const char* filename, const char* content, uint32_t length)
+{
+	if (0 == strcmp(filename, "data/dict.idx"))
+	{
+		dictionary_index.assign(content, length);
+	}
+	else if (0 == strcmp(filename, "data/names.idx"))
+	{
+		names_index.assign(content, length);
+	}
+	else if (0 == strcmp(filename, "data/kanji.dat"))
+	{
+		kanji_file.assign(content, length);
+	}
+	else if (0 == strcmp(filename, "data/deinflect.dat"))
+	{
+		deinflect.assign(content, length);
+	}
+	else if (0 == strcmp(filename, "data/expressions.dat"))
+	{
+		expressions.assign(content, length);
+	}
+
+	if (deinflect && expressions)
+	{
+		deinflector = std::make_shared<Deinflector>(deinflect, expressions);
+		deinflect.reset();
+		expressions.reset();
+	}
+
+	return true;
+}

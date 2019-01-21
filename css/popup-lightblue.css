@@ -1,0 +1,120 @@
+/* See note in */
+@import url("popup-common.css");
+
+#rikaigu-window,
+#rikaigu-window * {
+	color: #000000 !important;
+}
+
+#rikaigu-window {
+	background: #E6F4FF !important;
+}
+
+
+/* used for word definitions */
+
+#rikaigu-window .w-kanji {
+	color: #3082BF !important;
+}
+
+#rikaigu-window .w-kanji.uncommon {
+	color: #6d6d6d !important;
+}
+
+#rikaigu-window .w-kana {
+	color: #00B366 !important;
+}
+
+#rikaigu-window .w-kana.uncommon {
+	color: #6d6d6d !important;
+}
+
+#rikaigu-window .w-conj {
+	color: #808080 !important;
+}
+
+#rikaigu-window .w-title {
+	background: #BFE4FF !important;
+	color: #000000 !important;
+}
+
+
+/* used for kanji information */
+
+#rikaigu-window .k-kanji {
+	color: #000000 !important;
+}
+
+
+/* kanji: readings */
+
+#rikaigu-window .k-yomi {
+	color: #00B366 !important;
+}
+
+#rikaigu-window .k-yomi-hi {
+	color: #00868B !important;
+}
+
+#rikaigu-window .k-yomi-ti {
+	color: #000000 !important;
+}
+
+
+/* kanji radical, grade, freq, strokes box */
+
+#rikaigu-window .k-abox-r {
+	background: #DFF1FF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-abox-g {
+	background: #FFFFFF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-abox-f {
+	background: #FFFFFF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-abox-s {
+	background: #DFF1FF !important;
+	color: #003D6B !important;
+}
+
+
+/* kanji components box */
+
+#rikaigu-window .k-bbox-0a {
+	background: #DFF1FF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-bbox-0b {
+	background: #DFF1FF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-bbox-1a {
+	background: #FFFFFF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-bbox-1b {
+	background: #FFFFFF !important;
+	color: #003D6B !important;
+}
+
+
+/* kanji: misc index */
+
+#rikaigu-window .k-mix-td0 {
+	background: #DFF1FF !important;
+	color: #003D6B !important;
+}
+
+#rikaigu-window .k-mix-td1 {
+	background: #FFFFFF !important;
+	color: #003D6B !important;
+}

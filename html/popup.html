@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Rikaigu Popup</title>
+    <style>
+    body {
+      overflow: hidden;
+      margin: 0px;
+      padding: 0px;
+      background: white;
+    }
+    div:first-child {
+      margin-top: 0px;
+    }
+    div {
+      cursor: pointer;
+      text-align: center;
+      padding: 1px 3px;
+      font-family: sans-serif;
+      width: 100px;
+      margin: 1px 0;
+    }
+    div:hover, div.active {
+		background: #86abd9;
+    }
+	hr {
+		margin: 0;
+	}
+	a {
+		width: 100%;
+		display: inline-block;
+		color: black;
+		text-decoration: none;
+	}
+    </style>
+    <script src="/js/popup.js"></script>
+  </head>
+  <body>
+	<div id="scratchpad" class="active"><a href="scratchpad.html" target="_blank">Scratchpad</a></div>
+	<hr />
+    <div id="disable">Disable</div>
+  </body>
+</html>

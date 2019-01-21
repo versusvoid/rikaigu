@@ -1,0 +1,10 @@
+dist
+*.bc
+*.csv
+data/dict.*
+data/names.*
+data/model.bin
+cpp/rikai.asm.*
+*.swp
+__pycache__
+tmp

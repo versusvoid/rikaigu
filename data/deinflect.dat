@@ -1,0 +1,333 @@
+# Deinflect Rules 20081220-0509 | by Jonathan Zarate | http://www.polarcloud.com
+# vi: set noexpandtab tabstop=23:
+# pos are taken from jmdict except for `raw` - piece of original text
+# reason - particular deinflection marker
+# suffix | new suffix | source pos | new pos | reason
+# Test set:
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%D9%FA%A4%E1%A4%EB_v1
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B8%E2%A4%EC%A4%EB_v1-s
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B6%AB%A4%D6_v5b
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B6%C4%A4%B0_v5g
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B6%F5%A4%AF_v5k
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B9%D4%A4%AF_v5k-s
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B9%EF%A4%E0_v5m
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%BB%E0%A4%CC_v5n
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%BB%EA%A4%EB_v5r
+# v5aru: https://en.wiktionary.org/wiki/%E3%81%84%E3%82%89%E3%81%A3%E3%81%97%E3%82%83%E3%82%8B#Conjugation
+# v5r-i: https://en.wiktionary.org/wiki/%E6%9C%89%E3%82%8B#Conjugation
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%F0%E4%A4%B9_v5s
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B0%E9%A4%C4_v5t
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%C0%EA%A4%A6_v5u
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%C0%C1%A4%A6_v5u-s
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%CD%E8%A4%EB_vk
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%C9%BD%A4%B9%A4%EB_vs-s
+# http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%CA%AA%A4%C8%A4%B9%A4%EB_vs-i
+# Consider 間違いありません. It's somewhat irregular adj-i
+ありませんでした	なかった	raw	raw	polite
+いませんでした	う	raw	v5u|v5u-s|v5aru	polite past negative
+きませんでした	く	raw	v5k|v5k-s	polite past negative
+きませんでした	くる	raw	vk	polite past negative
+ぎませんでした	ぐ	raw	v5g	polite past negative
+しませんでした	す	raw	v5s	polite past negative
+しませんでした	する	raw	vs-i|vs-s	polite past negative
+ちませんでした	つ	raw	v5t	polite past negative
+にませんでした	ぬ	raw	v5n	polite past negative
+びませんでした	ぶ	raw	v5b	polite past negative
+みませんでした	む	raw	v5m	polite past negative
+りませんでした	る	raw	v5r|v5r-i	polite past negative
+ありません	ない	raw	adj-i	polite
+ませんでした	る	raw	v1|v1-s|vk	polite past negative
+いましょう	う	raw	v5u|v5u-s|v5aru	polite volitional
+きましょう	く	raw	v5k|v5k-s	polite volitional
+きましょう	くる	raw	vk	polite volitional
+ぎましょう	ぐ	raw	v5g	polite volitional
+しましょう	す	raw	v5s	polite volitional
+しましょう	する	raw	vs-i|vs-s	polite volitional
+ちましょう	つ	raw	v5t	polite volitional
+にましょう	ぬ	raw	v5n	polite volitional
+びましょう	ぶ	raw	v5b	polite volitional
+みましょう	む	raw	v5m	polite volitional
+りましょう	る	raw	v5r|v5r-i	polite volitional
+いません	う	raw	v5u|v5u-s|v5aru	polite negative
+かったら	い	raw	adj-i	-tara
+かったり	い	raw	adj-i	-tari
+きません	く	raw	v5k|v5k-s	polite negative
+きません	くる	raw	vk	polite negative
+ぎません	ぐ	raw	v5g	polite negative
+こさせる	くる	v1|v1-s	vk	causative
+こられる	くる	v1|v1-s	vk	potential or passive
+しません	す	raw	v5s	polite negative
+しません	する	raw	vs-i|vs-s	polite negative
+ちません	つ	raw	v5t	polite negative
+にません	ぬ	raw	v5n	polite negative
+びません	ぶ	raw	v5b	polite negative
+ましょう	る	raw	v1|v1-s|vk	polite volitional
+みません	む	raw	v5m	polite negative
+りません	る	raw	v5r|v5r-i	polite negative
+いちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+いちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+きちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+きちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+しちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+しちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+っちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+っちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+いじゃう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+いじまう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+んじゃう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+んじまう	でしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+ちゃう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+ちまう	てしまう	v5u|v5u-s	v5u|v5u-s	colloquial
+いたら	く	raw	v5k	-tara
+いだら	ぐ	raw	v5g	-tara
+いたり	く	raw	v5k	-tari
+いだり	ぐ	raw	v5g	-tari
+います	う	v5s	v5u|v5u-s	polite
+います	る	v5s	v5aru	polite
+# 行かせる　(potential)ー＞　行かす　(informal causative)ー＞　行く, but such chain is invalid
+かせる	く	v1|v1-s	v5k|v5k-s	causative
+がせる	ぐ	v1|v1-s	v5g	causative
+かった	い	raw	adj-i	past
+かない	く	adj-i	v5k|v5k-s	negative
+がない	ぐ	adj-i	v5g	negative
+かれる	く	v1|v1-s	v5k|v5k-s	passive
+がれる	ぐ	v1|v1-s	v5g	passive
+きたら	くる	raw	vk	-tara
+きたり	くる	raw	vk	-tari
+きます	く	v5s	v5k|v5k-s	polite
+きます	くる	v5s	vk	polite
+ぎます	ぐ	v5s	v5g	polite
+くない	い	adj-i	adj-i	negative
+ければ	い	raw	adj-i	-ba
+こない	くる	adj-i	vk	negative
+こよう	くる	raw	vk	volitional
+これる	くる	v1|v1-s	vk	potential
+させる	する	v1|v1-s	vs-i|vs-s	causative
+させる	る	v1|v1-s	v1|v1-s|vk	causative
+させる	す	v1|v1-s	v5s	causative
+さない	す	adj-i	v5s	negative
+される	す	v1|v1-s	v5s	passive or causative
+される	する	v1|v1-s	vs-i|vs-s	passive
+しえる	する	v1	vs-s	potential
+しうる	する	v5r	vs-s	potential
+できる	する	v1	vs-i	potential
+したら	す	raw	v5s	-tara
+したら	する	raw	vs-i|vs-s	-tara
+したり	す	raw	v5s	-tari
+したり	する	raw	vs-i|vs-s	-tari
+しない	する	adj-i	vs-i|vs-s	negative
+さない	する	adj-i	vs-s	negative
+します	す	v5s	v5s	polite
+します	する	v5s	vs-i|vs-s	polite
+しよう	する	raw	vs-i|vs-s	volitional
+たせる	つ	v1|v1-s	v5t	causative
+たない	つ	adj-i	v5t	negative
+たれる	つ	v1|v1-s	v5t	passive
+ちます	つ	v5s	v5t	polite
+ったら	く	raw	v5k-s	-tara
+ったら	う	raw	v5u	-tara
+うたら	う	raw	v5u-s	-tara
+ったら	つ	raw	v5t	-tara
+ったら	る	raw	v5r|v5r-i|v5aru	-tara
+ったり	く	raw	v5k-s	-tari
+ったり	う	raw	v5u	-tari
+うたり	う	raw	v5u-s	-tari
+ったり	つ	raw	v5t	-tari
+ったり	る	raw	v5r|v5r-i|v5aru	-tari
+なせる	ぬ	v1|v1-s	v5n	causative
+なない	ぬ	adj-i	v5n	negative
+なれる	ぬ	v1|v1-s	v5n	passive
+にます	ぬ	v5s	v5n	polite
+ばせる	ぶ	v1|v1-s	v5b	causative
+ばない	ぶ	adj-i	v5b	negative
+ばれる	ぶ	v1|v1-s	v5b	passive
+びます	ぶ	v5s	v5b	polite
+ませる	む	v1|v1-s	v5m	causative
+ません	る	raw	v1|v1-s|vk	polite negative
+まない	む	adj-i	v5m	negative
+まれる	む	v1|v1-s	v5m	passive
+みます	む	v5s	v5m	polite
+らせる	る	v1|v1-s	v5r|v5r-i|v5aru	causative
+らない	る	adj-i	v5r|v5aru	negative
+られる	る	v1|v1-s	v1|v1-s|v5r|v5r-i|v5aru|vk	potential or passive
+ります	る	v5s	v5r|v5r-i	polite
+わせる	う	v1|v1-s	v5u|v5u-s	causative
+わない	う	adj-i	v5u|v5u-s	negative
+われる	う	v1|v1-s	v5u|v5u-s	passive
+んだら	ぬ	raw	v5n	-tara
+んだら	ぶ	raw	v5b	-tara
+んだら	む	raw	v5m	-tara
+んだり	ぬ	raw	v5n	-tari
+んだり	ぶ	raw	v5b	-tari
+んだり	む	raw	v5m	-tari
+来れる	来る	v1|v1-s	vk	potential
+これる	くる	v1|v1-s	vk	potential
+てる	ている	v1	v1|v1-s	colloquial
+でる	でいる	v1	v1|v1-s	colloquial
+とる	ている	v1	v1	colloquial
+どる	でいる	v1	v1	colloquial
+とく	ておく	v5k	v5k	colloquial
+どく	でおく	v5k	v5k	colloquial
+いた	く	raw	v5k	past
+いだ	ぐ	raw	v5g	past
+いて	く	raw	v5k	-te
+いで	ぐ	raw	v5g	-te
+えば	う	raw	v5u|v5u-s	-ba
+える	う	v1|v1-s	v5u|v5u-s	potential
+おう	う	raw	v5u|v5u-s	volitional
+かず	く	raw	v5k|v5k-s	-zu
+がず	ぐ	raw	v5g	-zu
+きた	くる	raw	vk	past
+きて	くる	raw	vk	-te
+くて	い	raw	adj-i	-te
+けば	く	raw	v5k|v5k-s	-ba
+げば	ぐ	raw	v5g	-ba
+ける	く	v1|v1-s	v5k|v5k-s	potential
+げる	ぐ	v1|v1-s	v5g	potential
+こい	くる	raw	vk	imperative
+こう	く	raw	v5k|v5k-s	volitional
+ごう	ぐ	raw	v5g	volitional
+こず	くる	raw	vk	-zu
+さず	す	raw	v5s	-zu
+した	す	raw	v5s	past
+した	する	raw	vs-i|vs-s	past
+して	す	raw	v5s	-te
+して	する	raw	vs-i|vs-s	-te
+しろ	する	raw	vs-i|vs-s	imperative
+せず	する	raw	vs-i|vs-s	-zu
+せば	す	raw	v5s	-ba
+せよ	する	raw	vs-i|vs-s	imperative
+せる	す	v1|v1-s	v5s	potential
+そう	す	raw	v5s	volitional
+たず	つ	raw	v5t	-zu
+たら	る	raw	v1|v1-s|vk	-tara
+たり	る	raw	v1|v1-s|vk	-tari
+った	う	raw	v5u	past
+うた	う	raw	v5u-s	past
+った	く	raw	v5k-s	past
+った	つ	raw	v5t	past
+った	る	raw	v5r|v5r-i|v5aru	past
+って	う	raw	v5u	-te
+うて	う	raw	v5u-s	-te
+って	く	raw	v5k-s	-te
+って	つ	raw	v5t	-te
+って	る	raw	v5r|v5r-i|v5aru	-te
+てば	つ	raw	v5t	-ba
+てる	つ	v1|v1-s	v5t	potential
+とう	つ	raw	v5t	volitional
+ない	る	adj-i	v1|v1-s|vk	negative
+ない	ある	adj-i	v5r-i	negative
+なず	ぬ	raw	v5n	-zu
+ねば	ぬ	raw	v5n	-ba
+ねる	ぬ	v1|v1-s	v5n	potential
+のう	ぬ	raw	v5n	volitional
+ばず	ぶ	raw	v5b	-zu
+べば	ぶ	raw	v5b	-ba
+べる	ぶ	v1|v1-s	v5b	potential
+ぼう	ぶ	raw	v5b	volitional
+ます	る	v5s	v1|v1-s|vk	polite
+まず	む	raw	v5m	-zu
+めば	む	raw	v5m	-ba
+める	む	v1|v1-s	v5m	potential
+もう	む	raw	v5m	volitional
+よう	る	raw	v1|v1-s|vk	volitional
+らず	る	raw	v5r|v5r-i|v5aru	-zu
+れば	る	raw	v1|v1-s|v5r|v5r-i|v5aru|vk|vs-i|vs-s	-ba
+れる	る	v1|v1-s	v1|v1-s|v5r|v5r-i|v5aru	potential
+ろう	る	raw	v5r|v5r-i|v5aru	volitional
+わず	う	raw	v5u|v5u-s	-zu
+んだ	ぬ	raw	v5n	past
+んだ	ぶ	raw	v5b	past
+んだ	む	raw	v5m	past
+んで	ぬ	raw	v5n	-te
+んで	ぶ	raw	v5b	-te
+んで	む	raw	v5m	-te
+さす	る	v5s	v1|v1-s|vk	informal causative
+ばす	ぶ	v5s	v5b	informal causative
+ばぬ	ぶ	raw	v5b	archaic negative
+がす	ぐ	v5s	v5g	informal causative
+がぬ	ぐ	raw	v5g	archaic negative
+かす	く	v5s	v5k|v5k-s	informal causative
+かぬ	く	raw	v5k|v5k-s	archaic negative
+ます	む	v5s	v5m	informal causative
+まぬ	む	raw	v5m	archaic negative
+なす	ぬ	v5s	v5n	informal causative
+なぬ	ぬ	raw	v5n	archaic negative
+らす	る	v5s	v5r|v5r-i|v5aru	informal causative
+らぬ	る	raw	v5r|v5r-i|v5aru	archaic negative
+さす	す	v5s	v5s	informal causative
+さぬ	す	raw	v5s	archaic negative
+たす	つ	v5s	v5t	informal causative
+たぬ	つ	raw	v5t	archaic negative
+# wwwjdic says there is no caus-pass for v5u-s, but is's impossible to exclude it here and
+# hard (for now) to exclude it in the code, so let it be for now
+わす	う	v5s	v5u|v5u-s	informal causative
+わぬ	う	raw	v5u|v5u-s	archaic negative
+さす	する	v5s	vs-s|vs-i	informal causative
+せぬ	する	v5s	vs-s|vs-i	archaic negative
+かん	く	raw	v5k|v5k-s	casual negative
+がん	ぐ	raw	v5g	casual negative
+さん	す	raw	v5s	casual negative
+せん	する	raw	vs-s|vs-i	casual negative
+たん	つ	raw	v5t	casual negative
+なん	ぬ	raw	v5n	casual negative
+ばん	ぶ	raw	v5b	casual negative
+まん	む	raw	v5m	casual negative
+らん	る	raw	v5r|v5aru	casual negative
+わん	う	raw	v5u|v5u-s	casual negative
+ん	る	raw	v1|v1-s|vk	casual negative
+い	る	raw	vk	imperative
+え	う	raw	v5u|v5u-s	imperative
+く	い	raw	adj-i	adv
+け	く	raw	v5k|v5k-s	imperative
+げ	ぐ	raw	v5g	imperative
+# not sure
+さ	い	raw	adj-i	noun
+ず	る	raw	v1|v1-s|vk	-zu
+せ	す	raw	v5s	imperative
+た	る	raw	v1|v1-s|vk	past
+て	つ	raw	v5t	imperative
+て	る	raw	v1|v1-s|vk	-te
+な		raw	v1|v1-s|v5b|v5g|v5k|v5k-s|v5m|v5n|v5r|v5r-i|v5aru|v5s|v5t|v5u|v5u-s|vk|vs-i|vs-s	imperative negative
+ね	ぬ	raw	v5n	imperative
+べ	ぶ	raw	v5b	imperative
+め	む	raw	v5m	imperative
+よ	る	raw	v1|v1-s	imperative
+れ	る	raw	v5r|v5r-i|v5aru	imperative
+ろ	る	raw	v1	imperative
+れ	れる	raw	v1-s	imperative
+い	いる	raw	v1|v1-s	masu stem
+え	える	raw	v1|v1-s	masu stem
+き	きる	raw	v1|v1-s	masu stem
+ぎ	ぎる	raw	v1|v1-s	masu stem
+け	ける	raw	v1|v1-s	masu stem
+げ	げる	raw	v1|v1-s	masu stem
+じ	じる	raw	v1|v1-s	masu stem
+せ	せる	raw	v1|v1-s	masu stem
+ぜ	ぜる	raw	v1|v1-s	masu stem
+ち	ちる	raw	v1|v1-s	masu stem
+て	てる	raw	v1|v1-s	masu stem
+で	でる	raw	v1|v1-s	masu stem
+に	にる	raw	v1|v1-s	masu stem
+ね	ねる	raw	v1|v1-s	masu stem
+ひ	ひる	raw	v1|v1-s	masu stem
+び	びる	raw	v1|v1-s	masu stem
+へ	へる	raw	v1|v1-s	masu stem
+べ	べる	raw	v1|v1-s	masu stem
+み	みる	raw	v1|v1-s	masu stem
+め	める	raw	v1|v1-s	masu stem
+り	りる	raw	v1|v1-s	masu stem
+れ	れる	raw	v1|v1-s	masu stem
+り	る	raw	v5r|v5r-i	masu stem
+み	む	raw	v5m	masu stem
+い	う	raw	v5u|v5u-s|v5aru	masu stem
+き	く	raw	v5k|v5k-s	masu stem
+き	くる	raw	vk	masu stem
+来	来る	raw	vk	masu stem
+ぎ	ぐ	raw	v5g	masu stem
+し	す	raw	v5s	masu stem
+し	する	raw	vs-i|vs-s	masu stem
+ち	つ	raw	v5t	masu stem
+に	ぬ	raw	v5n	masu stem
+び	ぶ	raw	v5b	masu stem
+ぬ	る	raw	v1|v1-s|vk	archaic negative
