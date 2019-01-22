@@ -245,6 +245,8 @@ std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 
 static bool compare(WordResult& a, WordResult& b)
 {
+	// TODO match source and target script (katakana, hiragana)
+	// and, generally, use better model, you dummy
 	if (a.dentry.freq() != b.dentry.freq())
 	{
 		return std::log(a.dentry.freq() + 1) - a.match_bytes_length < std::log(b.dentry.freq() + 1) - b.match_symbols_length;

@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-import os
 import re
-import sys
 import struct
-from collections import OrderedDict
 
 import expressions
 import dictionary
@@ -135,9 +132,9 @@ def format_entry(entry):
 		del sense_groups
 
 		# TODO per kanji/reading freq
-		freq = freqs.get_frequency(entry)
-		if freq is not None:
-			parts.append(str(freq))
+		# freq = freqs.get_frequency(entry)
+		# if freq is not None:
+		# 	parts.append(str(freq))
 	else:
 		transes = []
 		for t in entry.transes:
@@ -145,9 +142,9 @@ def format_entry(entry):
 		parts.append('\\'.join(transes))
 		del transes
 
-		freq = freqs.get_name_frequency(entry)
-		if freq is not None:
-			parts.append(str(freq))
+		# freq = freqs.get_name_frequency(entry)
+		# if freq is not None:
+		# 	parts.append(str(freq))
 
 	return '\t'.join(parts)
 

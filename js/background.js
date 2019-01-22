@@ -58,7 +58,7 @@ function onLoaded(initiatorTab) {
 	if (initiatorTab) {
 		chrome.tabs.sendMessage(initiatorTab.id, {
 			"type": "enable",
-			"popup": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
+			"text": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
 		});
 	}
 
@@ -211,7 +211,7 @@ function getReviewEntriesForSentence(text) {
 function onMessage(request, sender, response) {
 	switch (request.type) {
 		case 'enable?':
-			response(rikaiguEnabled, sender.frameId);
+			response({enabled: rikaiguEnabled, frameId: sender.frameId});
 			break;
 
 		case 'xsearch':
@@ -233,18 +233,22 @@ function onMessage(request, sender, response) {
 
 		case 'review':
 			var result = getReviewEntriesForSentence(request.text);
-			response(result ? result.split('\n').map(s => s.split('\t')) : null);
+			if (result) {
+				chrome.tabs.sendMessage(sender.tab.id, {
+					"type": "show-reviewed",
+					"result": result.split('\n').map(s => s.split('\t'))
+				})
+			}
 			break;
 
-		case 'close':
-			chrome.tabs.sendMessage(sender.tab.id, request);
-			break;
-
-		case 'changeActiveFrame':
-			chrome.tabs.sendMessage(sender.tab.id, request);
-			break;
-		case 'keyboardEventForActiveFrame':
-			chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
+		case 'relay':
+			console.assert(request.targetType);
+			request.type = request.targetType;
+			if ('frameId' in request) {
+				chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
+			} else {
+				chrome.tabs.sendMessage(sender.tab.id, request);
+			}
 			break;
 
 		default:

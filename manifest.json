@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 
-	"name": "rikaigu",
+	"name": "rikaigu (devel)",
 	"version": "1.0.1",
 
 	"description": "Rikaikun enhanced. Translate Japanese by hovering over words.",

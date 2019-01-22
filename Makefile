@@ -31,7 +31,8 @@ dist/rikaigu.zip: manifest.json $(CSS) $(DICT_STATIC) $(IMG) $(HTML) $(JS) $(DIC
 	ln -sfr data/radicals.dat data/deinflect.dat \
 		data/dict.idx data/names.idx data/kanji.idx data/expressions.dat \
 		dist/rikaigu/data
-	ln -sfr manifest.json dist/rikaigu
+	cp manifest.json dist/rikaigu/
+	sed -i 's/rikaigu (devel)/rikaigu/g' dist/rikaigu/manifest.json
 	cd dist; zip rikaigu.zip -r rikaigu
 
 clean:

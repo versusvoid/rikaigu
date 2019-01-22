@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.request
 from collections import namedtuple
 import gzip
@@ -91,8 +92,12 @@ def maketmp():
 	if not os.path.isdir('tmp'):
 		raise Exception("`tmp` has to be dir, but it isn't")
 
+_report_time = time.time()
 def _download_reporthook(chunk_number, max_chunk_size, download_size):
-	print(f'\r{chunk_number} {max_chunk_size} {download_size}, {chunk_number*max_chunk_size/download_size}%')
+        global _report_time
+        if time.time() - _report_time > 1:
+            _report_time = time.time()
+            print(f'\r{chunk_number} {max_chunk_size} {download_size}, {100*chunk_number*max_chunk_size/download_size:.2f}%', end='')
 
 def download(url, filename):
 	maketmp()
@@ -100,6 +105,6 @@ def download(url, filename):
 	if not os.path.exists(path):
 		print(f"Downloading {filename}")
 		urllib.request.urlretrieve(url, path, _download_reporthook)
-		print(f"Downloaded {filename}")
+		print(f"\nDownloaded {filename}")
 	return path
 

@@ -191,7 +191,7 @@ function getTextFromRange(rangeNode, offset, forward, forwardMaxLength, boundary
 	var text = [], fullSelectionRange = [];
 	var maxLength = forward ? forwardMaxLength : 1024;
 	if (isInput(rangeNode)) {
-		getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset);
+		getText(rangeNode, maxLength, forward, text, fullSelectionRange, offset, boundaryCondition);
 		return [text[0], fullSelectionRange[0]];
 	}
 
@@ -234,6 +234,10 @@ function _getCacheEntry(boundaryCondition) {
 function getCurrentWordContext(boundaryCondition = japaneseCharacterBoundaryCondition) {
 	const rangeNode = rikaigu.lastShownRangeNode,
 		rangeOffset = rikaigu.lastShownRangeOffset;
+	if (!rangeNode) {
+		console.error("FIXME invalid frame");
+		return;
+	}
 	const cacheEntry = _getCacheEntry(boundaryCondition);
 	if (cacheEntry.range.isPointInRange(rangeNode, rangeOffset)) {
 		return cacheEntry.value;

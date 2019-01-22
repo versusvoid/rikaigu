@@ -425,17 +425,7 @@ void render_entries(SearchResult& result)
 	buffer += "</table>";
 	if (result.data.size() > 1)
 	{
-		if (result.more)
-		{
-			buffer += "...";
-		}
-		buffer += "<span class=\"rikaigu-second-and-further\">";
-		if (!result.more)
-		{
-			buffer += "...";
-		}
-
-		buffer += " (F)</span>";
+		buffer += u8"<div class=\"rikaigu-lurk-moar\">▼</div>";
 	}
 }
 

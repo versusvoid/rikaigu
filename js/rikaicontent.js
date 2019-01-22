@@ -53,10 +53,10 @@ function updateConfig() {
 	});
 }
 
-function enableTab(config, popup) {
+function enableTab(config, text) {
 	if (rikaigu === null) {
 		rikaigu = {
-			altView: 0,
+			altView: null,
 			keysDown: {},
 			lastPos: {
 				clientX: 0,
@@ -66,6 +66,7 @@ function enableTab(config, popup) {
 			},
 			lastTarget: null,
 			mousePressed: false,
+			mouseOnPopup: false,
 			isVisible: false,
 			shownMatch: null,
 			screenX: 0,
@@ -81,11 +82,11 @@ function enableTab(config, popup) {
 		window.addEventListener('mousedown', onMouseDown, false);
 		window.addEventListener('mouseup', onMouseUp, false);
 
-		if (popup) {
+		if (text) {
 			if (!document.hidden && window.self === window.top) {
-				rikaigu.altView = 1;
-				showPopup(popup);
-				rikaigu.altView = 0;
+				rikaigu.altView = 'up';
+				showPopup(text);
+				rikaigu.altView = null;
 			}
 			rikaigu.isVisible = true;
 		}
@@ -131,13 +132,15 @@ function makePopup() {
 	const popup = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
 	popup.setAttribute('id', 'rikaigu-window');
 	popup.classList.add('rikaigu-window');
+	popup.addEventListener('mouseenter', _onMouseEnter, false);
+	popup.addEventListener('mouseleave', _onMouseLeave, false);
 	document.documentElement.appendChild(popup);
 
 	document.addEventListener('click', onClick, false);
 	return popup;
 }
 
-function showPopup(text, x, y) {
+async function showPopup(text) {
 	var popup = document.getElementById('rikaigu-window');
 	if (!popup) {
 		popup = makePopup();
@@ -162,11 +165,14 @@ function showPopup(text, x, y) {
 		popup.innerHTML = text;
 	}
 
-	popup.style.setProperty('top', '-1000px', 'important');
-	popup.style.setProperty('left', '0px', 'important');
+	// popup.style.setProperty('top', `${window.scrollY}px`, 'important');
+	// popup.style.setProperty('left', `${window.scrollX}px`, 'important');
+	popup.style.setProperty('top', `-1000px`, 'important');
+	popup.style.setProperty('left', `0px`, 'important');
 
-	popup.style.display = '';
-	updatePopupPosition(x, y, popup);
+	popup.style.removeProperty('display');
+
+	await _updatePopupRect(popup);
 }
 
 function toggleHiddenReviewListEntryInfo(node) {
@@ -183,9 +189,27 @@ function toggleHiddenAllReviewListEntriesInfo(popup) {
 	}
 }
 
+function _toggleMoreEntries() {
+	for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
+		el.classList.toggle('rikaigu-hidden');
+	}
+}
+
+function _toggleMoreEntriesButton(button) {
+	button.innerHTML = button.innerText.indexOf('▲') !== -1 ? '▼' : '▲';
+}
+
 function onClick(ev) {
 	if (!rikaigu.isVisible) return;
-	if (!ev.target.classList.contains('rikaigu-add-to-review-list')) {
+	if (ev.target.classList.contains('rikaigu-lurk-moar')) {
+		console.log(window.getSelection().toString());
+		ev.preventDefault();
+		_toggleMoreEntries();
+		_toggleMoreEntriesButton(ev.target);
+		_getPopupAndUpdateItsPosition();
+		return;
+	}
+	if (!ev.target.classList.contains('rikaigu-add-to-review-list') && !window.debugMode) {
 		return requestHidePopup();
 	}
 	var wordNode = ev.target.parentNode;
@@ -195,75 +219,175 @@ function onClick(ev) {
 	});
 }
 
-function updatePopupPosition(x, y, popup) {
-	if (isNaN(x) || isNaN(y)) x = y = 0;
-	if (!popup) {
-		popup = document.getElementById('rikaigu-window');
-	}
-	rikaigu.shownX = x;
-	rikaigu.shownY = y;
-
-	var popupWidth = popup.offsetWidth;
-	var popupHeight = popup.offsetHeight;
-
-	// guess!
-	if (popupWidth <= 0) popupWidth = 200;
-	if (popupHeight <= 0) {
-		popupHeight = 0;
-		var j = 0;
-		var text = popup.innerHTML;
-		while ((j = text.indexOf('<br/>', j)) != -1) {
-			j += 5;
-			popupHeight += 22;
-		}
-		popupHeight += 25;
-	}
-
-	if (rikaigu.altView === 1) {
-		x = window.scrollX;
-		y = window.scrollY;
-	} else if (rikaigu.altView === 2) {
-		x = (window.innerWidth - (popupWidth + 20)) + window.scrollX;
-		y = (window.innerHeight - (popupHeight + 20)) + window.scrollY;
+const _PADDING_AND_BORDER = 4 + 1;
+function _computeFinalPosition(availableWidth, leftRightOrBoth, availableHeight, upDownOrBoth) {
+	if (rikaigu.altView === 'up' && (upDownOrBoth & _DIRECTIONS.UP) !== 0) {
+		return [window.scrollX, window.scrollY];
+	} else if (rikaigu.altView !== null) {
+		return [
+			(window.innerWidth - availableWidth) + window.scrollX,
+			(window.innerHeight - availableHeight) + window.scrollY
+		];
 	} else {
 
-		// Go left if necessary
-		if (x + popupWidth > window.innerWidth - 20) {
-			x = (window.innerWidth - popupWidth) - 20;
-			if (x < 0) x = 0;
+		let x,y;
+		if (leftRightOrBoth === 0) {
+			x = (window.innerWidth -  availableWidth) / 2;
+		}
+		// TODO change defaults for writing-mode: vertical-rl;
+		// these defaults are preferable only for horizontal
+		else if ((leftRightOrBoth & _DIRECTIONS.RIGHT) !== 0) {
+			x = _firstCharacterStart();
+		} else {
+			x = _lastCharacterEnd() - availableWidth;
 		}
 
-		// Below the mouse
-		// TODO compute from font-size
-		const verticalOffset = 25;
-
-		// Under the popup title
-		//if ((elem.title) && (elem.title != '')) verticalOffset += 20;
-
-		// Go up if necessary
-		if (y + verticalOffset + popupHeight > window.innerHeight) {
-			var t = y - popupHeight - 30;
-			if (t >= 0) {
-				y = t;
-			} else {
-				// If can't go up, still go down to prevent blocking cursor
-				y += verticalOffset;
-			}
+		if ((upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
+			y = _characterBottomLine();
 		} else {
-			y += verticalOffset;
+			y = _characterUpperLine() - availableHeight - _PADDING_AND_BORDER;
 		}
 
 		x += window.scrollX;
 		y += window.scrollY;
+		return [x, y];
+	}
+}
+
+const _DIRECTIONS = {
+	UP   : 0b0001,
+	DOWN : 0b0010,
+	LEFT : 0b0100,
+	RIGHT: 0b1000,
+}
+
+function _computeWidthAvailable(requiredWidth) {
+	const availableLeft = _lastCharacterEnd();
+	const availableRight = window.innerWidth - _firstCharacterStart();
+	const availableMax = Math.max(availableLeft, availableRight);
+	if (availableMax < requiredWidth) {
+		return [Math.min(requiredWidth, window.innerWidth), 0];
+	}
+	const dir = (availableRight >= requiredWidth ? _DIRECTIONS.RIGHT : 0)
+			  | (availableLeft >= requiredWidth ? _DIRECTIONS.LEFT : 0);
+	return [Math.min(requiredWidth, availableMax), dir];
+}
+
+function _computeHeightAvailable(requiredHeight) {
+	const availableUp = _characterUpperLine();
+	const availableDown = window.innerHeight - _characterBottomLine();
+	const dir = (availableUp >= requiredHeight ? _DIRECTIONS.UP : 0)
+			  | (availableDown >= requiredHeight ? _DIRECTIONS.DOWN : 0);
+	return [Math.min(requiredHeight, Math.max(availableUp, availableDown)), dir];
+}
+
+function _firstCharacterStart() {
+	// FIXME would not work in multiframe setting
+	// need comunications between frames
+	const r = new Range();
+	console.assert(rikaigu.lastRangeNode);
+	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
+	return r.getBoundingClientRect().x;
+}
+
+function _lastCharacterEnd() {
+	const s = window.getSelection();
+	console.assert(s.rangeCount > 0);
+	var end = 0;
+	for (var i = 0; i < s.rangeCount; ++i) {
+		end = Math.max(s.getRangeAt(i).getBoundingClientRect().right, end);
+	}
+	return end;
+}
+
+function _characterUpperLine() {
+	const r = new Range();
+	console.assert(rikaigu.lastRangeNode);
+	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
+	return r.getBoundingClientRect().top;
+}
+
+function _characterBottomLine() {
+	const r = new Range();
+	console.assert(rikaigu.lastRangeNode);
+	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
+	return r.getBoundingClientRect().bottom;
+}
+
+function _conditionSatisfied(condition) {
+	return new Promise(function (resolve) {
+		var count = 0;
+		var interval = setInterval(function() {
+			count += 1;
+			if (condition()) {
+				resolve(count);
+				clearInterval(interval);
+			}
+		}, 10);
+	});
+}
+
+const _defaultWidth = 347;
+const _defaultHeight = 413;
+async function _computeRequiredDimensions(popup) {
+	if (popup.offsetWidth === 0) {
+		await _conditionSatisfied(() => popup.offsetWidth !== 0);
+	}
+	return [Math.min(popup.offsetWidth, _defaultWidth), Math.min(popup.offsetHeight, _defaultHeight)];
+}
+
+function _makePopupScrollable(popup) {
+	console.error('implement me');
+	for (var el of popup.getElementsByClassName('rikaigu-lurk-moar')) {
+		el.parentNode.removeChild(el);
+	}
+	for (var el of popup.getElementsByClassName('rikaigu-second-and-further')) {
+		el.classList.remove('rikaigu-hidden')
+	}
+}
+
+function _isPopupBelowText(y) {
+	return y > _characterUpperLine() + window.scrollY;
+}
+
+function _placeExpandButton(popup, y) {
+	const el = popup.getElementsByClassName('rikaigu-lurk-moar')[0] || null;
+	if (el === null) return;
+	el.parentNode.removeChild(el);
+	if (_isPopupBelowText(y)) {
+		popup.insertBefore(el, popup.firstChild);
+	} else {
+		popup.appendChild(el);
+	}
+}
+
+async function _updatePopupRect(popup) {
+	console.assert(popup);
+
+	const [requiredWidth, requiredHeight] = await _computeRequiredDimensions(popup);
+	// TODO optimize recomputations of start/end/upper line/bottom line
+	// FIXME multiframe setting
+	const [availableWidth, leftRightOrBoth] = _computeWidthAvailable(requiredWidth);
+	const [availableHeight, upDownOrBoth] = _computeHeightAvailable(requiredHeight);
+	if (availableHeight < requiredHeight) {
+		_makePopupScrollable(popup);
 	}
 
-	popup.style.setProperty('left', x + 'px', 'important');
-	popup.style.setProperty('top', y + 'px', 'important');
+	const [x, y] = _computeFinalPosition(availableWidth, leftRightOrBoth, availableHeight, upDownOrBoth);
+	_placeExpandButton(popup, y);
+
+	popup.style.setProperty('left', `${x}px`, 'important');
+	popup.style.setProperty('top', `${y}px`, 'important');
+}
+
+function _getPopupAndUpdateItsPosition() {
+	_updatePopupRect(document.getElementById('rikaigu-window'));
 }
 
 function requestHidePopup() {
 	chrome.runtime.sendMessage({
-		"type": "close"
+		"type": "relay",
+		"targetType": "close"
 	});
 }
 
@@ -272,6 +396,7 @@ function hidePopup() {
 	if (popup) {
 		popup.style.setProperty('display', 'none', 'important');
 		popup.innerHTML = '';
+		rikaigu.mouseOnPopup = false;
 	}
 	rikaigu.shownMatch = null;
 }
@@ -299,7 +424,8 @@ function onKeyDown(ev) {
 			};
 			// Send message to background for distribution to iframe where mouse currently is.
 			if (rikaigu.activeFrame !== window.frameId) {
-				fakeEvent.type = "keyboardEventForActiveFrame";
+				fakeEvent.type = 'relay';
+				fakeEvent.targetType = 'keyboardEventForActiveFrame';
 				fakeEvent.frameId = rikaigu.activeFrame;
 				chrome.runtime.sendMessage(fakeEvent);
 			} else {
@@ -331,8 +457,18 @@ function onKeyDown(ev) {
 			reset();
 			break;
 		case 'KeyA':
-			rikaigu.altView = (rikaigu.altView + 1) % 3;
-			updatePopupPosition(rikaigu.shownX, rikaigu.shownY);
+			switch (rikaigu.altView) {
+				case null:
+					rikaigu.altView = 'up';
+					break;
+				case 'up':
+					rikaigu.altView = 'down';
+					break;
+				case 'down':
+					rikaigu.altView = null;
+					break;
+			}
+			_getPopupAndUpdateItsPosition();
 			break;
 		case 'KeyD':
 			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings}, function() {
@@ -340,16 +476,12 @@ function onKeyDown(ev) {
 				extractTextAndSearch();
 			});
 			break;
-		case 'KeyY':
-			rikaigu.altView = 0;
-			updatePopupPosition(rikaigu.shownX, rikaigu.shownY + 20);
-			break;
 		case 'KeyE':
 			chrome.storage.local.set({deinflectExpressions: !rikaigu.config.deinflectExpressions}, function() {
 				rikaigu.shownMatch = null;
 				extractTextAndSearch();
 			});
-			break
+			break;
 		case 'KeyF':
 			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
 				el.classList.toggle('rikaigu-hidden');
@@ -359,7 +491,7 @@ function onKeyDown(ev) {
 			toggleHiddenAllReviewListEntriesInfo(document.getElementById('rikaigu-window'));
 			break;
 		case 'KeyS':
-			alert('Здесь мог бы быть ваш код для отображения слов из review-list из текущего предложения.');
+			window.debugMode = !window.debugMode;
 			break;
 		default:
 			return;
@@ -401,6 +533,13 @@ function processSearchResult(selectionRange, prefixSelectionRange, result) {
 		rikaigu.lastShownRangeNode = selectionRange.rangeNode;
 		rikaigu.lastShownRangeOffset = selectionRange.offset;
 	}
+
+	chrome.runtime.sendMessage(
+		{
+			"type": "review",
+			"text": getCurrentWordSentence(),
+		}
+	);
 }
 
 function makeFake(real) {
@@ -426,7 +565,7 @@ function isInput(node) {
 	return node && (node.nodeName === 'TEXTAREA' || node.nodeName === 'INPUT' || node.nodeName === 'SELECT');
 }
 
-function onMouseMove(ev) {
+function _updateMousePositionState(ev) {
 	rikaigu.lastPos = {
 		clientX: ev.clientX,
 		clientY: ev.clientY,
@@ -437,25 +576,29 @@ function onMouseMove(ev) {
 
 	if (rikaigu.activeFrame !== window.frameId) {
 		chrome.runtime.sendMessage({
-			"type": "changeActiveFrame",
-			"frameId": window.frameId
+			"type": "relay",
+			"targetType": "changeActiveFrame",
+			"activeFrameId": window.frameId
 		});
 	}
+}
 
-	if (rikaigu.config.showOnKey !== 'None' &&
-		((rikaigu.config.showOnKey.includes("Alt") && !ev.altKey) ||
-		(rikaigu.config.showOnKey.includes("Ctrl") && !ev.ctrlKey))) {
-		return;
-	}
+function _shouldActivate(ev) {
+	return !rikaigu.mouseOnPopup && (
+		rikaigu.config.showOnKey === 'None' ||
+		rikaigu.config.showOnKey.includes("Alt") && ev.altKey ||
+		rikaigu.config.showOnKey.includes("Ctrl") && ev.ctrlKey
+	);
+}
 
+function _getNewRange(ev) {
 	var rangeEnd = 0;
-	rikaigu.previousTarget = ev.target;
 	var rangeNode, rangeOffset;
 	if (isInput(ev.target)) {
-		var fakeInput = makeFake(ev.target);
+		const fakeInput = makeFake(ev.target);
 		document.body.appendChild(fakeInput);
 		rangeNode = ev.target;
-		var range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
 		if (range.startContainer.parentNode !== fakeInput) {
 			console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset);
 		}
@@ -463,8 +606,8 @@ function onMouseMove(ev) {
 		rangeEnd = ev.target.value.length;
 		document.body.removeChild(fakeInput);
 	} else {
-		var range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-		var rect = range && range.getBoundingClientRect();
+		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+		const rect = range && range.getBoundingClientRect();
 		if (!range
 				|| ev.clientX - rect.right > 25
 				|| rect.left - ev.clientX > 25
@@ -478,50 +621,86 @@ function onMouseMove(ev) {
 			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
 		}
 	}
-	if (rangeNode === rikaigu.lastRangeNode && rangeOffset === rikaigu.lastRangeOffset
-			&& (rikaigu.isVisible || rikaigu.timer !== null)) {
-		return;
-	}
+	return [rangeEnd, rangeNode, rangeOffset];
+}
 
+function _checkNothingChanged(rangeNode, rangeOffset) {
+	return rangeNode === rikaigu.lastRangeNode && rangeOffset === rikaigu.lastRangeOffset
+		&& (rikaigu.isVisible || rikaigu.timer !== null);
+}
+
+function _saveNewRange(rangeNode, rangeOffset) {
 	rikaigu.lastRangeNode = rangeNode;
 	rikaigu.lastRangeOffset = rangeOffset;
+}
 
-	if (rikaigu.lastRangeNode && rikaigu.lastRangeOffset < rangeEnd) {
-		var delay = !!ev.noDelay ? 1 : rikaigu.config.popupDelay;
-		if (rikaigu.timer) {
-			clearTimeout(rikaigu.timer);
-		}
-		rikaigu.timer = setTimeout(
-			function(rangeNode, rangeOffset) {
-				rikaigu.timer = null;
-				if (!rikaigu || rangeNode != rikaigu.lastRangeNode
-						|| rangeOffset != rikaigu.lastRangeOffset) {
-					return;
-				}
-				extractTextAndSearch(rangeNode, rangeOffset);
-			}, delay, rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-		return;
+function _shouldSetSearchTimeout(rangeEnd) {
+	return rikaigu.lastRangeNode && rikaigu.lastRangeOffset < rangeEnd;
+}
+
+function _setSearchTimeout(ev) {
+	const delay = !!ev.noDelay ? 1 : rikaigu.config.popupDelay;
+	if (rikaigu.timer) {
+		clearTimeout(rikaigu.timer);
 	}
+	rikaigu.timer = setTimeout(
+		function(rangeNode, rangeOffset) {
+			rikaigu.timer = null;
+			if (!rikaigu || rangeNode != rikaigu.lastRangeNode
+					|| rangeOffset != rikaigu.lastRangeOffset) {
+				return;
+			}
+			extractTextAndSearch(rangeNode, rangeOffset);
+		},
+		delay, rikaigu.lastRangeNode, rikaigu.lastRangeOffset
+	);
+}
 
-	if (!rikaigu.isVisible) return;
+function _shouldResetPopup(ev) {
+	if (!rikaigu.isVisible || rikaigu.config.showOnKey !== 'None') return false;
 
+	// TODO check if required
 	if (rikaigu.selected && rikaigu.lastRangeNode) {
-		var highlightedRange = window.getSelection().getRangeAt(0);
+		const highlightedRange = window.getSelection().getRangeAt(0);
 		// Check if cursor still in highlighted range.
 		// At this point updated request have already been sent. If match will change, we'll update
 		// (or close) popup. Otherwise no reason to close it.
 		if (highlightedRange.comparePoint(rikaigu.lastRangeNode, rikaigu.lastRangeOffset) === 0) {
-			return;
+			return false;
 		}
 	}
 
-	// Don't close just because we moved from a valid popup slightly over to a place with nothing
-	var dx = rikaigu.shownX - ev.screenX;
-	var dy = rikaigu.shownY - ev.screenY;
-	var distance = Math.sqrt(dx * dx + dy * dy);
-	if (distance > 4 && rikaigu.config.showOnKey === 'None') {
+	return !rikaigu.mouseOnPopup;
+}
+
+function onMouseMove(ev) {
+	if (window.debugMode) return;
+
+	_updateMousePositionState(ev);
+
+	if (!_shouldActivate(ev)) return;
+
+	const [rangeEnd, rangeNode, rangeOffset] = _getNewRange(ev);
+	if (_checkNothingChanged(rangeNode, rangeOffset)) return;
+
+	_saveNewRange(rangeNode, rangeOffset);
+
+	if (_shouldSetSearchTimeout(rangeEnd)) {
+		_setSearchTimeout(ev);
+		return;
+	}
+
+	if (_shouldResetPopup(ev)) {
 		reset();
 	}
+}
+
+function _onMouseEnter(ev) {
+	rikaigu.mouseOnPopup = true;
+}
+
+function _onMouseLeave(ev) {
+	rikaigu.mouseOnPopup = false;
 }
 
 function makeReviewPopup() {
@@ -561,10 +740,10 @@ function processReviewResult(result) {
 
 //Event Listeners
 chrome.runtime.onMessage.addListener(
-	function(request, sender, sendResponse) {
+	function(request, sender, response) {
 		switch (request.type) {
 			case 'enable':
-				chrome.storage.local.get(null, config => enableTab(config, request.popup));
+				chrome.storage.local.get(null, config => enableTab(config, request.text));
 				break;
 			case 'disable':
 				disableTab();
@@ -572,26 +751,23 @@ chrome.runtime.onMessage.addListener(
 			case 'show':
 				if (window.self === window.top) {
 					if (request.match === rikaigu.shownMatch) {
-						updatePopupPosition(
-							request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
-							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
-						);
+						// _getPopupAndUpdateItsPosition();
+						// updatePopupPosition(
+							// request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
+							// request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
+						// );
+						console.error('why this branch even exists');
 					} else {
-						showPopup(request.html,
-							request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
-							request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
-						);
+						showPopup(request.html);
 						rikaigu.shownMatch = request.match;
 					}
 				}
 				rikaigu.isVisible = true;
-				chrome.runtime.sendMessage(
-					{
-						"type": "review",
-						"text": getCurrentWordSentence(),
-					},
-					processReviewResult
-				);
+				break;
+			case 'show-reviewed':
+				if (window.self === window.top) {
+					processReviewResult(request.result);
+				}
 				break;
 			case 'close':
 				if (window.self === window.top) {
@@ -603,7 +779,7 @@ chrome.runtime.onMessage.addListener(
 
 			case 'changeActiveFrame':
 				if (rikaigu) {
-					rikaigu.activeFrame = request.frameId;
+					rikaigu.activeFrame = request.activeFrameId;
 				}
 				break;
 			case 'keyboardEventForActiveFrame':
@@ -630,9 +806,9 @@ chrome.runtime.onMessage.addListener(
  */
 chrome.runtime.sendMessage({
 	"type": "enable?"
-}, function(enabled, frameId) {
-	window.frameId = frameId;
-	if (enabled) {
+}, function(response) {
+	window.frameId = response.frameId;
+	if (response.enabled) {
 		chrome.storage.local.get(null, enableTab);
 	}
 });
