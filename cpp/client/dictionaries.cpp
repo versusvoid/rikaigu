@@ -269,14 +269,15 @@ static bool compare(WordResult& a, WordResult& b)
 static size_t line_buffer_size = 0;
 static char* line = nullptr;
 
+const std::size_t MAX_ENTRIES = 32; 
 inline void sort_and_limit(SearchResult& res)
 {
 	// Sort by match length and then by commonnesss
 	std::sort(res.data.begin(), res.data.end(), compare);
-	if (res.data.size() > 5) {
+	if (res.data.size() > MAX_ENTRIES) {
 		res.more = true;
 	}
-	res.data.erase(res.data.begin() + std::min(5L, long(res.data.size())), res.data.end());
+	res.data.erase(res.data.begin() + std::min(MAX_ENTRIES, res.data.size()), res.data.end());
 }
 
 SearchResult word_search(const char* word, bool names_dictionary)

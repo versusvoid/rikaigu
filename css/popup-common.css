@@ -27,6 +27,12 @@
 	visibility: visible !important;
 }
 
+#rikaigu-window {
+	max-width: 347px !important;
+	max-height: 413px !important;
+	overflow: auto !important;
+}
+
 #rikaigu-review-window {
 	position: sticky !important;
 	bottom: 10px !important;
@@ -66,6 +72,8 @@
 	text-align: center !important;
 	background-color: #ffffff55 !important;
 	user-select: none !important;
+	bottom: 0px !important;
+	position: sticky !important;
 }
 
 .rikaigu-lurk-moar:hover {

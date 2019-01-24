@@ -333,7 +333,10 @@ async function _computeRequiredDimensions(popup) {
 	if (popup.offsetWidth === 0) {
 		await _conditionSatisfied(() => popup.offsetWidth !== 0);
 	}
-	return [Math.min(popup.offsetWidth, _defaultWidth), Math.min(popup.offsetHeight, _defaultHeight)];
+	return [
+		Math.min(popup.offsetWidth, _defaultWidth),
+		Math.min(popup.offsetHeight, _defaultHeight + _PADDING_AND_BORDER)
+	];
 }
 
 function _makePopupScrollable(popup) {
@@ -362,8 +365,6 @@ function _placeExpandButton(popup, y) {
 }
 
 async function _updatePopupRect(popup) {
-	console.assert(popup);
-
 	const [requiredWidth, requiredHeight] = await _computeRequiredDimensions(popup);
 	// TODO optimize recomputations of start/end/upper line/bottom line
 	// FIXME multiframe setting
@@ -583,7 +584,7 @@ function _updateMousePositionState(ev) {
 	}
 }
 
-function _shouldActivate(ev) {
+function _shouldDoAnythingOnMouseMove(ev) {
 	return !rikaigu.mouseOnPopup && (
 		rikaigu.config.showOnKey === 'None' ||
 		rikaigu.config.showOnKey.includes("Alt") && ev.altKey ||
@@ -624,7 +625,7 @@ function _getNewRange(ev) {
 	return [rangeEnd, rangeNode, rangeOffset];
 }
 
-function _checkNothingChanged(rangeNode, rangeOffset) {
+function _checkRangeHaveNotChanged(rangeNode, rangeOffset) {
 	return rangeNode === rikaigu.lastRangeNode && rangeOffset === rikaigu.lastRangeOffset
 		&& (rikaigu.isVisible || rikaigu.timer !== null);
 }
@@ -647,7 +648,8 @@ function _setSearchTimeout(ev) {
 		function(rangeNode, rangeOffset) {
 			rikaigu.timer = null;
 			if (!rikaigu || rangeNode != rikaigu.lastRangeNode
-					|| rangeOffset != rikaigu.lastRangeOffset) {
+					|| rangeOffset != rikaigu.lastRangeOffset
+					|| rikaigu.mouseOnPopup) {
 				return;
 			}
 			extractTextAndSearch(rangeNode, rangeOffset);
@@ -673,15 +675,28 @@ function _shouldResetPopup(ev) {
 	return !rikaigu.mouseOnPopup;
 }
 
+function _setResetTimeout(ev) {
+	if (rikaigu.resetTimer) return;
+	rikaigu.resetTimer = setTimeout(
+		function () {
+			rikaigu.resetTimer = null;
+			if (_shouldResetPopup(ev)) {
+				reset();
+			}
+		},
+		Math.max(3, rikaigu.config.popupDelay / 2)
+	);
+}
+
 function onMouseMove(ev) {
 	if (window.debugMode) return;
 
 	_updateMousePositionState(ev);
 
-	if (!_shouldActivate(ev)) return;
+	if (!_shouldDoAnythingOnMouseMove(ev)) return;
 
 	const [rangeEnd, rangeNode, rangeOffset] = _getNewRange(ev);
-	if (_checkNothingChanged(rangeNode, rangeOffset)) return;
+	if (_checkRangeHaveNotChanged(rangeNode, rangeOffset)) return;
 
 	_saveNewRange(rangeNode, rangeOffset);
 
@@ -691,7 +706,7 @@ function onMouseMove(ev) {
 	}
 
 	if (_shouldResetPopup(ev)) {
-		reset();
+		_setResetTimeout(ev);
 	}
 }
 
