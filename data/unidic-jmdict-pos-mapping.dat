@@ -1,0 +1,287 @@
+# upos1	upos2	upos3	upos4	jpos	mapped	[ent_seq of first appearance]
+補助記号	*	*	*	unc	True
+補助記号	*	*	*	n	True
+連体詞	*	*	*	adj-f	True
+副詞	*	*	*	adv	True
+
+名詞	*	*	*	n	True
+名詞	*	*	*	pref	False
+
+動詞	*	*	*	v1	True
+動詞	*	*	*	v1-s	True
+動詞	*	*	*	v5aru	True
+動詞	*	*	*	v5b	True
+動詞	*	*	*	v5g	True
+動詞	*	*	*	v5k	True
+動詞	*	*	*	v5k-s	True
+動詞	*	*	*	v5m	True
+動詞	*	*	*	v5n	True
+動詞	*	*	*	v5r	True
+動詞	*	*	*	v5r-i	True
+動詞	*	*	*	v5s	True
+動詞	*	*	*	v5t	True
+動詞	*	*	*	v5u	True
+動詞	*	*	*	v5u-s	True
+動詞	*	*	*	v5uru	True
+動詞	*	*	*	vs-s	True
+動詞	*	*	*	vs-i	True
+動詞	*	*	*	int	False
+
+形状詞	*	*	*	adj-na	True
+形状詞	*	*	*	adj-pn	False
+
+動詞	*	*	*	exp	False
+
+形容詞	*	*	*	adj-i	True
+形容詞	*	*	*	n	False
+
+代名詞	*	*	*	n	False
+代名詞	*	*	*	pn	True
+代名詞	*	*	*	exp	False
+
+感動詞	*	*	*	int	True
+感動詞	*	*	*	n	True
+感動詞	*	*	*	adj-pn	False
+
+連体詞	*	*	*	adj-pn	True
+連体詞	*	*	*	int	False
+
+接頭辞	*	*	*	pref	True
+名詞	普通名詞	副詞可能	*	adv	True	1001010
+感動詞	フィラー	*	*	n-pref	False	2759530
+感動詞	一般	*	*	n-pref	False	2759530
+代名詞	*	*	*	n-pref	False	2759530
+名詞	普通名詞	一般	*	n-pref	False	2759530
+記号	文字	*	*	n	True	2594000
+助詞	格助詞	*	*	prt	True	2029000
+名詞	普通名詞	*	*	prt	False	2085890
+名詞	固有名詞	*	*	adj-na	False	1002520
+名詞	普通名詞	一般	*	n-suf	True	1270530
+助詞	*	*	*	prt	True	1002800
+副詞	*	*	*	adv-to	True	1002860
+接続詞	*	*	*	prt	True	1002980
+動詞	一般	*	*	n	False	1002990
+形状詞	一般	*	*	n	False	2439650
+副詞	*	*	*	n	False	1003340
+接尾辞	動詞的	*	*	n	False	1003340
+形状詞	タリ	*	*	adj-t	True	1591460
+副詞	*	*	*	n-adv	True	1578110
+接続詞	*	*	*	n	False	2447510
+名詞	固有名詞	人名	*	num	False	1280050
+接尾辞	名詞的	一般	*	suf	True	2085750
+接尾辞	名詞的	一般	*	n-suf	True	2414430
+接頭辞	*	*	*	n	True	2414470
+接尾辞	名詞的	一般	*	n	True	2679630
+名詞	普通名詞	一般	*	n-t	True	1004710
+名詞	普通名詞	一般	*	suf	True	1004950
+助詞	終助詞	*	*	int	True	1005110
+助動詞	*	*	*	aux-v	True	2568020
+感動詞	一般	*	*	adv	False	1005190
+接続詞	*	*	*	int	True	1005240
+名詞	普通名詞	一般	*	num	False	2747950
+名詞	数詞	*	*	num	True	2747950
+名詞	普通名詞	一般	*	n-adv	True	1590300
+接尾辞	名詞的	助数詞	*	ctr	True	2077160
+名詞	普通名詞	一般	*	ctr	False	2833466
+名詞	固有名詞	人名	*	ctr	False	2833466
+副詞	*	*	*	ctr	False	2833466
+接尾辞	名詞的	一般	*	ctr	False	2833466
+代名詞	*	*	*	int	False	2216210
+接尾辞	*	*	*	n-suf	True	1007480
+助詞	副助詞	*	*	n	False	1007630
+助動詞	*	*	*	n	False	1007750
+名詞	普通名詞	サ変可能	*	num	False	2748010
+副詞	*	*	*	num	False	2748010
+名詞	普通名詞	一般	*	aux	True	2575620
+名詞	普通名詞	一般	*	adj-na	False	2833090
+副詞	*	*	*	adj-na	False	2833090
+接尾辞	形状詞的	*	*	suf	True	1008020
+副詞	*	*	*	prt	False	1008120
+助詞	格助詞	*	*	n	False	2029780
+助動詞	*	*	*	conj	False	1008530
+副詞	*	*	*	pref	False	2252690
+助詞	接続助詞	*	*	pref	False	2252690
+副詞	*	*	*	int	False	2255350
+名詞	普通名詞	一般	*	int	False	2255350
+形状詞	一般	*	*	adv	True	2836914
+動詞	非自立可能	*	*	aux	True	1009470
+動詞	一般	*	*	conj	False	1009470
+接続詞	*	*	*	conj	True	2836540
+副詞	*	*	*	conj	True	1010120
+名詞	普通名詞	副詞可能	*	n-adv	True	1602120
+名詞	普通名詞	一般	*	adj-no	True	1011170
+副詞	*	*	*	vs	True	1012370
+接尾辞	*	*	*	suf	True	1012440
+助動詞	*	*	*	adj-i	False	1013240
+動詞	*	*	*	unc	False	1013350
+名詞	普通名詞	一般	*	adj-f	True	1014110
+名詞	普通名詞	形状詞可能	*	adj-na	True	1014250
+名詞	普通名詞	一般	*	unc	True	1016550
+感動詞	フィラー	*	*	adv	True	1631600
+名詞	普通名詞	一般	*	vs	False	1016730
+名詞	固有名詞	*	*	n-pr	True	1025660
+名詞	固有名詞	*	*	adv	False	1029450
+名詞	普通名詞	一般	*	adv-to	False	2107080
+名詞	固有名詞	*	*	adv-to	False	1564170
+名詞	固有名詞	人名	*	suf	False	1992130
+名詞	普通名詞	サ変形状詞可能	*	adj-na	False	1053760
+名詞	普通名詞	副詞可能	*	adj-na	False	2835807
+接頭辞	*	*	*	adj-na	False	2835807
+名詞	普通名詞	一般	*	pn	True	1445640
+副詞	*	*	*	suf	False	2201000
+名詞	普通名詞	*	*	vi	False	1077100
+副詞	*	*	*	n-suf	False	2161820
+助動詞	*	*	*	int	False	1077410
+接尾辞	形状詞的	*	*	n	False	1079220
+名詞	普通名詞	サ変可能	*	vs	True	1083420
+形状詞	一般	*	*	adj-f	True	1085690
+連体詞	*	*	*	adv	False	2142690
+形容詞	一般	*	*	adj-na	False	1089950
+形容詞	非自立可能	*	*	v5u	False	2258900
+名詞	固有名詞	地名	一般	suf	False	1092890
+形容詞	一般	*	*	pref	False	2065150
+感動詞	一般	*	*	prt	False	2722170
+名詞	普通名詞	一般	*	vt	False	1930050
+名詞	普通名詞	助数詞可能	*	num	False	2748000
+名詞	普通名詞	一般	*	n-pr	True	1104440
+助動詞	*	*	*	aux	True	2210140
+名詞	普通名詞	形状詞可能	*	adj-f	True	1127440
+形容詞	一般	*	*	adv	False	2825987
+名詞	数詞	*	*	ctr	False	2833465
+動詞	一般	*	*	n-suf	False	2742350
+動詞	非自立可能	*	*	n	False	1284320
+接尾辞	形容詞的	*	*	aux-adj	True	2772730
+名詞	普通名詞	一般	*	adj-ku	True	1394280
+動詞	非自立可能	*	*	prt	False	2086640
+副詞	*	*	*	vt	False	1153460
+名詞	普通名詞	サ変可能	*	n-adv	True	1154050
+名詞	普通名詞	助数詞可能	*	suf	False	2609800	actually this is somewhat bullshit
+感動詞	フィラー	*	*	prt	False	2428180
+形容詞	非自立可能	*	*	num	False	2747940
+名詞	普通名詞	助数詞可能	*	ctr	True	1165000
+接頭辞	*	*	*	adv	False	2449460
+感動詞	フィラー	*	*	aux-v	False	2654300
+感動詞	一般	*	*	aux-v	False	2654300
+動詞	非自立可能	*	*	aux-v	False	2654300
+名詞	固有名詞	人名	*	n-suf	False	2095180
+動詞	一般	*	*	vz	True	1176790
+接頭辞	*	*	*	suf	False	2260030	NB: suf in jmdict, prefix in unidic. Who lies?
+動詞	一般	*	*	prt	False	2017770
+助詞	副助詞	*	*	suf	False	2089060
+代名詞	*	*	*	adv-to	True	1188720
+代名詞	*	*	*	n-adv	True	1188760
+名詞	普通名詞	副詞可能	*	n-t	True	1188960
+動詞	一般	*	*	suf	False	1314550
+接尾辞	形状詞的	*	*	adj-na	False	2653620
+副詞	*	*	*	v5k	False	2108590
+名詞	数詞	*	*	adv	False	2744250
+形容詞	非自立可能	*	*	adj-pn	False	1518460
+名詞	普通名詞	サ変可能	*	adj-f	True	2141900
+助動詞	*	*	*	n-adv	False	2585210
+形状詞	助動詞語幹	*	*	n	False	1605840
+形状詞	助動詞語幹	*	*	prt	False	2654310
+名詞	固有名詞	*	*	aux-v	False	2654310
+名詞	普通名詞	助数詞可能	*	n-suf	True	2104230
+名詞	普通名詞	一般	*	conj	False	1256490
+名詞	普通名詞	形状詞可能	*	n-suf	True	2796330
+形容詞	一般	*	*	adj-f	True	2524020
+感動詞	フィラー	*	*	num	False	2747970
+助動詞	*	*	*	adv	False	1466920
+接尾辞	名詞的	一般	*	num	False	1280050
+形状詞	タリ	*	*	num	False	2145170
+接尾辞	名詞的	助数詞	*	num	True	2145170
+名詞	固有名詞	一般	*	num	False	2728160
+名詞	普通名詞	*	*	cop-da	False	2835284
+名詞	固有名詞	*	*	cop-da	False	2835284
+動詞	一般	*	*	adj-na	False	1303470
+名詞	普通名詞	副詞可能	*	n-suf	False	2273940
+動詞	一般	*	*	adv	False	1326630
+名詞	普通名詞	一般	*	adv	True	1342310
+名詞	普通名詞	形状詞可能	*	adj-t	True	2826849
+名詞	固有名詞	人名	*	n-adv	False	1389320
+名詞	固有名詞	地名	*	n-adv	False	1389320
+接尾辞	動詞的	*	*	aux-v	True	1391130
+名詞	普通名詞	副詞可能	*	adj-no	True	1404210
+接頭辞	*	*	*	prt	False	2097680
+形状詞	一般	*	*	suf	False	2823210
+名詞	普通名詞	形状詞可能	*	adj-no	True	1424250
+接頭辞	*	*	*	adv-to	False	2414500
+名詞	普通名詞	一般	*	num	False	2728160
+名詞	固有名詞	人名	*	num	False	2728160
+名詞	固有名詞	一般	*	num	False	2728160
+名詞	固有名詞	人名	*	adj-no	False	1461580
+名詞	固有名詞	地名	*	adj-no	False	1461580
+名詞	数詞	*	*	n-adv	True	1461790
+動詞	一般	*	*	n	False	1463485
+動詞	一般	*	*	n	False	1627960
+形容詞	一般	*	*	int	False	2248980
+動詞	一般	*	*	pref	False	1484220
+形状詞	一般	*	*	adj-no	True	2563970
+動詞	一般	*	*	adj-pn	False	1532250
+形状詞	*	*	*	n	False	2541720
+接頭辞	*	*	*	n-pref	True	1957100
+接尾辞	名詞的	一般	*	conj	True	1590370
+形状詞	タリ	*	*	adv-to	True	1574420
+名詞	普通名詞	形状詞可能	*	adv	True	1574570
+名詞	固有名詞	人名	*	int	False	2768550
+名詞	固有名詞	地名	*	ctr	False	2833465
+形状詞	タリ	*	*	int	False	2835846
+副詞	*	*	*	adj-no	True	2076900
+動詞	非自立可能	*	*	suf	False	2582570
+形状詞	一般	*	*	adv-to	True	1596530
+接頭辞	*	*	*	adj-pn	True	1605890
+動詞	一般	*	*	adj-no	False	1752900
+名詞	固有名詞	人名	*	n-pref	False	2771060
+名詞	普通名詞	一般	*	adj-i	False	1789560
+動詞	一般	*	*	adj-i	False	1789560
+形状詞	タリ	*	*	adv	True	1820070
+形容詞	*	*	*	adj-ix	True	2820690
+助詞	終助詞	*	*	suf	True	2705890
+名詞	固有名詞	人名	*	adj-f	False	2003100
+名詞	数詞	*	*	int	False	2003620
+形状詞	一般	*	*	pref	False	2811970
+接尾辞	名詞的	副詞可能	*	prt	True	2018230
+形容詞	非自立可能	*	*	suf	True	2037145
+動詞	*	*	*	v4h	True	2055480
+名詞	普通名詞	形状詞可能	*	n-adv	True	2063340
+形容詞	一般	*	*	v5r	False	2068640
+名詞	普通名詞	*	*	aux-v	False	2089610
+動詞	一般	*	*	aux-v	True	2089610
+接尾辞	名詞的	一般	*	int	False	2097670
+動詞	一般	*	*	adj-f	True	2101560
+副詞	*	*	*	adj-f	True	2104980
+感動詞	一般	*	*	conj	True	2113470
+助動詞	*	*	*	adj-f	True	2130370
+形容詞	一般	*	*	adj-no	True	2133230
+名詞	固有名詞	人名	*	prt	False	2133450
+助詞	格助詞	*	*	n-pref	False	2759530
+助動詞	*	*	*	n-pref	False	2759530
+助詞	準体助詞	*	*	n-pref	False	2759530
+助詞	終助詞	*	*	n-pref	False	2759530
+名詞	数詞	*	*	n-pref	True	2759530
+記号	一般	*	*	n	True	2173760
+名詞	普通名詞	サ変可能	*	suf	True	2182600
+形容詞	非自立可能	*	*	int	True	2255590
+名詞	固有名詞	人名	*	vs	False	2259910
+動詞	一般	*	*	vs-c	True	2410640
+感動詞	一般	*	*	suf	True	2410730
+記号	文字	*	*	adj-f	False	2430790
+名詞	固有名詞	一般	*	adj-f	True	2433490
+動詞	一般	*	*	vk	True	2535670
+名詞	普通名詞	サ変形状詞可能	*	adv-to	True	2615170
+形状詞	一般	*	*	adj-i	True	2708710
+名詞	固有名詞	地名	*	int	False	2739960
+名詞	普通名詞	サ変可能	*	adj-no	True	2782370
+名詞	普通名詞	一般	*	adj-pn	True	2818320
+動詞	一般	*	*	v4k	True	2827117
+名詞	固有名詞	人名	*	conj	False	2830057
+動詞	一般	*	*	vt	True	2831651
+動詞	一般	*	*	vi	True	2832525
+感動詞	一般	*	*	pref	True	2832857
+動詞	一般	*	*	n-pref	False	2834428
+形状詞	一般	*	*	int	True	2834510
+名詞	固有名詞	地名	*	n-pref	False	2835482
+名詞	普通名詞	*	*	int	False	2835939
+助動詞	*	*	*	prt	True	2837545
+接尾辞	動詞的	*	*	prt	False	2085890
+補助記号	一般	*	*	aux-v	False	2654300

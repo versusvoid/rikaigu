@@ -8,16 +8,39 @@ import gzip
 import pickle
 import os
 
-Kanji = namedtuple('Kanji', 'text, common')
-Reading = namedtuple('Reading', 'text, common, kanjis')
-Sense = namedtuple('Sense', 'kanji_restriction, reading_restriction, misc, dialect, glosses, s_inf')
+class Kanji(namedtuple('Kanji', 'text, common')):
+
+	def __repr__(self):
+		return f'Kanji(text=\033[1m{self.text}\033[0m, common={self.common})'
+
+class Reading(namedtuple('Reading', 'text, common, kanjis')):
+
+	def __repr__(self):
+		return f'Reading(text=\033[1m{self.text}\033[0m, common={self.common}, kanjis={self.kanjis})'
+
+def _bold(strings):
+	return ''.join(('[', ', '.join(map(lambda t: "'\033[1m" + t + "'\033[0m", strings)), ']'))
+
+class Sense(namedtuple('Sense', 'kanji_restriction, reading_restriction, misc, dialect, glosses, s_inf')):
+
+	def __repr__(self):
+		return 'Sense(' + ', '.join([
+			f'kanji_restriction={self.kanji_restriction}',
+			f'reading_restriction={self.reading_restriction}',
+			f'misc={self.misc}',
+			f'dialect={self.dialect}',
+			f'glosses={_bold(self.glosses)}',
+			f's_inf={self.s_inf}'
+		]) + ')'
+
+
 Trans = namedtuple('Trans', 'types, glosses')
 class SenseGroup(namedtuple('SenseGroup', 'pos, senses')):
 
 	def _format(self, indent=2):
 		res = ['\t'*indent + 'SenseGroup(']
 		indent += 1
-		res.append('\t'*indent + 'pos=' + str(self.pos) + ',')
+		res.append('\t'*indent + f'pos={_bold(self.pos)},')
 		res.append('\t'*indent + 'senses=[')
 		indent += 1
 		for s in self.senses:
