@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
-from utils import download, kata_to_hira
 from collections import namedtuple
-from index import index_keys
+from itertools import groupby
 import xml.etree.ElementTree as ET
 import gzip
 import pickle
 import os
+import gc
 
-class Kanji(namedtuple('Kanji', 'text, common')):
+from utils import download, kata_to_hira
+from index import index_keys
+
+class Kanji(namedtuple('Kanji', 'text, inf, common')):
 
 	def __repr__(self):
 		return f'Kanji(text=\033[1m{self.text}\033[0m, common={self.common})'
 
-class Reading(namedtuple('Reading', 'text, common, kanjis')):
+class Reading(namedtuple('Reading', 'text, nokanji, kanji_restriction, inf, common')):
 
 	def __repr__(self):
 		return f'Reading(text=\033[1m{self.text}\033[0m, common={self.common}, kanjis={self.kanjis})'
@@ -21,7 +24,7 @@ class Reading(namedtuple('Reading', 'text, common, kanjis')):
 def _bold(strings):
 	return ''.join(('[', ', '.join(map(lambda t: "'\033[1m" + t + "'\033[0m", strings)), ']'))
 
-class Sense(namedtuple('Sense', 'kanji_restriction, reading_restriction, misc, dialect, glosses, s_inf')):
+class Sense(namedtuple('Sense', 'kanji_restriction, reading_restriction, misc, lsource, dialect, glosses, s_inf')):
 
 	def __repr__(self):
 		return 'Sense(' + ', '.join([
@@ -120,49 +123,27 @@ def make_entry(elem, entities):
 			assert last_tag == 'ent_seq' or last_tag == 'k_ele'
 
 			kanji = child.find('keb').text
-
-			# TODO take &uk; into account
-			entry.kanjis.append(Kanji(kanji, child.find('ke_pri') is not None))
-			all_kanjis[entry.kanjis[-1].text] = len(entry.kanjis) - 1
+			inf = tuple(entities[el.text] for el in child.iter('ke_inf')) or None
+			common = child.find('ke_pri') is not None
+			entry.kanjis.append(Kanji(kanji, inf, common))
+			all_kanjis[kanji] = len(entry.kanjis) - 1
 
 		elif child.tag == 'r_ele':
 			assert last_tag == 'ent_seq' or last_tag == 'k_ele' or last_tag == 'r_ele'
-			if all_kanji_indexes is None:
-				all_kanji_indexes = range(len(entry.kanjis))
 
-			kanjis_restriction = []
-			for el in child.iter('re_restr'):
-				kanjis_restriction.append(all_kanjis[el.text])
-			if len(kanjis_restriction) == 0:
-				kanjis_restriction = all_kanji_indexes
-
-			'''
-			FIXME somewhat strange
-			'''
+			reading = child.find('reb').text
+			nokanji = child.find('re_nokanji') is not None
+			kanjis_restriction = tuple(all_kanjis[el.text] for el in child.iter('re_restr')) or None
+			inf = tuple(entities[el.text] for el in child.iter('re_inf')) or None
 			common = child.find('re_pri') is not None
 
-			original_text = child.find('reb').text
-			common_text = kata_to_hira(original_text)
-			ri = all_readings.get(common_text)
-			if ri is not None:
-				reading = entry.readings[ri]
-
-				combined_restriction = set(reading.kanjis)
-				combined_restriction.update(kanjis_restriction)
-				if len(combined_restriction) == len(all_kanjis):
-					combined_restriction = all_kanji_indexes
-
-				entry.readings[ri] = Reading(common_text, reading.common or common, combined_restriction)
-			else:
-				entry.readings.append(Reading(original_text, common, kanjis_restriction))
-				all_readings[common_text] = len(entry.readings) - 1
+			entry.readings.append(Reading(reading, nokanji, kanjis_restriction, inf, common))
+			all_readings[reading] = len(entry.readings) - 1
 
 		elif child.tag == 'sense':
 			assert last_tag == 'r_ele' or last_tag == 'sense'
-			if all_reading_indexes is None:
-				all_reading_indexes = range(len(entry.readings))
 
-			pos = list(map(lambda el: entities[el.text], child.iter('pos')))
+			pos = tuple(entities[el.text] for el in child.iter('pos'))
 			if len(pos) == 0:
 				assert len(sense_group.pos) > 0
 			else:
@@ -170,21 +151,23 @@ def make_entry(elem, entities):
 					entry.sense_groups.append(sense_group)
 				sense_group = SenseGroup(pos, [])
 
-			kanjis_restriction = list(map(lambda el: all_kanjis[el.text], child.iter('stagk')))
+			kanjis_restriction = tuple(all_kanjis[el.text] for el in child.iter('stagk')) or None
+			readings_restriction = tuple(all_readings[el.text] for el in child.iter('stagr')) or None
 
-			readings_restriction = set(map(lambda el: all_readings[kata_to_hira(el.text)], child.iter('stagr')))
-
-			misc = list(map(lambda el: entities[el.text], child.iter('misc')))
-			dialect = list(map(lambda el: entities[el.text], child.iter('dial')))
-			s_inf = list(map(lambda el: el.text, child.iter('s_inf')))
-			assert len(s_inf) <= 1, ET.tostring(elem, encoding="unicode")
-			if len(s_inf) == 0:
-				s_inf = None
-			else:
+			misc = tuple(entities[el.text] for el in child.iter('misc'))
+			lsource = tuple(
+				el.get('{http://www.w3.org/XML/1998/namespace}lang', 'eng') for el in child.iter('lsource')
+			) or None
+			dialect = tuple(entities[el.text] for el in child.iter('dial')) or None
+			s_inf = tuple(el.text for el in child.iter('s_inf')) or None
+			assert s_inf is None or len(s_inf) <= 1, ET.tostring(elem, encoding="unicode")
+			if s_inf is not None:
 				s_inf = s_inf[0]
-			glosses = list(map(lambda el: el.text, child.iter('gloss')))
+			glosses = tuple(el.text for el in child.iter('gloss'))
 
-			sense_group.senses.append(Sense(kanjis_restriction, readings_restriction, misc, dialect, glosses, s_inf))
+			sense_group.senses.append(
+				Sense(kanjis_restriction, readings_restriction, misc, lsource, dialect, glosses, s_inf)
+			)
 
 		elif child.tag == 'trans':
 			assert last_tag == 'r_ele' or last_tag == 'trans'
@@ -196,7 +179,7 @@ def make_entry(elem, entities):
 			entry.transes.append(Trans(types, glosses))
 		else:
 			assert child.tag == 'ent_seq'
-			entry = Entry(child.text, [], [], [])
+			entry = Entry(int(child.text), [], [], [])
 
 		last_tag = child.tag
 
@@ -206,11 +189,6 @@ def make_entry(elem, entities):
 	del all_readings
 
 	return entry
-
-_dictionary = {}
-def _record_entry(entry):
-	for key, key_sources in index_keys(entry, variate=False, with_source=True).items():
-		_dictionary.setdefault(key, []).append((key_sources, entry))
 
 def find_entry(k, r, d=None, with_keys=False):
 	if d is None:
@@ -251,15 +229,16 @@ def find_entry(k, r, d=None, with_keys=False):
 
 	raise Exception(f'Unknown entry {k}|{r}:\n{entries}')
 
-def dictionary_reader(dictionary='JMdict_e.gz', store_in_memory=False):
+def dictionary_reader(dictionary='JMdict_e.gz'):
 	dictionary_path = download('http://ftp.monash.edu.au/pub/nihongo/' + dictionary, dictionary)
 	entities = {}
 	with gzip.open(dictionary_path, 'rt') as f:
 		for l in f:
-			if l.startswith('<JMdict>'): break
+			if l.startswith('<JMdict>') or l.startswith('<JMnedict>'): break
 			if l.startswith('<!ENTITY'):
 				parts = l.strip().split(maxsplit=2)
 				assert parts[2].startswith('"') and parts[2].endswith('">')
+				assert parts[2][1:-2] not in entities
 				entities[parts[2][1:-2]] = parts[1]
 
 	entry_no = 0
@@ -272,21 +251,30 @@ def dictionary_reader(dictionary='JMdict_e.gz', store_in_memory=False):
 			entry = make_entry(elem, entities)
 			yield entry, elem
 			elem.clear()
-			if store_in_memory:
-				_record_entry(entry)
-		elif elem.tag == 'JMdict':
+		elif elem.tag in ('JMdict', 'JMnedict'):
 			elem.clear()
 
-def load_dictionary(dictionary='JMdict_e.gz'):
-	global _dictionary
-	if len(_dictionary) > 0:
-		return
+def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate):
+	res = {}
+	for e in entries:
+		for key in index_keys(e, variate=variate, convert_to_hiragana=convert_to_hiragana_for_index):
+			other_entries = res.setdefault(key, [])
+			if len(other_entries) == 0 or other_entries[-1].id != e.id:
+				other_entries.append(e)
+	return res
+
+def load_dictionary(dictionary='JMdict_e.gz', convert_to_hiragana_for_index=True, variate=False):
 	if os.path.exists('tmp/parsed-jmdict.pkl'):
 		with open('tmp/parsed-jmdict.pkl', 'rb') as f:
-			_dictionary = pickle.load(f)
-		return
-	for _ in dictionary_reader(dictionary, True):
-		pass
-	with open('tmp/parsed-jmdict.pkl', 'wb') as f:
-		pickle.dump(_dictionary, f)
+			entries = pickle.load(f)
+	else:
+		entries = list(e for e, _ in dictionary_reader(dictionary))
+		with open('tmp/parsed-jmdict.pkl', 'wb') as f:
+			pickle.dump(entries, f)
 
+	indexed = make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate)
+
+	del entries
+	gc.collect()
+
+	return indexed

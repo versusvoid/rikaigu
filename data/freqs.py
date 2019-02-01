@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-import dictionary
 import os
 import subprocess
 import sys
 import pickle
 import itertools
 import MeCab # https://github.com/SamuraiT/mecab-python3
-from collections import namedtuple
+from collections import namedtuple, defaultdict
+
 from utils import download, is_katakana, is_kana, kata_to_hira, any, all
+import dictionary
 
 def download_dump():
 	extracted_dump = 'tmp/jawiki-text.xz'
@@ -228,8 +229,20 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		return res
 
-DEBUG = False
-def match_unidic_ids_with_jmdict():
+def u2j_simple_match(lex, jmdict):
+	raise NotImplementedError()
+
+DEBUG = True
+def match_unidic_ids_with_jmdict(jmdict, unidic):
+	jmdict2unidic = defaultdict(set)
+	unidic2jmdict = defaultdict(set)
+
+	for i, lex in enumerate(unidic):
+		for jmdict_id in u2j_simple_match(lex, jmdict):
+			jmdict2unidic[jmdict_id].add(i)
+			unidic2jmdict[i].add(jmdict_id)
+
+def match_unidic_ids_with_jmdict_old():
 	download_unidic()
 	mecab = MeCab.Tagger('-d tmp/unidic-cwj-2.3.0')
 
@@ -362,10 +375,66 @@ def process_corpus(unidic2jmdict_ids):
 
 	return freqs
 
+FullUnidicLex = namedtuple('FullUnidicLex', '''
+	text_form, leftId, rightId, weight,
+	pos1, pos2, pos3, pos4,
+	cType, cForm,
+	lForm, lemma,
+	orth, pron, orthBase, pronBase,
+	goshu,
+	iType, iForm, fType, fForm, iConType, fConType,
+	type, kana, kanaBase, form, formBase,
+	aType, aConType, aModType,
+	lid, lemma_id
+''')
+UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
+
+def split_lex(l):
+	if l.startswith('""'):
+		assert l.count('"') == 2
+		return l.split(',')
+
+	res = []
+	start = 0
+	end = l.find('"')
+	while end >= 0:
+		if start < end:
+			res.extend(l[start:end - 1].split(','))
+		start = end + 1
+		end = l.find('"', end + 1)
+		res.append(l[start:end])
+		start = end + 2
+		end = l.find('"', start)
+	res.extend(l[start:].split(','))
+
+	return res
+
+assert split_lex('a,,"d,e,f",h,,"k,l",m') == ['a', '', 'd,e,f', 'h', '', 'k,l', 'm']
+assert split_lex('"a,,",d,"k,l",m') == ['a,,', 'd', 'k,l', 'm']
+
+def load_unidic():
+	download_unidic()
+
+	res = set()
+	with open('tmp/unidic-cwj-2.3.0/lex.csv') as f:
+		for l in f:
+			l = FullUnidicLex(*split_lex(l.strip()))
+			res.add(UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id))
+			del l
+
+	return list(res)
+
 def compute_freqs():
-	dictionary.load_dictionary()
-	unidic2jmdict_ids = match_unidic_ids_with_jmdict()
+	jmdict = dictionary.load_dictionary()
+	unidic = load_unidic()
+
+	import gc
+	gc.collect()
 	input()
+
+	unidic2jmdict_ids = match_unidic_ids_with_jmdict()
+	if DEBUG:
+		exit()
 	freqs = process_corpus(unidic2jmdict_ids)
 	return [(k,v) for k, v in freqs.items() if v >= 77]
 
