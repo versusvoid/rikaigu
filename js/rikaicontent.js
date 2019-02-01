@@ -672,6 +672,7 @@ function _shouldResetPopup(ev) {
 		}
 	}
 
+	// FIXME would be true only in top frame
 	return !rikaigu.mouseOnPopup;
 }
 
