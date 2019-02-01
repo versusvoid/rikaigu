@@ -246,6 +246,7 @@ def match_unidic_ids_with_jmdict():
 		skip_f = open('tmp/u2j.skip', 'w')
 		print('skip:', skip)
 
+	# TODO JMnedict too
 	# TODO parse directly from JMdict.xml and utilize all the meta-info for matching
 	# (lsource, misc, maybe even s_inf)
 	# TODO 2 collaborative filtering: other lexes for same lemma (other readings, writings)
@@ -267,20 +268,23 @@ def match_unidic_ids_with_jmdict():
 		if len(seen_entries) % 10000 == 0:
 			print(f'Processing {len(seen_entries)} entry #{entry.id}')
 
-		archaic = False
+		all_archaic = True
 		usually_kana = set()
 		for sg in entry.sense_groups:
 			for s in sg.senses:
-				archaic = archaic or 'arch' in s.misc
+				all_archaic = all_archaic and 'arch' in s.misc
 				if 'uk' in s.misc:
 					if s.reading_restriction != ():
 						usually_kana.update(s.reading_restriction)
 					else:
 						usually_kana.update(range(0, len(entry.readings)))
-		if archaic: continue
+		if all_archaic: continue
 
 		pos = set()
 		pos.update(*map(lambda sg: sg.pos, entry.sense_groups))
+
+		any_common = False
+		any_map = False
 
 		all_readings = set()
 		for i, r in enumerate(entry.readings):
@@ -291,10 +295,13 @@ def match_unidic_ids_with_jmdict():
 				except KeyError:
 					print(f'Entry at position #{entry_index}')
 					raise
+
+				if r.common:
+					any_common = True
+
 				if unidic_id is not None:
 					unidic2jmdict_id_mapping.setdefault(unidic_id, entry.id)
-				elif r.common:
-					missing_commons += 1
+					any_map = True
 
 
 		for k in entry.kanjis:
@@ -303,10 +310,16 @@ def match_unidic_ids_with_jmdict():
 			except KeyError:
 				print(f'Entry at position #{entry_index}')
 				raise
+
+			if k.common:
+				any_common = True
+
 			if unidic_id is not None:
 				unidic2jmdict_id_mapping.setdefault(unidic_id, entry.id)
-			elif k.common:
-				missing_commons += 1
+				any_map = True
+
+		if any_common and not any_map:
+			missing_commons += 1
 
 	del mecab
 	print(missing_commons, 'commons missing mapping from unidic')
@@ -347,15 +360,38 @@ def process_corpus(unidic2jmdict_ids):
 			traceback.print_exc()
 			continue
 
-	with open('tmp/jmdict-freqs.dat', 'w') as of:
-		for k, v in freqs.items():
-			if v > 77:
-				print(k, v, sep='\t', file=of)
+	return freqs
 
-def main():
+def compute_freqs():
 	dictionary.load_dictionary()
 	unidic2jmdict_ids = match_unidic_ids_with_jmdict()
+	input()
+	freqs = process_corpus(unidic2jmdict_ids)
+	return [(k,v) for k, v in freqs.items() if v >= 77]
 
-	process_corpus(unidic2jmdict_ids)
+def save_freqs(freqs):
+	with open('tmp/jmdict-freqs.dat', 'w') as of:
+		for k, v in freqs.items():
+			print(k, v, sep='\t', file=of)
 
-main()
+def load_freqs():
+	res = []
+	with open('tmp/jmdict-freqs.dat') as f:
+		for l in f:
+			k, v = l.strip().split()
+			res.append((k, v))
+	return res
+
+def compute_freq_order():
+	if os.path.exists('tmp/jmdict-freqs.dat'):
+		freqs = load_freqs()
+	else:
+		freqs = compute_freqs()
+		save_freqs(_freq_order)
+
+	freqs.sort(key=lambda p: int(p[1]), reverse=True)
+	return {k:i for i, (k, _) in enumerate(freqs)}
+
+__freq_order = compute_freq_order()
+def get_frequency(entry):
+	return __freq_order.get(entry.id)

@@ -106,7 +106,7 @@ class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 		for i in usually_kana:
 			yield self.readings[i]
 
-Name = namedtuple('Name', 'kanjis, readings, transes')
+Name = namedtuple('Name', 'id, kanjis, readings, transes')
 def make_entry(elem, entities):
 	entry = None
 	all_kanjis = {}
@@ -189,7 +189,7 @@ def make_entry(elem, entities):
 		elif child.tag == 'trans':
 			assert last_tag == 'r_ele' or last_tag == 'trans'
 			if type(entry) == Entry:
-				entry = Name(entry.kanjis, entry.readings, [])
+				entry = Name(entry.id, entry.kanjis, entry.readings, [])
 
 			types = list(map(lambda el: entities[el.text], child.iter('name_type')))
 			glosses = list(map(lambda el: el.text, child.iter('trans_det')))
