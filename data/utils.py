@@ -1,6 +1,6 @@
 import os
 import time
-import urllib.request
+import subprocess
 from collections import namedtuple
 import gzip
 import xml.etree.ElementTree as ET
@@ -86,25 +86,17 @@ def kata_to_hira(w, full_or_none=False):
 
 	return ''.join(res)
 
-def maketmp():
-	if not os.path.exists('tmp'):
-		os.makedirs('tmp')
-	if not os.path.isdir('tmp'):
-		raise Exception("`tmp` has to be dir, but it isn't")
-
-_report_time = time.time()
-def _download_reporthook(chunk_number, max_chunk_size, download_size):
-        global _report_time
-        if time.time() - _report_time > 1:
-            _report_time = time.time()
-            print(f'\r{chunk_number} {max_chunk_size} {download_size}, {100*chunk_number*max_chunk_size/download_size:.2f}%', end='')
-
 def download(url, filename):
-	maketmp()
 	path = os.path.join('tmp', filename)
 	if not os.path.exists(path):
 		print(f"Downloading {filename}")
-		urllib.request.urlretrieve(url, path, _download_reporthook)
+		tmp_path = path + '-part'
+		subprocess.check_call(
+			['curl', '-C', url, '-o', tmp_path, '--create-dirs'],
+			stderr=subprocess.PIPE,
+			universal_newlines=True
+		)
+		os.rename(tmp_path, path)
 		print(f"\nDownloaded {filename}")
 	return path
 

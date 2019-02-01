@@ -27,7 +27,7 @@ def download_dump():
 		print("Stripping wiki markup")
 		subprocess.check_call([' | '.join([
 			'tmp/wikiextractor-master/WikiExtractor.py -q -o - --no-templates -s --lists tmp/jawiki-articles.xml.bz2',
-			'head -n 400000',
+			# 'head -n 400000',
 			'egrep -v "^<"',
 			'xz > tmp/jawiki-text.xz'])], shell=True)
 
@@ -37,12 +37,20 @@ def download_unidic():
 	files = ['char.bin', 'dicrc', 'matrix.bin', 'sys.dic', 'unk.dic', 'lex.csv']
 	if all(map(lambda fn: os.path.exists('tmp/unidic-cwj-2.3.0/' + fn), files)):
 		return
-	print("Downloading unidic...")
-	subprocess.check_call(f'''
-		curl https://unidic.ninjal.ac.jp/unidic_archive/cwj/2.3.0/unidic-cwj-2.3.0.zip
-		| bsdtar -xv -C tmp f- unidic-cwj-2.3.0/{{{','.join(files)}}}
-		''',
-		shell=True, stderr=subprocess.PIPE, universal_newlines=True)
+
+	filename = 'tmp/unidic-cwj-2.3.0.zip'
+	download('https://unidic.ninjal.ac.jp/unidic_archive/cwj/2.3.0/unidic-cwj-2.3.0.zip', filename)
+
+	print('Extracting unidic')
+	subprocess.check_call(
+		[
+			'bsdtar', '-xv',
+			'-C', 'tmp',
+			'-f', filename,
+		] + [f'unidic-cwj-2.3.0/{f}' for f in files],
+		stderr=subprocess.PIPE,
+		universal_newlines=True
+	)
 
 unidic_pos2jmdict_pos = {}
 def add_mapping(unidic_pos, jmdict_pos, mapped):
@@ -169,32 +177,37 @@ def match_pos(possible_jmdict_pos, full_unidic_pos, ask_for_pos_match, variant, 
 		update_mapping(upos, jpos, mapped, entry.id)
 		return mapped
 
+# for magic numbers see `dicrc` file from unidic
+NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM = 28
+ORTH_BASE_INDEX = 10
+PRON_BASE_INDEX = 11
+# -1 'cos some fields in unidic may contain commas in them
+# and mecab does not print them in unambiguous way (using quotes like in unidic/lex.csv),
+# so lemma_id may be at position 28, 29 or 30, but it's always last
+LEMMA_ID_INDEX = -1
+
+def get_unidic_lexem_key(properties):
+	return (properties[ORTH_BASE_INDEX], properties[PRON_BASE_INDEX], int(properties[LEMMA_ID_INDEX]))
+
 def match_variants(all_variants, all_readings, jmdict_pos, entry, ask_for_pos_match):
 	for variant in all_variants:
-		variant_props = variant.split('\t')[1].split(',')
-		assert len(variant_props) >= 28
+		variant_properties = variant.split('\t')[1].split(',')
+		assert len(variant_properties) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM
 
 		if all_readings is not None:
 			unidic_readings = (
-				variant_props[11],
-				variant_props[9],
-				variant_props[6],
+				variant_properties[11],
+				variant_properties[9],
+				variant_properties[6],
 			)
 			if all(lambda r: kata_to_hira(r) not in all_readings, unidic_readings):
 				continue
 
-		unidic_pos = variant_props[:4]
+		unidic_pos = variant_properties[:4]
 		if not match_pos(jmdict_pos, unidic_pos, ask_for_pos_match, variant, entry):
 			continue
-		# for magic numbers see `dicrc` file from unidic
-		orthBase = variant_props[10]
-		pronBase = variant_props[11]
-		# -1 'cos some fields in unidic may contain commas in them
-		# and mecab does not print them in unambiguous way (using quotes like in unidic/lex.csv),
-		# so lemma_id may be at position 28, 29 or 30, but it's always last
-		lemma_id = int(variant_props[-1])
 
-		return (orthBase, pronBase, lemma_id)
+		return get_unidic_lexem_key(variant_properties)
 
 def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	all_variants = []
@@ -206,7 +219,7 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		N = 3
 	for l in mecab.parseNBest(N, lexeme).split('\n')[:-1]:
-		if l.startswith(unsplit_parse_prefix) and l.count(',') >= 28:
+		if l.startswith(unsplit_parse_prefix) and l.count(',') >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
 			all_variants.append(l.strip())
 
 	res = match_variants(all_variants, all_readings, jmdict_pos, entry, ask_for_pos_match=False)
@@ -215,6 +228,7 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		return res
 
+DEBUG = False
 def match_unidic_ids_with_jmdict():
 	download_unidic()
 	mecab = MeCab.Tagger('-d tmp/unidic-cwj-2.3.0')
@@ -225,11 +239,12 @@ def match_unidic_ids_with_jmdict():
 	unidic2jmdict_id_mapping = {}
 
 	skip = 0
-	if os.path.exists('tmp/u2j.skip'):
-		with open('tmp/u2j.skip') as f:
-			skip = int(f.read() or 0)
-	skip_f = open('tmp/u2j.skip', 'w')
-	print('skip:', skip)
+	if DEBUG:
+		if os.path.exists('tmp/u2j.skip'):
+			with open('tmp/u2j.skip') as f:
+				skip = int(f.read() or 0)
+		skip_f = open('tmp/u2j.skip', 'w')
+		print('skip:', skip)
 
 	# TODO parse directly from JMdict.xml and utilize all the meta-info for matching
 	# (lsource, misc, maybe even s_inf)
@@ -239,10 +254,13 @@ def match_unidic_ids_with_jmdict():
 		enumerate(itertools.chain.from_iterable(dictionary._dictionary.values())),
 		skip, None
 	)
+	missing_commons = 0
+	print('Matching jmdict entries with unidic lexemes')
 	for entry_index, (_, entry) in iterator:
-		skip_f.flush()
-		skip_f.seek(0)
-		skip_f.write(str(entry_index))
+		if DEBUG:
+			skip_f.flush()
+			skip_f.seek(0)
+			skip_f.write(str(entry_index))
 
 		if entry.id in seen_entries: continue
 		seen_entries.add(entry.id)
@@ -275,6 +293,9 @@ def match_unidic_ids_with_jmdict():
 					raise
 				if unidic_id is not None:
 					unidic2jmdict_id_mapping.setdefault(unidic_id, entry.id)
+				elif r.common:
+					missing_commons += 1
+
 
 		for k in entry.kanjis:
 			try:
@@ -284,14 +305,23 @@ def match_unidic_ids_with_jmdict():
 				raise
 			if unidic_id is not None:
 				unidic2jmdict_id_mapping.setdefault(unidic_id, entry.id)
+			elif k.common:
+				missing_commons += 1
 
-	print("That's all, folks!")
 	del mecab
-
+	print(missing_commons, 'commons missing mapping from unidic')
+	print(len(unidic2jmdict_id_mapping), 'unidic lexemes mapped to jmdict')
 	return unidic2jmdict_id_mapping
 
-def process_token(l, unidic2jmdict_ids):
-	raise NotImplementedError()
+def process_token(l, unidic2jmdict_ids, freqs):
+	if l.startswith('EOS'):
+		return
+	properties = l.split('\t')[1].split(',')
+	if len(properties) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+		return
+	jmdict_id = unidic2jmdict_ids.get(get_unidic_lexem_key(properties))
+	if jmdict_id is not None:
+		freqs[jmdict_id] = freqs.get(jmdict_id, 0) + 1
 
 def process_corpus(unidic2jmdict_ids):
 	extracted_dump = download_dump()
@@ -299,10 +329,28 @@ def process_corpus(unidic2jmdict_ids):
 	mecab = subprocess.Popen([f'unxz -c {extracted_dump} | mecab -d tmp/unidic-cwj-2.3.0'],
 	#mecab = subprocess.Popen([f'cat tmp/test.dat | egrep -v "^#" | mecab'],
 			shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True)
-	for line_no, l in enumerate(mecab.stdout):
-		process_token(l, unidic2jmdict_ids)
-		if (line_no + 1) % 2000 == 0:
-			print(line_no + 1)
+
+	freqs = {}
+	iterator = enumerate(mecab.stdout)
+	while True:
+		try:
+			line_no, l = next(iterator)
+
+			process_token(l, unidic2jmdict_ids, freqs)
+			if (line_no + 1) % 1000000 == 0:
+				print(line_no + 1)
+		except (StopIteration, KeyboardInterrupt):
+			break
+		except Exception as e:
+			import traceback
+			print('some error:')
+			traceback.print_exc()
+			continue
+
+	with open('tmp/jmdict-freqs.dat', 'w') as of:
+		for k, v in freqs.items():
+			if v > 77:
+				print(k, v, sep='\t', file=of)
 
 def main():
 	dictionary.load_dictionary()
