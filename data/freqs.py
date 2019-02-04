@@ -11,6 +11,43 @@ from collections import namedtuple, defaultdict
 from utils import download, is_katakana, is_kana, kata_to_hira, any, all
 import dictionary
 
+FullUnidicLex = namedtuple('FullUnidicLex', '''
+	text_form, leftId, rightId, weight,
+	pos1, pos2, pos3, pos4,
+	cType, cForm,
+	lForm, lemma,
+	orth, pron, orthBase, pronBase,
+	goshu,
+	iType, iForm, fType, fForm, iConType, fConType,
+	type, kana, kanaBase, form, formBase,
+	aType, aConType, aModType,
+	lid, lemma_id
+''')
+UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
+
+def split_lex(l):
+	if l.startswith('""'):
+		assert l.count('"') == 2
+		return l.split(',')
+
+	res = []
+	start = 0
+	end = l.find('"')
+	while end >= 0:
+		if start < end:
+			res.extend(l[start:end - 1].split(','))
+		start = end + 1
+		end = l.find('"', end + 1)
+		res.append(l[start:end])
+		start = end + 2
+		end = l.find('"', start)
+	res.extend(l[start:].split(','))
+
+	return res
+
+assert split_lex('a,,"d,e,f",h,,"k,l",m') == ['a', '', 'd,e,f', 'h', '', 'k,l', 'm']
+assert split_lex('"a,,",d,"k,l",m') == ['a,,', 'd', 'k,l', 'm']
+
 def download_dump():
 	extracted_dump = 'tmp/jawiki-text.xz'
 	if not os.path.exists(extracted_dump):
@@ -230,17 +267,60 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 		return res
 
 def u2j_simple_match(lex, jmdict):
-	raise NotImplementedError()
+	writing = kata_to_hira(lex.orthBase)
+	reading = kata_to_hira(lex.pronBase)
+	for entry in jmdict.get(writing, ()):
+		if reading == writing:
+			if len(entry.kanjis) == 0:
+				yield entry.id
+		elif any(kata_to_hira(r.text) == reading for r in entry.readings):
+			yield entry.id
+
+def find_one2one(a2b, b2a):
+	stars = []
+	for k, vs in a2b.items():
+		v = next(iter(vs))
+		if len(vs) == 1 and len(b2a[v]) == 1:
+			stars.append((k, v))
+	return stars
+
+def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdict_pos):
+	for sg in entry.sense_groups:
+		if all('arch' in s.misc for s in sg.senses):
+			continue
+		for p in sg.pos:
+			unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
 
 DEBUG = True
-def match_unidic_ids_with_jmdict(jmdict, unidic):
+def match_unidic_ids_with_jmdict(jmdict, index, unidic):
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
 
-	for i, lex in enumerate(unidic):
-		for jmdict_id in u2j_simple_match(lex, jmdict):
-			jmdict2unidic[jmdict_id].add(i)
-			unidic2jmdict[i].add(jmdict_id)
+	print('matching')
+	lemma_id2lex = {}
+	for lex in unidic:
+		if lex.pos[:2] == ('名詞', '固有名詞'):
+			continue
+		for jmdict_id in u2j_simple_match(lex, index):
+			jmdict2unidic[jmdict_id].add(lex.lemma_id)
+			unidic2jmdict[lex.lemma_id].add(jmdict_id)
+		lemma_id2lex.setdefault(lex.lemma_id, lex)
+	del lex, jmdict_id
+
+	print('computing stars')
+	stars = find_one2one(jmdict2unidic, unidic2jmdict)
+	print(len(stars), 'one2ones')
+
+	unidic_pos2jmdict_pos = {}
+	for jmdict_id, lemma_id in stars:
+		record_pos_mapping(jmdict[jmdict_id], lemma_id2lex[lemma_id], unidic_pos2jmdict_pos)
+
+	with open('tmp/unidic_pos2jmdict_pos.dat', 'w') as of:
+		print("# vi: tabstop=60", file=of)
+		items = list(unidic_pos2jmdict_pos.items())
+		items.sort(key=lambda p: p[0])
+		for (upos, jpos), (lex, jid) in items:
+			print(upos, jpos, lex[1:], jid, sep='\t', file=of)
 
 def match_unidic_ids_with_jmdict_old():
 	download_unidic()
@@ -375,46 +455,10 @@ def process_corpus(unidic2jmdict_ids):
 
 	return freqs
 
-FullUnidicLex = namedtuple('FullUnidicLex', '''
-	text_form, leftId, rightId, weight,
-	pos1, pos2, pos3, pos4,
-	cType, cForm,
-	lForm, lemma,
-	orth, pron, orthBase, pronBase,
-	goshu,
-	iType, iForm, fType, fForm, iConType, fConType,
-	type, kana, kanaBase, form, formBase,
-	aType, aConType, aModType,
-	lid, lemma_id
-''')
-UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
-
-def split_lex(l):
-	if l.startswith('""'):
-		assert l.count('"') == 2
-		return l.split(',')
-
-	res = []
-	start = 0
-	end = l.find('"')
-	while end >= 0:
-		if start < end:
-			res.extend(l[start:end - 1].split(','))
-		start = end + 1
-		end = l.find('"', end + 1)
-		res.append(l[start:end])
-		start = end + 2
-		end = l.find('"', start)
-	res.extend(l[start:].split(','))
-
-	return res
-
-assert split_lex('a,,"d,e,f",h,,"k,l",m') == ['a', '', 'd,e,f', 'h', '', 'k,l', 'm']
-assert split_lex('"a,,",d,"k,l",m') == ['a,,', 'd', 'k,l', 'm']
-
 def load_unidic():
 	download_unidic()
 
+	print('loading unidic')
 	res = set()
 	with open('tmp/unidic-cwj-2.3.0/lex.csv') as f:
 		for l in f:
@@ -425,14 +469,14 @@ def load_unidic():
 	return list(res)
 
 def compute_freqs():
-	jmdict = dictionary.load_dictionary()
+	jmdict, index = dictionary.load_dictionary()
 	unidic = load_unidic()
-
 	import gc
 	gc.collect()
-	input()
+	unidic2jmdict_ids = match_unidic_ids_with_jmdict(jmdict, index, unidic)
+	input('ready when you are')
+	exit()
 
-	unidic2jmdict_ids = match_unidic_ids_with_jmdict()
 	if DEBUG:
 		exit()
 	freqs = process_corpus(unidic2jmdict_ids)

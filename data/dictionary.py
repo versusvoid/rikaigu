@@ -255,6 +255,7 @@ def dictionary_reader(dictionary='JMdict_e.gz'):
 			elem.clear()
 
 def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate):
+	print('indexing dictionary')
 	res = {}
 	for e in entries:
 		for key in index_keys(e, variate=variate, convert_to_hiragana=convert_to_hiragana_for_index):
@@ -264,17 +265,14 @@ def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate):
 	return res
 
 def load_dictionary(dictionary='JMdict_e.gz', convert_to_hiragana_for_index=True, variate=False):
+	print('loading dictionary')
 	if os.path.exists('tmp/parsed-jmdict.pkl'):
 		with open('tmp/parsed-jmdict.pkl', 'rb') as f:
 			entries = pickle.load(f)
 	else:
-		entries = list(e for e, _ in dictionary_reader(dictionary))
+		entries = {e.id: e for e, _ in dictionary_reader(dictionary)}
 		with open('tmp/parsed-jmdict.pkl', 'wb') as f:
 			pickle.dump(entries, f)
 
-	indexed = make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate)
-
-	del entries
-	gc.collect()
-
-	return indexed
+	indexed = make_indexed_dictionary(entries.values(), convert_to_hiragana_for_index, variate)
+	return entries, indexed
