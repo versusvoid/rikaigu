@@ -308,7 +308,7 @@ def match_unidic_jmdict_one2one(jmdict, index, unidic):
 			jmdict2unidic[entry.id].add(lex.lemma_id)
 			unidic2jmdict[lex.lemma_id].add(entry.id)
 		lemma_id2lex.setdefault(lex.lemma_id, lex)
-	del lex, entry
+	del lex
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
 	print('computing unambiguous mappings')
@@ -382,6 +382,9 @@ def match_unidic_jmdict_stars_refining_pos(
 	print(len(stars), 'stars')
 	print(len(set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))), 'jmdict ids')
 	print(len(set(itertools.chain.from_iterable(map(lambda p: p[1], stars)))), 'unidic ids')
+
+	del jmdict2unidic, unidic2jmdict
+	return stars
 
 def match_unidic_ids_with_jmdict_old():
 	download_unidic()
@@ -522,23 +525,34 @@ def load_unidic():
 	print('loading unidic')
 	res = set()
 	print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
+	all_lemma_ids = set()
 	with open('tmp/unidic-cwj-2.3.0/lex.csv') as f:
+	# with open('tmp/test-lex.csv') as f:
 		for l in f:
 			l = FullUnidicLex(*split_lex(l.strip()))
 			if l.pos1 == '名詞' and l.pos2 == '固有名詞':
 				continue
 			res.add(UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id))
+			all_lemma_ids.add(int(l.lemma_id))
 			del l
 
-	return list(res)
+	return list(res), all_lemma_ids
 
 def compute_freqs():
 	jmdict, index = dictionary.load_dictionary()
-	unidic = load_unidic()
+	unidic, all_lemma_ids = load_unidic()
 	u2p_pos: Set[Tuple[UnidicPosType, str]] = match_unidic_jmdict_one2one(jmdict, index, unidic)
 	input('ready when you are')
-	match_unidic_jmdict_stars_refining_pos(jmdict, index, unidic, u2p_pos)
-	input("what's next")
+	stars = match_unidic_jmdict_stars_refining_pos(jmdict, index, unidic, u2p_pos)
+	all_lemma_ids.difference_update(itertools.chain.from_iterable(map(lambda p: map(int, p[1]), stars)))
+
+	import random
+	all_lemma_ids = list(all_lemma_ids)
+	while True:
+		lemma_id = random.choice(all_lemma_ids)
+		os.system(f"rg ',{lemma_id}$' tmp/unidic-cwj-2.3.0/lex.csv")
+		input('continue?')
+
 	exit()
 
 	if DEBUG:
