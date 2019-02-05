@@ -5,8 +5,11 @@ import subprocess
 import sys
 import pickle
 import itertools
-import MeCab # https://github.com/SamuraiT/mecab-python3
+import gc
+from typing import Tuple, Set, List
 from collections import namedtuple, defaultdict
+
+import MeCab # https://github.com/SamuraiT/mecab-python3
 
 from utils import download, is_katakana, is_kana, kata_to_hira, any, all
 import dictionary
@@ -24,6 +27,7 @@ FullUnidicLex = namedtuple('FullUnidicLex', '''
 	lid, lemma_id
 ''')
 UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
+UnidicPosType = Tuple[str, str, str, str]
 
 def split_lex(l):
 	if l.startswith('""'):
@@ -266,61 +270,118 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		return res
 
-def u2j_simple_match(lex, jmdict):
+def u2j_simple_match(lex, jmdict: dictionary.IndexedDictionary):
 	writing = kata_to_hira(lex.orthBase)
 	reading = kata_to_hira(lex.pronBase)
 	for entry in jmdict.get(writing, ()):
 		if reading == writing:
 			if len(entry.kanjis) == 0:
-				yield entry.id
+				yield entry
 		elif any(kata_to_hira(r.text) == reading for r in entry.readings):
-			yield entry.id
+			yield entry
 
-def find_one2one(a2b, b2a):
-	stars = []
+def find_one2ones(a2b, b2a):
+	one2ones = []
 	for k, vs in a2b.items():
 		v = next(iter(vs))
 		if len(vs) == 1 and len(b2a[v]) == 1:
-			stars.append((k, v))
-	return stars
+			one2ones.append((k, v))
+
+	return one2ones
 
 def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdict_pos):
 	for sg in entry.sense_groups:
-		if all('arch' in s.misc for s in sg.senses):
+		if sg.is_archaic():
 			continue
 		for p in sg.pos:
 			unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
 
 DEBUG = True
-def match_unidic_ids_with_jmdict(jmdict, index, unidic):
+def match_unidic_jmdict_one2one(jmdict, index, unidic):
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
 
-	print('matching')
+	print('simple matching')
 	lemma_id2lex = {}
 	for lex in unidic:
-		if lex.pos[:2] == ('名詞', '固有名詞'):
-			continue
-		for jmdict_id in u2j_simple_match(lex, index):
-			jmdict2unidic[jmdict_id].add(lex.lemma_id)
-			unidic2jmdict[lex.lemma_id].add(jmdict_id)
+		for entry in u2j_simple_match(lex, index):
+			jmdict2unidic[entry.id].add(lex.lemma_id)
+			unidic2jmdict[lex.lemma_id].add(entry.id)
 		lemma_id2lex.setdefault(lex.lemma_id, lex)
-	del lex, jmdict_id
+	del lex, entry
+	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
-	print('computing stars')
-	stars = find_one2one(jmdict2unidic, unidic2jmdict)
-	print(len(stars), 'one2ones')
+	print('computing unambiguous mappings')
+	one2ones = find_one2ones(jmdict2unidic, unidic2jmdict)
+	print(len(one2ones), 'unambiguouses')
 
 	unidic_pos2jmdict_pos = {}
-	for jmdict_id, lemma_id in stars:
+	for jmdict_id, lemma_id in one2ones:
+		assert type(jmdict_id) == int, jmdict_id
+		assert type(lemma_id) == str, lemma_id
 		record_pos_mapping(jmdict[jmdict_id], lemma_id2lex[lemma_id], unidic_pos2jmdict_pos)
+	del one2ones, jmdict_id, lemma_id
 
 	with open('tmp/unidic_pos2jmdict_pos.dat', 'w') as of:
-		print("# vi: tabstop=60", file=of)
+		print("# vi: tabstop=50", file=of)
 		items = list(unidic_pos2jmdict_pos.items())
 		items.sort(key=lambda p: p[0])
 		for (upos, jpos), (lex, jid) in items:
-			print(upos, jpos, lex[1:], jid, sep='\t', file=of)
+			print(','.join(upos), jpos, ','.join(lex[1:]), jid, sep='\t', file=of)
+		del items
+
+	res = set(unidic_pos2jmdict_pos.keys())
+	del jmdict2unidic, unidic2jmdict, unidic_pos2jmdict_pos
+	gc.collect()
+	return res
+
+def u2j_match_pos_single(entry, lex, u2j_pos):
+	for sg in entry.sense_groups:
+		if sg.is_archaic():
+			continue
+		if any(((lex.pos, jpos) in u2j_pos) for jpos in sg.pos):
+			return True
+	return False
+
+def u2j_match_pos_all(lex, jmdict: dictionary.IndexedDictionary, u2j_pos):
+	for entry in u2j_simple_match(lex, jmdict):
+		if u2j_match_pos_single(entry, lex, u2j_pos):
+			yield entry
+
+def find_stars(a2b, b2a):
+	stars = []
+	for k, vs in a2b.items():
+		if all(len(b2a[v]) == 1 for v in vs):
+			stars.append(((k,), vs))
+
+	for k, vs in b2a.items():
+		if len(vs) == 1: continue
+		if all(len(a2b[v]) == 1 for v in vs):
+			stars.append((vs, (k,)))
+	return stars
+
+def match_unidic_jmdict_stars_refining_pos(
+		jmdict: dictionary.Dictionary,
+		index: dictionary.IndexedDictionary,
+		unidic: List[UnidicLex],
+		u2j_pos: Set[Tuple[UnidicPosType, str]]):
+
+	jmdict2unidic = defaultdict(set)
+	unidic2jmdict = defaultdict(set)
+
+	print('pos matching')
+	for lex in unidic:
+		for entry in u2j_match_pos_all(lex, index, u2j_pos):
+			jmdict2unidic[entry.id].add(lex.lemma_id)
+			unidic2jmdict[lex.lemma_id].add(entry.id)
+	del lex
+	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
+
+	print('computing stars')
+	stars = find_stars(jmdict2unidic, unidic2jmdict)
+	print(len(stars), 'stars')
+	print(len(set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))), 'jmdict ids')
+	print(len(set(itertools.chain.from_iterable(map(lambda p: p[1], stars)))), 'unidic ids')
 
 def match_unidic_ids_with_jmdict_old():
 	download_unidic()
@@ -460,9 +521,12 @@ def load_unidic():
 
 	print('loading unidic')
 	res = set()
+	print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
 	with open('tmp/unidic-cwj-2.3.0/lex.csv') as f:
 		for l in f:
 			l = FullUnidicLex(*split_lex(l.strip()))
+			if l.pos1 == '名詞' and l.pos2 == '固有名詞':
+				continue
 			res.add(UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id))
 			del l
 
@@ -471,10 +535,10 @@ def load_unidic():
 def compute_freqs():
 	jmdict, index = dictionary.load_dictionary()
 	unidic = load_unidic()
-	import gc
-	gc.collect()
-	unidic2jmdict_ids = match_unidic_ids_with_jmdict(jmdict, index, unidic)
+	u2p_pos: Set[Tuple[UnidicPosType, str]] = match_unidic_jmdict_one2one(jmdict, index, unidic)
 	input('ready when you are')
+	match_unidic_jmdict_stars_refining_pos(jmdict, index, unidic, u2p_pos)
+	input("what's next")
 	exit()
 
 	if DEBUG:

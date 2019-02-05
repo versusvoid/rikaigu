@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 from itertools import groupby
+from typing import Dict, List, Tuple
 import xml.etree.ElementTree as ET
 import gzip
 import pickle
@@ -39,6 +40,12 @@ class Sense(namedtuple('Sense', 'kanji_restriction, reading_restriction, misc, l
 
 Trans = namedtuple('Trans', 'types, glosses')
 class SenseGroup(namedtuple('SenseGroup', 'pos, senses')):
+
+	def is_archaic(self):
+		for s in self.senses:
+			if 'arch' not in s.misc:
+				return False
+		return True
 
 	def _format(self, indent=2):
 		res = ['\t'*indent + 'SenseGroup(']
@@ -84,13 +91,6 @@ class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 
 	def __repr__(self):
 		return self._format()
-
-	def is_archaic(self):
-		for sg in self.sense_groups:
-			for s in sg.senses:
-				if 'arch' in s.misc:
-					return True
-		return False
 
 	def get_uk_readings(self):
 		usually_kana = set()
@@ -254,7 +254,8 @@ def dictionary_reader(dictionary='JMdict_e.gz'):
 		elif elem.tag in ('JMdict', 'JMnedict'):
 			elem.clear()
 
-def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate):
+IndexedDictionary = Dict[str, List[Entry]]
+def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> IndexedDictionary:
 	print('indexing dictionary')
 	res = {}
 	for e in entries:
@@ -264,7 +265,12 @@ def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate):
 				other_entries.append(e)
 	return res
 
-def load_dictionary(dictionary='JMdict_e.gz', convert_to_hiragana_for_index=True, variate=False):
+Dictionary = Dict[int, Entry]
+def load_dictionary(
+		dictionary='JMdict_e.gz',
+		convert_to_hiragana_for_index=True,
+		variate=False) -> Tuple[Dictionary, IndexedDictionary]:
+
 	print('loading dictionary')
 	if os.path.exists('tmp/parsed-jmdict.pkl'):
 		with open('tmp/parsed-jmdict.pkl', 'rb') as f:
