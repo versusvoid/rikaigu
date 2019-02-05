@@ -314,6 +314,8 @@ def match_unidic_jmdict_one2one(jmdict, index, unidic):
 	if DEBUG:
 		print(jmdict2unidic)
 		print(unidic2jmdict)
+		print(*unidic, sep='\n')
+		print(*map(jmdict.__getitem__, jmdict2unidic.keys()), sep='\n')
 
 	print('computing unambiguous mappings')
 	one2ones = find_one2ones(jmdict2unidic, unidic2jmdict)
@@ -560,7 +562,8 @@ def compute_freqs():
 	import random
 	all_lemmas = list(lemma_representatives.values())
 	while True:
-		lemma = random.choice(all_lemmas)
+		# lemma = random.choice(all_lemmas)
+		lemma = lemma_representatives[87379]
 		pattern = shlex.quote(f">({lemma.orthBase}|{lemma.pronBase})<")
 		if subprocess.call(f'gunzip -c tmp/JMdict_e.gz | rg -q {pattern}', shell=True) == 0:
 			pattern = shlex.quote(f',{lemma.lemma_id}$')

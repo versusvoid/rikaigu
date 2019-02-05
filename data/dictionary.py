@@ -20,7 +20,7 @@ class Kanji(namedtuple('Kanji', 'text, inf, common')):
 class Reading(namedtuple('Reading', 'text, nokanji, kanji_restriction, inf, common')):
 
 	def __repr__(self):
-		return f'Reading(text=\033[1m{self.text}\033[0m, common={self.common}, kanjis={self.kanjis})'
+		return f'Reading(text=\033[1m{self.text}\033[0m, common={self.common}, restriction={self.kanji_restriction})'
 
 def _bold(strings):
 	return ''.join(('[', ', '.join(map(lambda t: "'\033[1m" + t + "'\033[0m", strings)), ']'))
