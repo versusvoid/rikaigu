@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import shlex
 import sys
 import pickle
 import itertools
@@ -275,7 +276,7 @@ def u2j_simple_match(lex, jmdict: dictionary.IndexedDictionary):
 	reading = kata_to_hira(lex.pronBase)
 	for entry in jmdict.get(writing, ()):
 		if reading == writing:
-			if len(entry.kanjis) == 0:
+			if len(entry.kanjis) == 0 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings):
 				yield entry
 		elif any(kata_to_hira(r.text) == reading for r in entry.readings):
 			yield entry
@@ -294,9 +295,9 @@ def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdic
 		if sg.is_archaic():
 			continue
 		for p in sg.pos:
-			unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
+			if p != 'exp':
+				unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
 
-DEBUG = True
 def match_unidic_jmdict_one2one(jmdict, index, unidic):
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
@@ -310,6 +311,9 @@ def match_unidic_jmdict_one2one(jmdict, index, unidic):
 		lemma_id2lex.setdefault(lex.lemma_id, lex)
 	del lex
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
+	if DEBUG:
+		print(jmdict2unidic)
+		print(unidic2jmdict)
 
 	print('computing unambiguous mappings')
 	one2ones = find_one2ones(jmdict2unidic, unidic2jmdict)
@@ -376,6 +380,9 @@ def match_unidic_jmdict_stars_refining_pos(
 			unidic2jmdict[lex.lemma_id].add(entry.id)
 	del lex
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
+	if DEBUG:
+		print(jmdict2unidic)
+		print(unidic2jmdict)
 
 	print('computing stars')
 	stars = find_stars(jmdict2unidic, unidic2jmdict)
@@ -525,33 +532,40 @@ def load_unidic():
 	print('loading unidic')
 	res = set()
 	print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
-	all_lemma_ids = set()
-	with open('tmp/unidic-cwj-2.3.0/lex.csv') as f:
-	# with open('tmp/test-lex.csv') as f:
+	lemma_representatives = {}
+	filename = 'tmp/unidic-cwj-2.3.0/lex.csv'
+	if DEBUG:
+		filename = 'tmp/test-lex.csv'
+	with open(filename) as f:
 		for l in f:
 			l = FullUnidicLex(*split_lex(l.strip()))
 			if l.pos1 == '名詞' and l.pos2 == '固有名詞':
 				continue
-			res.add(UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id))
-			all_lemma_ids.add(int(l.lemma_id))
+			l = UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id)
+			res.add(l)
+			lemma_representatives.setdefault(int(l.lemma_id), l)
 			del l
 
-	return list(res), all_lemma_ids
+	return list(res), lemma_representatives
 
+DEBUG = False
 def compute_freqs():
 	jmdict, index = dictionary.load_dictionary()
-	unidic, all_lemma_ids = load_unidic()
+	unidic, lemma_representatives = load_unidic()
 	u2p_pos: Set[Tuple[UnidicPosType, str]] = match_unidic_jmdict_one2one(jmdict, index, unidic)
-	input('ready when you are')
 	stars = match_unidic_jmdict_stars_refining_pos(jmdict, index, unidic, u2p_pos)
-	all_lemma_ids.difference_update(itertools.chain.from_iterable(map(lambda p: map(int, p[1]), stars)))
 
+	for lemma_id in itertools.chain.from_iterable(map(lambda p: p[1], stars)):
+		lemma_representatives.pop(int(lemma_id), None)
 	import random
-	all_lemma_ids = list(all_lemma_ids)
+	all_lemmas = list(lemma_representatives.values())
 	while True:
-		lemma_id = random.choice(all_lemma_ids)
-		os.system(f"rg ',{lemma_id}$' tmp/unidic-cwj-2.3.0/lex.csv")
-		input('continue?')
+		lemma = random.choice(all_lemmas)
+		pattern = shlex.quote(f">({lemma.orthBase}|{lemma.pronBase})<")
+		if subprocess.call(f'gunzip -c tmp/JMdict_e.gz | rg -q {pattern}', shell=True) == 0:
+			pattern = shlex.quote(f',{lemma.lemma_id}$')
+			os.system(f'rg {pattern} tmp/unidic-cwj-2.3.0/lex.csv')
+			input('continue?')
 
 	exit()
 
