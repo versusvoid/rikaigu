@@ -7,7 +7,7 @@ import sys
 import pickle
 import itertools
 import gc
-from typing import Tuple, Set, List
+from typing import Tuple, Set, List, DefaultDict
 from collections import namedtuple, defaultdict
 
 import MeCab # https://github.com/SamuraiT/mecab-python3
@@ -29,6 +29,8 @@ FullUnidicLex = namedtuple('FullUnidicLex', '''
 ''')
 UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
 UnidicPosType = Tuple[str, str, str, str]
+UnidicType = DefaultDict[int, Set[UnidicLex]]
+UnidicIndexType = DefaultDict[str, Set[int]]
 
 def split_lex(l):
 	if l.startswith('""'):
@@ -271,14 +273,21 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		return res
 
-def u2j_simple_match(lex, jmdict: dictionary.IndexedDictionary):
+def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType):
 	writing = kata_to_hira(lex.orthBase)
 	reading = kata_to_hira(lex.pronBase)
-	for entry in jmdict.get(writing, ()):
+
+	entries = jindex.get(writing, ())
+	for entry in entries:
 		if reading == writing:
 			if len(entry.kanjis) == 0 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings):
 				yield entry
-		elif any(kata_to_hira(r.text) == reading for r in entry.readings):
+		elif (
+				any(kata_to_hira(r.text) == reading for r in entry.readings)
+				# or # 取り鍋, but it's a strange thing
+				# (len(entries) == 1 and len(uindex[writing]) == 1)
+				):
+
 			yield entry
 
 def find_one2ones(a2b, b2a):
@@ -291,31 +300,44 @@ def find_one2ones(a2b, b2a):
 	return one2ones
 
 def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdict_pos):
+	if sum(not sg.is_archaic() for sg in entry.sense_groups) > 1:
+		return
+
 	for sg in entry.sense_groups:
 		if sg.is_archaic():
 			continue
+
+		if len(sg.pos) > 1 and 'exp' not in sg.pos:
+			return # 65460 -> 65425 stars, but looks interesting for meanwhile
+
 		for p in sg.pos:
 			if p != 'exp':
 				unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
 
-def match_unidic_jmdict_one2one(jmdict, index, unidic):
+PosMappingType = Set[Tuple[UnidicPosType, str]]
+def match_unidic_jmdict_one2one(
+		jmdict: dictionary.DictionaryType, jindex: dictionary.IndexedDictionaryType,
+		unidic: UnidicType, uindex: UnidicIndexType) -> PosMappingType:
+
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
 
 	print('simple matching')
-	lemma_id2lex = {}
-	for lex in unidic:
-		for entry in u2j_simple_match(lex, index):
-			jmdict2unidic[entry.id].add(lex.lemma_id)
-			unidic2jmdict[lex.lemma_id].add(entry.id)
-		lemma_id2lex.setdefault(lex.lemma_id, lex)
-	del lex
+	for lemma_lexes in unidic.values():
+		for lex in lemma_lexes:
+			for entry in u2j_simple_match(lex, jindex, uindex):
+				jmdict2unidic[entry.id].add(lex.lemma_id)
+				unidic2jmdict[lex.lemma_id].add(entry.id)
+	del lemma_lexes, lex
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 	if DEBUG:
 		print(jmdict2unidic)
 		print(unidic2jmdict)
-		print(*unidic, sep='\n')
+		print(*itertools.chain.from_iterable(unidic.values()), sep='\n')
 		print(*map(jmdict.__getitem__, jmdict2unidic.keys()), sep='\n')
+
+	# print(jmdict2unidic.get(1000430), jmdict2unidic.get(1000420))
+	# print(unidic2jmdict.get(911), unidic2jmdict.get(912), unidic2jmdict.get(6965))
 
 	print('computing unambiguous mappings')
 	one2ones = find_one2ones(jmdict2unidic, unidic2jmdict)
@@ -323,17 +345,15 @@ def match_unidic_jmdict_one2one(jmdict, index, unidic):
 
 	unidic_pos2jmdict_pos = {}
 	for jmdict_id, lemma_id in one2ones:
-		assert type(jmdict_id) == int, jmdict_id
-		assert type(lemma_id) == str, lemma_id
-		record_pos_mapping(jmdict[jmdict_id], lemma_id2lex[lemma_id], unidic_pos2jmdict_pos)
-	del one2ones, jmdict_id, lemma_id
+		record_pos_mapping(jmdict[jmdict_id], next(iter(unidic[lemma_id])), unidic_pos2jmdict_pos)
+	del one2ones
 
 	with open('tmp/unidic_pos2jmdict_pos.dat', 'w') as of:
 		print("# vi: tabstop=50", file=of)
 		items = list(unidic_pos2jmdict_pos.items())
 		items.sort(key=lambda p: p[0])
 		for (upos, jpos), (lex, jid) in items:
-			print(','.join(upos), jpos, ','.join(lex[1:]), jid, sep='\t', file=of)
+			print(','.join(upos), jpos, ','.join(map(str, lex[1:])), jid, sep='\t', file=of)
 		del items
 
 	res = set(unidic_pos2jmdict_pos.keys())
@@ -349,42 +369,113 @@ def u2j_match_pos_single(entry, lex, u2j_pos):
 			return True
 	return False
 
-def u2j_match_pos_all(lex, jmdict: dictionary.IndexedDictionary, u2j_pos):
-	for entry in u2j_simple_match(lex, jmdict):
+def u2j_match_pos_all(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType, u2j_pos):
+	for entry in u2j_simple_match(lex, jindex, uindex):
 		if u2j_match_pos_single(entry, lex, u2j_pos):
 			yield entry
 
 def find_stars(a2b, b2a):
 	stars = []
 	for k, vs in a2b.items():
+		assert len(vs) > 0
 		if all(len(b2a[v]) == 1 for v in vs):
 			stars.append(((k,), vs))
 
 	for k, vs in b2a.items():
 		if len(vs) == 1: continue
+		assert len(vs) > 0
 		if all(len(a2b[v]) == 1 for v in vs):
 			stars.append((vs, (k,)))
 	return stars
 
+def is_lemma_single_cover_for_entry(lemma_lexes, entry):
+	all_orthbase = set(lex.orthBase for lex in lemma_lexes)
+	return (
+		all(r.text in all_orthbase for r in entry.readings)
+		and
+		all(k.text in all_orthbase for k in entry.kanjis)
+	)
+
+def is_entry_single_cover_for_lemma(entry, lemma_lexes):
+	all_writings_and_readings = set(itertools.chain((r.text for r in entry.readings), (k.text for k in entry.kanjis)))
+	return all(lex.orthBase in all_writings_and_readings for lex in lemma_lexes)
+
+
+def is_single_cover(dict2_node, dict1_node):
+	if type(dict1_node) == dictionary.Entry:
+		return is_lemma_single_cover_for_entry(dict2_node, dict1_node)
+	else:
+		assert type(dict2_node) == dictionary.Entry and type(dict1_node) == set and type(next(iter(dict1_node))) == UnidicLex
+		return is_entry_single_cover_for_lemma(dict2_node, dict1_node)
+
+def find_single_cover(dict1_node, dict2, dict2_keys):
+	single_covers = []
+	for lemma_id in dict2_keys:
+		if is_single_cover(dict2[lemma_id], dict1_node):
+			single_covers.append(lemma_id)
+
+	if len(single_covers) == 1:
+		return lemma_id
+
+def cut_out_redundunt_mappings_for_fully_covered_nodes(dict1, dict1_to_dict2, dict2, dict2_to_dict1):
+	for dict1_key, dict2_keys in dict1_to_dict2.items():
+		if len(dict2_keys) == 1:
+			continue
+		if all(len(dict2_to_dict1[dict2_key]) == 1 for dict2_key in dict2_keys): # already a star
+			continue
+
+		single_cover_dict2_key = find_single_cover(dict1[dict1_key], dict2, dict2_keys)
+		if single_cover_dict2_key is None:
+			continue
+
+		for other_dict2_key in dict2_keys:
+			if other_dict2_key != single_cover_dict2_key:
+				dict1_keys = dict2_to_dict1.get(other_dict2_key)
+				if len(dict1_keys) == 1:
+					dict2_to_dict1.pop(other_dict2_key)
+				else:
+					dict1_keys.remove(dict1_key)
+
+		dict2_keys.clear()
+		dict2_keys.add(single_cover_dict2_key)
+
 def match_unidic_jmdict_stars_refining_pos(
-		jmdict: dictionary.Dictionary,
-		index: dictionary.IndexedDictionary,
-		unidic: List[UnidicLex],
+		jmdict: dictionary.DictionaryType,
+		jindex: dictionary.IndexedDictionaryType,
+		unidic: UnidicType,
+		uindex: UnidicIndexType,
 		u2j_pos: Set[Tuple[UnidicPosType, str]]):
 
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
 
 	print('pos matching')
-	for lex in unidic:
-		for entry in u2j_match_pos_all(lex, index, u2j_pos):
-			jmdict2unidic[entry.id].add(lex.lemma_id)
-			unidic2jmdict[lex.lemma_id].add(entry.id)
+	for lemma_lexes in unidic.values():
+		for lex in lemma_lexes:
+			for entry in u2j_match_pos_all(lex, jindex, uindex, u2j_pos):
+				jmdict2unidic[entry.id].add(lex.lemma_id)
+				unidic2jmdict[lex.lemma_id].add(entry.id)
 	del lex
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 	if DEBUG:
 		print(jmdict2unidic)
 		print(unidic2jmdict)
+
+	cut_out_redundunt_mappings_for_fully_covered_nodes(jmdict, jmdict2unidic, unidic, unidic2jmdict)
+	cut_out_redundunt_mappings_for_fully_covered_nodes(unidic, unidic2jmdict, jmdict, jmdict2unidic)
+
+	print("TODO: utilize xref to merge jmdict's 2835613 and 1007130")
+
+	test_jmdict_ids = (1000920,)
+	test_unidic_ids = (2547,)
+	print(*(jmdict2unidic.get(i) for i in test_jmdict_ids))
+	print(*(unidic2jmdict.get(i) for i in test_unidic_ids))
+
+	for uid in set(itertools.chain.from_iterable(jmdict2unidic.get(i, ()) for i in test_jmdict_ids)):
+		print(*unidic[uid], sep='\n')
+	for jid in set(itertools.chain.from_iterable(unidic2jmdict.get(i, ()) for i in test_unidic_ids)):
+		print(jmdict[jid], sep='\n')
+	input()
 
 	print('computing stars')
 	stars = find_stars(jmdict2unidic, unidic2jmdict)
@@ -392,8 +483,8 @@ def match_unidic_jmdict_stars_refining_pos(
 	print(len(set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))), 'jmdict ids')
 	print(len(set(itertools.chain.from_iterable(map(lambda p: p[1], stars)))), 'unidic ids')
 
-	del jmdict2unidic, unidic2jmdict
-	return stars
+	del jmdict2unidic#, unidic2jmdict
+	return stars, set(unidic2jmdict.keys())
 
 def match_unidic_ids_with_jmdict_old():
 	download_unidic()
@@ -528,13 +619,13 @@ def process_corpus(unidic2jmdict_ids):
 
 	return freqs
 
-def load_unidic():
+def load_unidic() -> Tuple[UnidicType, UnidicIndexType]:
 	download_unidic()
 
 	print('loading unidic')
-	res = set()
+	res = defaultdict(set)
+	index = defaultdict(set)
 	print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
-	lemma_representatives = {}
 	filename = 'tmp/unidic-cwj-2.3.0/lex.csv'
 	if DEBUG:
 		filename = 'tmp/test-lex.csv'
@@ -543,29 +634,70 @@ def load_unidic():
 			l = FullUnidicLex(*split_lex(l.strip()))
 			if l.pos1 == '名詞' and l.pos2 == '固有名詞':
 				continue
-			l = UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, l.lemma_id)
-			res.add(l)
-			lemma_representatives.setdefault(int(l.lemma_id), l)
+			l = UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, int(l.lemma_id))
+			res[l.lemma_id].add(l)
+			index[kata_to_hira(l.orthBase)].add(l.lemma_id)
+			index[kata_to_hira(l.pronBase)].add(l.lemma_id)
 			del l
 
-	return list(res), lemma_representatives
+	return res, index
+
+def load_additional_pos_mapping(u2j_pos: PosMappingType):
+	with open('data/unidic-jmdict-pos-mapping.dat') as f:
+		for l in f:
+			l = l.strip()
+			if len(l) == 0 or l.startswith('#'):
+				continue
+			upos, jpos = l.split()[:2]
+			upos = tuple(upos.split(','))
+			u2j_pos.add((upos, jpos))
 
 DEBUG = False
 def compute_freqs():
-	jmdict, index = dictionary.load_dictionary()
-	unidic, lemma_representatives = load_unidic()
-	u2p_pos: Set[Tuple[UnidicPosType, str]] = match_unidic_jmdict_one2one(jmdict, index, unidic)
-	stars = match_unidic_jmdict_stars_refining_pos(jmdict, index, unidic, u2p_pos)
+	jmdict, jindex = dictionary.load_dictionary()
+	unidic, uindex = load_unidic()
+	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
+	load_additional_pos_mapping(u2j_pos)
+	stars, somehow_matched_lemma_ids = match_unidic_jmdict_stars_refining_pos(jmdict, jindex, unidic, uindex, u2j_pos)
 
-	for lemma_id in itertools.chain.from_iterable(map(lambda p: p[1], stars)):
-		lemma_representatives.pop(int(lemma_id), None)
+	if DEBUG:
+		print(stars)
+		print(somehow_matched_lemma_ids)
+		exit()
+
+	mapped_jmdict_ids = set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))
+	num_unmapped_commons = 0
+	num_commons = 0
+	for entry in jmdict.values():
+		if entry.is_common():
+			num_commons += 1
+			if entry.id not in mapped_jmdict_ids:
+				num_unmapped_commons += 1
+				continue
+	print(f'unmapped commons: {num_unmapped_commons}/{num_commons}')
+	for entry in jmdict.values():
+		if entry.id in mapped_jmdict_ids:
+			continue
+		if entry.is_common():
+			patterns = list(itertools.chain.from_iterable(
+				[('-e', k.text) for k in entry.kanjis] + [('-e', r.text) for r in entry.readings]
+			))
+			assert len(patterns) > 0
+			command = ['rg', '-F', '-w'] + patterns + ['tmp/unidic-cwj-2.3.0/lex.csv']
+			if subprocess.call(command, stdout=subprocess.PIPE) == 0:
+				print('Unmapped common:\n', entry)
+				input()
+
+	for lemma_id in somehow_matched_lemma_ids:
+		unidic.pop(lemma_id, None)
 	import random
-	all_lemmas = list(lemma_representatives.values())
+	all_lemmas = list(unidic.keys())
 	while True:
-		# lemma = random.choice(all_lemmas)
-		lemma = lemma_representatives[87379]
-		pattern = shlex.quote(f">({lemma.orthBase}|{lemma.pronBase})<")
-		if subprocess.call(f'gunzip -c tmp/JMdict_e.gz | rg -q {pattern}', shell=True) == 0:
+		lemma = next(iter(unidic[random.choice(all_lemmas)]))
+		# lemma = next(iter(unidic[194862]))
+		pattern1 = shlex.quote(f'>{lemma.orthBase}<')
+		pattern2 = shlex.quote(f'>{lemma.pronBase}<')
+		if subprocess.call(f'gunzip -c tmp/JMdict_e.gz | rg -F -q -e {pattern1} -e {pattern2}', shell=True) == 0:
 			pattern = shlex.quote(f',{lemma.lemma_id}$')
 			os.system(f'rg {pattern} tmp/unidic-cwj-2.3.0/lex.csv')
 			input('continue?')

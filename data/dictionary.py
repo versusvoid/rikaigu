@@ -92,6 +92,9 @@ class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 	def __repr__(self):
 		return self._format()
 
+	def is_common(self):
+		return any(r.common for r in self.readings) or any(k.common for k in self.kanjis)
+
 	def get_uk_readings(self):
 		usually_kana = set()
 		for sg in self.sense_groups:
@@ -254,8 +257,8 @@ def dictionary_reader(dictionary='JMdict_e.gz'):
 		elif elem.tag in ('JMdict', 'JMnedict'):
 			elem.clear()
 
-IndexedDictionary = Dict[str, List[Entry]]
-def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> IndexedDictionary:
+IndexedDictionaryType = Dict[str, List[Entry]]
+def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> IndexedDictionaryType:
 	print('indexing dictionary')
 	res = {}
 	for e in entries:
@@ -265,11 +268,11 @@ def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> 
 				other_entries.append(e)
 	return res
 
-Dictionary = Dict[int, Entry]
+DictionaryType = Dict[int, Entry]
 def load_dictionary(
 		dictionary='JMdict_e.gz',
 		convert_to_hiragana_for_index=True,
-		variate=False) -> Tuple[Dictionary, IndexedDictionary]:
+		variate=False) -> Tuple[DictionaryType, IndexedDictionaryType]:
 
 	print('loading dictionary')
 	if os.path.exists('tmp/parsed-jmdict.pkl'):

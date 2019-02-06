@@ -74,12 +74,14 @@ def is_english(c):
 	code = ord(c)
 	return (code >= 65 and code <= 90) or (code >= 97 and code <= 122)
 
-_long_vowel_mapping = dict(itertools.chain(
+_e_row = set('え け げ せ ぜ て で ね へ べ ぺ め 　 　 れ ゑ'.split())
+_o_row = set('お こ ご そ ぞ と ど の ほ ぼ ぽ も よ ょ ろ'.split())
+_long_vowel_mark_mapping = dict(itertools.chain(
 	map(lambda k: (k, 'あ'), 'あ か が さ ざ た だ な は ば ぱ ま や ゃ ら わ'.split()),
 	map(lambda k: (k, 'い'), 'い き ぎ し じ ち ぢ に ひ び ぴ み 　 　 り ゐ'.split()),
   	map(lambda k: (k, 'う'), 'う く ぐ す ず つ づ ぬ ふ ぶ ぷ む ゆ ゅ る'.split()),
-  	map(lambda k: (k, 'い'), 'え け げ せ ぜ て で ね へ べ ぺ め 　 　 れ ゑ'.split()),
-  	map(lambda k: (k, 'う'), 'お こ ご そ ぞ と ど の ほ ぼ ぽ も よ ょ ろ'.split()),
+  	map(lambda k: (k, 'い'), _e_row),
+  	map(lambda k: (k, 'う'), _o_row),
 	map(lambda k: (k, 'ー'), 'ぁ ぃ ぅ ぇ ぉ ゔ ゎ'.split()),
 ))
 def kata_to_hira(w, full_or_none=False):
@@ -89,15 +91,24 @@ def kata_to_hira(w, full_or_none=False):
 		code = ord(c)
 		if code >= 0x30a1 and code <= 0x30f6:
 			res.append(chr(ord(c) - ord('ァ') + ord('ぁ')))
-		elif c == 'ー' and len(res) > 0 and res[-1] in _long_vowel_mapping:
-			res.append(_long_vowel_mapping[res[-1]])
+		elif c == 'ー' and len(res) > 0 and res[-1] in _long_vowel_mark_mapping:
+			res.append(_long_vowel_mark_mapping[res[-1]])
 		elif full_or_none and not is_hiragana(c):
 			return w
 		else:
 			res.append(c)
+
+		if len(res) > 1:
+			if res[-1] == 'お' and res[-2] in _o_row:
+				res[-1] = 'う'
+			if res[-1] == 'え' and res[-2] in _e_row:
+				res[-1] = 'い'
+
 		prev = c
 
 	return ''.join(res)
+
+assert kata_to_hira('ぶっとおし') == 'ぶっとうし', kata_to_hira('ぶっとおし')
 
 def download(url, filename):
 	path = os.path.join('tmp', filename)
