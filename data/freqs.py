@@ -273,14 +273,17 @@ def synthesize_mapping(lexeme, mecab, jmdict_pos, entry, all_readings=None):
 	else:
 		return res
 
-def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType):
-	writing = kata_to_hira(lex.orthBase)
-	reading = kata_to_hira(lex.pronBase)
-
-	entries = jindex.get(writing, ())
+def filter_matching_entries(lex, writing, reading, entries):
 	for entry in entries:
 		if reading == writing:
-			if len(entry.kanjis) == 0 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings):
+			condition1 = len(entry.kanjis) == 0
+			condition2 = condition1 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings)
+			condition3 = condition2 or any(
+				any('uk' in s.misc for s in sg.senses)
+				for sg in entry.sense_groups
+				if not sg.is_archaic()
+			)
+			if condition3:
 				yield entry
 		elif (
 				any(kata_to_hira(r.text) == reading for r in entry.readings)
@@ -289,6 +292,17 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 				):
 
 			yield entry
+
+def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType):
+	writing = kata_to_hira(lex.orthBase)
+	reading = kata_to_hira(lex.pronBase)
+
+	yield from filter_matching_entries(lex, writing, reading, jindex.get(writing, ()))
+
+	writing = '御' + writing
+	entries = jindex.get(writing)
+	if entries is not None:
+		yield from filter_matching_entries(lex, writing, 'お' + reading, entries)
 
 def find_one2ones(a2b, b2a):
 	one2ones = []
@@ -357,9 +371,10 @@ def match_unidic_jmdict_one2one(
 		del items
 
 	res = set(unidic_pos2jmdict_pos.keys())
+	somehow_mapped_jmdict_ids = set(jmdict2unidic.keys())
 	del jmdict2unidic, unidic2jmdict, unidic_pos2jmdict_pos
 	gc.collect()
-	return res
+	return res, somehow_mapped_jmdict_ids
 
 def u2j_match_pos_single(entry, lex, u2j_pos):
 	for sg in entry.sense_groups:
@@ -625,15 +640,15 @@ def load_unidic() -> Tuple[UnidicType, UnidicIndexType]:
 	print('loading unidic')
 	res = defaultdict(set)
 	index = defaultdict(set)
-	print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
+	# print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
 	filename = 'tmp/unidic-cwj-2.3.0/lex.csv'
 	if DEBUG:
 		filename = 'tmp/test-lex.csv'
 	with open(filename) as f:
 		for l in f:
 			l = FullUnidicLex(*split_lex(l.strip()))
-			if l.pos1 == '名詞' and l.pos2 == '固有名詞':
-				continue
+			# if l.pos1 == '名詞' and l.pos2 == '固有名詞':
+			# 	continue
 			l = UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, int(l.lemma_id))
 			res[l.lemma_id].add(l)
 			index[kata_to_hira(l.orthBase)].add(l.lemma_id)
@@ -656,37 +671,50 @@ DEBUG = False
 def compute_freqs():
 	jmdict, jindex = dictionary.load_dictionary()
 	unidic, uindex = load_unidic()
-	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
-	load_additional_pos_mapping(u2j_pos)
-	stars, somehow_matched_lemma_ids = match_unidic_jmdict_stars_refining_pos(jmdict, jindex, unidic, uindex, u2j_pos)
+	u2j_pos, mapped_jmdict_ids = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
+	# load_additional_pos_mapping(u2j_pos)
+	# stars, somehow_matched_lemma_ids = match_unidic_jmdict_stars_refining_pos(jmdict, jindex, unidic, uindex, u2j_pos)
 
 	if DEBUG:
 		print(stars)
 		print(somehow_matched_lemma_ids)
 		exit()
 
-	mapped_jmdict_ids = set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))
+	# mapped_jmdict_ids = set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))
+	def stupidly_unmapped(entry):
+		if all('exp' in sg.pos for sg in entry.sense_groups):
+			return True
+		if all('conj' in sg.pos for sg in entry.sense_groups):
+			return True
+		if any(k.text.startswith('御') for k in entry.kanjis):
+			return True
+
+		if any(any(k.text.endswith(suf) for suf in ['ます', '様', 'さん', 'ない', 'でも', 'なら']) for k in entry.kanjis):
+			return True
+
+		return False
+
 	num_unmapped_commons = 0
 	num_commons = 0
 	for entry in jmdict.values():
 		if entry.is_common():
 			num_commons += 1
-			if entry.id not in mapped_jmdict_ids:
+			if entry.id not in mapped_jmdict_ids and not stupidly_unmapped(entry):
 				num_unmapped_commons += 1
 				continue
 	print(f'unmapped commons: {num_unmapped_commons}/{num_commons}')
 	for entry in jmdict.values():
 		if entry.id in mapped_jmdict_ids:
 			continue
-		if entry.is_common():
-			patterns = list(itertools.chain.from_iterable(
-				[('-e', k.text) for k in entry.kanjis] + [('-e', r.text) for r in entry.readings]
-			))
-			assert len(patterns) > 0
-			command = ['rg', '-F', '-w'] + patterns + ['tmp/unidic-cwj-2.3.0/lex.csv']
-			if subprocess.call(command, stdout=subprocess.PIPE) == 0:
-				print('Unmapped common:\n', entry)
-				input()
+		if entry.is_common() and not stupidly_unmapped(entry):
+			# patterns = list(itertools.chain.from_iterable(
+				# [('-e', k.text) for k in entry.kanjis] + [('-e', r.text) for r in entry.readings]
+			# ))
+			# assert len(patterns) > 0
+			# command = ['rg', '-F', '-w'] + patterns + ['tmp/unidic-cwj-2.3.0/lex.csv']
+			# if subprocess.call(command, stdout=subprocess.PIPE) == 0:
+			print('Unmapped common:\n', entry)
+			input()
 
 	for lemma_id in somehow_matched_lemma_ids:
 		unidic.pop(lemma_id, None)

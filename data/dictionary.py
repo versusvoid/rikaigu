@@ -65,7 +65,7 @@ class SenseGroup(namedtuple('SenseGroup', 'pos, senses')):
 class Entry(namedtuple('Entry', 'id, kanjis, readings, sense_groups')):
 
 	def _format(self, indent=0):
-		res = ['\t'*indent + 'Entry(']
+		res = ['\t'*indent + f'Entry({self.id}']
 		indent += 1
 		res.append('\t'*indent + 'kanjis=[')
 		indent += 1
