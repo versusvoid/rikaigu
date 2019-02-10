@@ -627,14 +627,14 @@ def match_unidic_ids_with_jmdict_old():
 	print(len(unidic2jmdict_id_mapping), 'unidic lexemes mapped to jmdict')
 	return unidic2jmdict_id_mapping
 
-def have_matching_writing(entry, continuous_orth):
-	return any(kata_to_hira(k.text) == continuous_orth for k in entry.kanjis)
+def have_matching_writing(entry, orth, orth_base):
+	return any(kata_to_hira(k.text) in (orth, orth_base) for k in entry.kanjis)
 
-def have_matching_reading(entry, continuous_pron):
+def have_matching_reading(entry, pron, pron_base):
 	global_precondition = len(entry.kanjis) == 0
 	for i, r in enumerate(entry.readings):
 		precondition = global_precondition or r.nokanji or have_uk_for_reading(entry, i)
-		if precondition and kata_to_hira(r.text) == continuous_pron:
+		if precondition and kata_to_hira(r.text) in (pron, pron_base):
 			return True
 	return False
 
@@ -643,7 +643,9 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 	current_level = u2j_complex_mapping
 	current_index = word_index
 	continuous_orth = ''
+	continuous_orth_base = ''
 	continuous_pron = ''
+	continuous_pron_base = ''
 
 	while current_index < len(sentence):
 		current_key = get_complex_mapping_key(sentence[current_index])
@@ -652,14 +654,18 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 			break
 
 		continuous_orth += kata_to_hira(sentence[current_index][ORTH_INDEX + 1])
+		continuous_orth_base += kata_to_hira(sentence[current_index][ORTH_BASE_INDEX + 1])
 		continuous_pron += kata_to_hira(sentence[current_index][PRON_INDEX + 1])
+		continuous_pron_base += kata_to_hira(sentence[current_index][PRON_BASE_INDEX + 1])
 		if complex_mapping_node.jmdict_ids is None:
 			possible_ends.append(None)
 		else:
 			possible_ends.append((
 				complex_mapping_node.jmdict_ids,
 				continuous_orth,
+				continuous_orth_base,
 				continuous_pron,
+				continuous_pron_base,
 			))
 		current_index += 1
 		current_level = complex_mapping_node.children
@@ -667,7 +673,7 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 	for current_index in range(len(possible_ends) - 1, -1, -1):
 		if possible_ends[current_index] is None:
 			continue
-		jmdict_ids, continuous_orth, continuous_pron = possible_ends[current_index]
+		jmdict_ids, orth, orth_base, pron, pron_base = possible_ends[current_index]
 		if len(jmdict_ids) == 1:
 			freqs[next(iter(jmdict_ids))] += 1
 			return current_index
@@ -675,11 +681,11 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 		for jmdict_id in jmdict_ids:
 			entry = jmdict.get(jmdict_id)
 
-			if have_matching_writing(entry, continuous_orth):
+			if have_matching_writing(entry, orth, orth_base):
 				freqs[jmdict_id] += 1
 				return current_index
 
-			if continuous_orth == continuous_pron and have_matching_reading(entry, continuous_orth):
+			if continuous_orth == continuous_pron and have_matching_reading(entry, pron, pron_base):
 				freqs[jmdict_id] += 1
 				return current_index
 
@@ -967,7 +973,7 @@ def compute_freqs():
 
 def save_freqs(freqs):
 	with open('tmp/jmdict-freqs.dat', 'w') as of:
-		for k, v in freqs.items():
+		for k, v in freqs:
 			print(k, v, sep='\t', file=of)
 
 def load_freqs():
