@@ -116,9 +116,7 @@ Name = namedtuple('Name', 'id, kanjis, readings, transes')
 def make_entry(elem, entities):
 	entry = None
 	all_kanjis = {}
-	all_kanji_indexes = None
 	all_readings = {}
-	all_reading_indexes = None
 	last_tag = ''
 	sense_group = None
 	for child in elem:
@@ -136,11 +134,11 @@ def make_entry(elem, entities):
 
 			reading = child.find('reb').text
 			nokanji = child.find('re_nokanji') is not None
-			kanjis_restriction = tuple(all_kanjis[el.text] for el in child.iter('re_restr')) or None
+			kanji_restriction = tuple(all_kanjis[el.text] for el in child.iter('re_restr')) or None
 			inf = tuple(entities[el.text] for el in child.iter('re_inf')) or None
 			common = child.find('re_pri') is not None
 
-			entry.readings.append(Reading(reading, nokanji, kanjis_restriction, inf, common))
+			entry.readings.append(Reading(reading, nokanji, kanji_restriction, inf, common))
 			all_readings[reading] = len(entry.readings) - 1
 
 		elif child.tag == 'sense':
@@ -154,7 +152,7 @@ def make_entry(elem, entities):
 					entry.sense_groups.append(sense_group)
 				sense_group = SenseGroup(pos, [])
 
-			kanjis_restriction = tuple(all_kanjis[el.text] for el in child.iter('stagk')) or None
+			kanji_restriction = tuple(all_kanjis[el.text] for el in child.iter('stagk')) or None
 			readings_restriction = tuple(all_readings[el.text] for el in child.iter('stagr')) or None
 
 			misc = tuple(entities[el.text] for el in child.iter('misc'))
@@ -169,7 +167,7 @@ def make_entry(elem, entities):
 			glosses = tuple(el.text for el in child.iter('gloss'))
 
 			sense_group.senses.append(
-				Sense(kanjis_restriction, readings_restriction, misc, lsource, dialect, glosses, s_inf)
+				Sense(kanji_restriction, readings_restriction, misc, lsource, dialect, glosses, s_inf)
 			)
 
 		elif child.tag == 'trans':

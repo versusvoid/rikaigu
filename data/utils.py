@@ -98,6 +98,9 @@ def kata_to_hira(w, full_or_none=False):
 		else:
 			res.append(c)
 
+		if res[-1] == 'を':
+			res[-1] = 'お'
+
 		if len(res) > 1:
 			if res[-1] == 'お' and res[-2] in _o_row:
 				res[-1] = 'う'

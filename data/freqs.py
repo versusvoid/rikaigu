@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 
 import os
 import subprocess
@@ -7,12 +9,14 @@ import sys
 import pickle
 import itertools
 import gc
+import regex
+from dataclasses import dataclass
 from typing import Tuple, Set, List, Dict, DefaultDict
 from collections import namedtuple, defaultdict
 
 import MeCab # https://github.com/SamuraiT/mecab-python3
 
-from utils import download, is_katakana, is_kana, kata_to_hira, any, all
+from utils import download, is_katakana, is_kana, kata_to_hira, any, all, is_hiragana
 import dictionary
 
 FullUnidicLex = namedtuple('FullUnidicLex', '''
@@ -234,6 +238,7 @@ def match_pos(possible_jmdict_pos, full_unidic_pos, ask_for_pos_match, variant, 
 
 # for magic numbers see `dicrc` file from unidic
 NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM = 28
+PRON_INDEX = 9
 ORTH_BASE_INDEX = 10
 PRON_BASE_INDEX = 11
 # -1 'cos some fields in unidic may contain commas in them
@@ -300,14 +305,14 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 				if not sg.is_archaic()
 			))
 			if condition3:
-				yield entry
+				yield entry, writing
 		elif (
 				any(kata_to_hira(r.text) == reading for r in entry.readings)
 				# or # 取り鍋, but it's a strange thing
 				# (len(entries) == 1 and len(uindex[writing]) == 1)
 				):
 
-			yield entry
+			yield entry, writing
 
 def find_one2ones(a2b, b2a):
 	one2ones = []
@@ -327,7 +332,7 @@ def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdic
 			continue
 
 		if len(sg.pos) > 1 and 'exp' not in sg.pos:
-			return # 65460 -> 65425 stars, but looks interesting for meanwhile
+			return
 
 		for p in sg.pos:
 			if p != 'exp':
@@ -344,7 +349,7 @@ def match_unidic_jmdict_one2one(
 	print('simple matching')
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
-			for entry in u2j_simple_match(lex, jindex, uindex):
+			for entry, _ in u2j_simple_match(lex, jindex, uindex):
 				jmdict2unidic[entry.id].add(lex.lemma_id)
 				unidic2jmdict[lex.lemma_id].add(entry.id)
 	del lemma_lexes, lex
@@ -391,29 +396,41 @@ def u2j_match_pos_single(entry, lex, u2j_pos):
 	return False
 
 def u2j_match_pos_all(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType, u2j_pos):
-	for entry in u2j_simple_match(lex, jindex, uindex):
+	for entry, writing in u2j_simple_match(lex, jindex, uindex):
 		if u2j_match_pos_single(entry, lex, u2j_pos):
-			yield entry
+			yield entry, writing
 
-def find_stars(jmdict2unidic, unidic2jmdict):
-	stars = []
-	for jmdict_id, lemma_ids in jmdict2unidic.items():
-		assert len(lemma_ids) > 0
-		# if all(len(b2a[v]) == 1 for v in vs):
-		'''
-		if we see orthBase = あれれ there is only one match for it in
-		jmdict, and we can unambiguously map it there
-		'''
-		unambiguous = [lemma_id for lemma_id in lemma_ids if len(unidic2jmdict[lemma_id]) == 1]
-		if len(unambiguous) > 0:
-			stars.append(((jmdict_id,), unambiguous))
+Mapping = namedtuple('Mapping', 'full, partial')
+def compute_final_unambiguous_unidic2jmdict_mapping(jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id):
+	mapping = {}
+	# for jmdict_id, lemma_ids in jmdict2unidic.items():
+	# 	assert len(lemma_ids) > 0
+	# 	# if all(len(b2a[v]) == 1 for v in vs):
+	# 	'''
+	# 	if we see orthBase = あれれ there is only one match for it in
+	# 	jmdict, and we can unambiguously map it there
+	# 	'''
+	# 	for lemma_id in lemma_ids:
+	# 		if len(unidic2jmdict[lemma_id]) == 1:
+	# 			assert lemma_id not in mapping
+	# 			mapping[lemma_id] = jmdict_id
+	# 			continue
 
 	for lemma_id, jmdict_ids in unidic2jmdict.items():
-		if len(jmdict_ids) == 1: continue
 		assert len(jmdict_ids) > 0
-		if all(len(jmdict2unidic[jmdict_id]) == 1 for jmdict_id in jmdict_ids):
-			stars.append((jmdict_ids, (lemma_id,)))
-	return stars
+		if len(jmdict_ids) == 1:
+			mapping[lemma_id] = next(iter(jmdict_ids))
+		elif all(len(jmdict2unidic[jmdict_id]) == 1 for jmdict_id in jmdict_ids):
+			mapping[lemma_id] = jmdict_ids
+		else:
+			assert lemma_id in lemma_id2writing2jmdict_id, (lemma_id, unidic2jmdict.get(lemma_id))
+			writing2jmdict_ids = lemma_id2writing2jmdict_id.get(lemma_id)
+			for w, sub_jmdict_ids in writing2jmdict_ids.items():
+				if len(sub_jmdict_ids) == 1:
+					mapping.setdefault(lemma_id, set()).add((w, next(iter(sub_jmdict_ids))))
+
+
+	return mapping
 
 def is_lemma_single_cover_for_entry(lemma_lexes, entry):
 	all_orthbase = set(lex.orthBase for lex in lemma_lexes)
@@ -439,12 +456,12 @@ def is_single_cover(dict2_node, dict1_node):
 
 def find_single_cover(dict1_node, dict2, dict2_keys):
 	single_covers = []
-	for lemma_id in dict2_keys:
-		if is_single_cover(dict2[lemma_id], dict1_node):
-			single_covers.append(lemma_id)
+	for dict2_key in dict2_keys:
+		if is_single_cover(dict2[dict2_key], dict1_node):
+			single_covers.append(dict2_key)
 
 	if len(single_covers) == 1:
-		return lemma_id
+		return single_covers[0]
 
 def cut_out_redundunt_mappings_for_fully_covered_nodes(dict1, dict1_to_dict2, dict2, dict2_to_dict1):
 	for dict1_key, dict2_keys in dict1_to_dict2.items():
@@ -470,19 +487,22 @@ def cut_out_redundunt_mappings_for_fully_covered_nodes(dict1, dict1_to_dict2, di
 		dict2_keys.add(single_cover_dict2_key)
 
 # records conjugated jmdict entries unambiguously mapped to unidic
-def try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex):
+def try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex, lemma_id2writing2jmdict_id):
 	for k, entry in jmdict.items():
 		if k in jmdict2unidic:
 			continue
 
 		for text in itertools.chain((r.text for r in entry.readings), (k.text for k in entry.kanjis)):
-			lemma_ids = uindex.get(kata_to_hira(text), ())
+			text = kata_to_hira(text)
+			lemma_ids = uindex.get(text, ())
 			if len(lemma_ids) == 1:
 				lemma_id = next(iter(lemma_ids))
 				jmdict2unidic[entry.id].add(lemma_id)
 				unidic2jmdict[lemma_id].add(entry.id)
+				lemma_id2writing2jmdict_id[lemma_id][text].add(entry.id)
 
-def match_unidic_jmdict_stars_refining_pos(
+
+def match_unidic_jmdict_with_refining(
 		jmdict: dictionary.DictionaryType,
 		jindex: dictionary.IndexedDictionaryType,
 		unidic: UnidicType,
@@ -491,16 +511,18 @@ def match_unidic_jmdict_stars_refining_pos(
 
 	jmdict2unidic = defaultdict(set)
 	unidic2jmdict = defaultdict(set)
+	lemma_id2writing2jmdict_id = defaultdict(lambda: defaultdict(set))
 
 	print('pos matching')
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
-			for entry in u2j_match_pos_all(lex, jindex, uindex, u2j_pos):
+			for entry, writing in u2j_match_pos_all(lex, jindex, uindex, u2j_pos):
 				jmdict2unidic[entry.id].add(lex.lemma_id)
 				unidic2jmdict[lex.lemma_id].add(entry.id)
+				lemma_id2writing2jmdict_id[lex.lemma_id][writing].add(entry.id)
 	del lex
 
-	try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex)
+	try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex, lemma_id2writing2jmdict_id)
 	assert all(len(vs) > 0 for vs in jmdict2unidic.values())
 	assert all(len(vs) > 0 for vs in unidic2jmdict.values())
 
@@ -514,12 +536,10 @@ def match_unidic_jmdict_stars_refining_pos(
 	cut_out_redundunt_mappings_for_fully_covered_nodes(jmdict, jmdict2unidic, unidic, unidic2jmdict)
 	cut_out_redundunt_mappings_for_fully_covered_nodes(unidic, unidic2jmdict, jmdict, jmdict2unidic)
 
-	print("TODO: utilize xref to merge jmdict's 2835613 and 1007130")
-
-	test_jmdict_ids = (1000590,)
-	test_unidic_ids = (1406,)
-	print(*(jmdict2unidic.get(i) for i in test_jmdict_ids))
-	print(*(unidic2jmdict.get(i) for i in test_unidic_ids))
+	test_jmdict_ids = ()
+	test_unidic_ids = ()
+	print(*(f'{i}:{jmdict2unidic.get(i)}' for i in test_jmdict_ids))
+	print(*(f'{i}:{unidic2jmdict.get(i)}' for i in test_unidic_ids))
 
 	for uid in set(itertools.chain.from_iterable(jmdict2unidic.get(i, ()) for i in test_jmdict_ids)):
 		print(*unidic[uid], sep='\n')
@@ -528,14 +548,12 @@ def match_unidic_jmdict_stars_refining_pos(
 	if len(test_jmdict_ids) + len(test_unidic_ids) > 0:
 		input()
 
-	print('computing stars')
-	stars = find_stars(jmdict2unidic, unidic2jmdict)
-	print(len(stars), 'stars')
-	print(len(set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))), 'jmdict ids')
-	print(len(set(itertools.chain.from_iterable(map(lambda p: p[1], stars)))), 'unidic ids')
+	print('computing mappings')
+	mapping = compute_final_unambiguous_unidic2jmdict_mapping(jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id)
+	print(len(mapping), 'unidic ids')
 
-	del jmdict2unidic#, unidic2jmdict
-	return stars, set(unidic2jmdict.keys())
+	del jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id
+	return mapping
 
 def match_unidic_ids_with_jmdict_old():
 	download_unidic()
@@ -676,21 +694,14 @@ def load_unidic() -> Tuple[UnidicType, UnidicIndexType]:
 	print('loading unidic')
 	res = {}
 	index = defaultdict(set)
-	# print("\n\tWARNING!!! SKIPPING NAMES, FIXMEPLEASE!\n")
 	filename = 'tmp/unidic-cwj-2.3.0/lex.csv'
-	if DEBUG:
-		filename = 'tmp/test-lex.csv'
 	with open(filename) as f:
 		for l in f:
 			l = FullUnidicLex(*split_lex(l.strip()))
-			# if l.pos1 == '名詞' and l.pos2 == '固有名詞':
-			# 	continue
-			# for k in (l.orthBase, l.pronBase):
 			for k in (l.surface, l.lForm, l.lemma, l.orth, l.pron, l.orthBase, l.pronBase):
 				index[kata_to_hira(k)].add(int(l.lemma_id))
 			l = UnidicLex((l.pos1, l.pos2, l.pos3, l.pos4), l.orthBase, l.pronBase, int(l.lemma_id))
 			res.setdefault(l.lemma_id, set()).add(l)
-			del l
 
 	return res, index
 
@@ -704,35 +715,191 @@ def load_additional_pos_mapping(u2j_pos: PosMappingType):
 			upos = tuple(upos.split(','))
 			u2j_pos.add((upos, jpos))
 
+def get_mapped_jmdict_ids(mapping):
+	mapped_jmdict_ids = set()
+	for v in mapping.values():
+		if type(v) == int:
+			mapped_jmdict_ids.add(v)
+		else:
+			for s in v:
+				if type(s) == int:
+					mapped_jmdict_ids.add(s)
+				else:
+					mapped_jmdict_ids.add(s[1])
+	return mapped_jmdict_ids
+
+def compute_reading(variant):
+	is_regex = False
+	reading = []
+	for l in variant:
+		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+			reading.append(kata_to_hira(l[PRON_INDEX + 1]))
+		else:
+			reading.append('.+')
+			is_regex = True
+	reading = ''.join(reading)
+	if is_regex:
+		return regex.compile(reading)
+	else:
+		return reading
+
+def reading_matches(parsed_reading, dictionary_reading):
+	if type(parsed_reading) == str:
+		return parsed_reading == dictionary_reading
+	else:
+		return parsed_reading.fullmatch(dictionary_reading) is not None
+
+def variant_matches_reading(entry, kanji_index, variant):
+	if len(variant) == 1 and len(variant[0]) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+		return True
+	parsed_reading = compute_reading(variant)
+	for r in entry.readings:
+		if (
+				not r.nokanji
+				and
+				(
+					r.kanji_restriction is None
+					or
+					kanji_index in r.kanji_restriction
+				)
+				and
+				reading_matches(parsed_reading, kata_to_hira(r.text))
+			):
+
+			return True
+
+	return False
+
+def match_reading_to_any_variant(entry, kanji_index, variants):
+	for variant in variants:
+		if variant_matches_reading(entry, kanji_index, variant):
+			return variant
+	return None
+
+@dataclass
+class ComplexMappingNode(object):
+	jmdict_ids: int
+	children: Dict[int, ComplexMappingNode]
+
+def get_complex_mapping_key(parse_line):
+	if len(parse_line) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+		return parse_line[-1]
+	else:
+		return parse_line[0]
+
+
+def record_complex_mapping(mapping, parse, id, text):
+	key = get_complex_mapping_key(parse[0])
+	target = mapping.get(key)
+	if target is None:
+		target = ComplexMappingNode(set(), {})
+		mapping[key] = target
+
+	for l in parse[1:]:
+		key = get_complex_mapping_key(l)
+		new_target = target.children.get(key)
+		if new_target is None:
+			new_target = ComplexMappingNode(set(), {})
+			target.children[key] = new_target
+		target = new_target
+
+	target.jmdict_ids.add(id)
+
+def have_uk_for_reading(entry, reading_index):
+	for sg in entry.sense_groups:
+		for s in sg.senses:
+			if s.reading_restriction is not None and reading_index not in s.reading_restriction:
+				continue
+			if 'uk' in s.misc:
+				return True
+
+def parse_mecab_variants(parse, one):
+	parse = parse.split('\n')[:(-1 if one else -2)]
+	variants = [[]]
+	for l in parse:
+		if l.startswith('EOS'):
+			variants.append([])
+			continue
+
+		l = l.split('\t')
+		l.extend(l.pop().split(','))
+		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+			l[-1] = int(l[-1])
+		variants[-1].append(l)
+
+	if one:
+		return variants[0]
+	else:
+		return variants
+
+
+def compute_complex_mapping(jmdict, already_mapped_jmdict_ids):
+	mapping = {}
+	mecab = MeCab.Tagger('-d tmp/unidic-cwj-2.3.0')
+	mapped_jmdict_ids = set()
+
+	for entry_index, entry in enumerate(jmdict.values()):
+		if (entry_index + 1) % 1000 == 0:
+			print(f'complex mappings {entry_index + 1}/{len(jmdict)}')
+
+		if entry.id in already_mapped_jmdict_ids:
+			continue
+		for i, k in enumerate(entry.kanjis):
+			assert ',' not in k
+			parse = mecab.parseNBest(5, k.text)
+			variants = parse_mecab_variants(parse, one=False)
+			matching_variant = match_reading_to_any_variant(entry, i, variants)
+			if matching_variant is None:
+				print('ERROR: unmatched reading:', k.text, entry, parse, sep='\n')
+				continue
+			record_complex_mapping(mapping, matching_variant, entry.id, kata_to_hira(k.text))
+			mapped_jmdict_ids.add(entry.id)
+			del k
+
+		for i, r in enumerate(entry.readings):
+			if all(is_hiragana(c) for c in r.text) and not r.nokanji and not have_uk_for_reading(entry, i):
+				continue
+			variant = parse_mecab_variants(mecab.parse(r.text), one=True)
+			if any(len(l) < 28 for l in variant):
+				# some part of reading was parsed as unknown
+				continue
+			record_complex_mapping(mapping, variant, entry.id, kata_to_hira(r.text))
+			mapped_jmdict_ids.add(entry.id)
+
+	del mecab
+	return mapping, mapped_jmdict_ids
+
+
 DEBUG = False
 def compute_freqs():
 	jmdict, jindex = dictionary.load_dictionary()
-	unidic, uindex = load_unidic()
-	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
-	load_additional_pos_mapping(u2j_pos)
-	stars, somehow_matched_lemma_ids = match_unidic_jmdict_stars_refining_pos(jmdict, jindex, unidic, uindex, u2j_pos)
 
-	if DEBUG:
-		print(stars)
-		print(somehow_matched_lemma_ids)
-		exit()
+	filename = 'tmp/unidic2jmdict-unambiguous-simple-mapping.pkl'
+	if os.path.exists(filename):
+		with open(filename, 'rb') as f:
+			mapping = pickle.load(f)
+	else:
+		unidic, uindex = load_unidic()
+		u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
+		load_additional_pos_mapping(u2j_pos)
+		mapping = match_unidic_jmdict_with_refining(jmdict, jindex, unidic, uindex, u2j_pos)
+		del unidic, uindex, jindex, u2j_pos
+		gc.collect()
+		with open(filename, 'wb') as of:
+			pickle.dump(mapping, of)
 
-	mapped_jmdict_ids = set(itertools.chain.from_iterable(map(lambda p: p[0], stars)))
+	mapped_jmdict_ids = get_mapped_jmdict_ids(mapping)
+	print(len(mapped_jmdict_ids), 'mapped jmdict entries')
+	complex_mapping, new_mapped_jmdict_ids = compute_complex_mapping(jmdict, mapped_jmdict_ids)
+	gc.collect()
+
+	mapped_jmdict_ids.update(new_mapped_jmdict_ids)
+	print("that's all, folks! mapped", len(mapped_jmdict_ids))
+	input()
+	exit()
+
 	def have_possible_map(entry):
-		# if all('exp' in sg.pos for sg in entry.sense_groups):
-		# 	return True
-		# if all('conj' in sg.pos for sg in entry.sense_groups):
-		# 	return True
-		# if any(k.text.startswith('御') for k in entry.kanjis):
-		# 	return True
-
-		if any((kata_to_hira(s.text) in uindex) for s in itertools.chain(entry.kanjis, entry.readings)):
-			return True
-
-		# if any(any(k.text.endswith(suf) for suf in ['ます', '様', 'さん', 'ない', 'でも', 'なら']) for k in entry.kanjis):
-			# return True
-
-		return False
+		return any((kata_to_hira(s.text) in uindex) for s in itertools.chain(entry.kanjis, entry.readings))
 
 	num_unmapped_commons = 0
 	num_have_possible_map = 0
@@ -754,38 +921,21 @@ def compute_freqs():
 	print('unmapped', num_unmapped, 'commons:', f'{num_unmapped_commons}/{num_commons},',
 		num_have_possible_map, 'have potential maps,', num_common_have_possible_map, 'commons'
 	)
-	for entry in jmdict.values():
+	jmdict_ids = list(jmdict)
+	import random
+	while True:
+		entry = jmdict[random.choice(jmdict_ids)]
 		if entry.id in mapped_jmdict_ids:
 			continue
-		if entry.is_common() and have_possible_map(entry):
-			# patterns = list(itertools.chain.from_iterable(
-				# [('-e', k.text) for k in entry.kanjis] + [('-e', r.text) for r in entry.readings]
-			# ))
-			# assert len(patterns) > 0
-			# command = ['rg', '-F', '-w'] + patterns + ['tmp/unidic-cwj-2.3.0/lex.csv']
-			# if subprocess.call(command, stdout=subprocess.PIPE) == 0:
-			print('Unmapped common:\n', entry)
-			input()
-
-	for lemma_id in somehow_matched_lemma_ids:
-		unidic.pop(lemma_id, None)
-	import random
-	all_lemmas = list(unidic.keys())
-	while True:
-		lemma = next(iter(unidic[random.choice(all_lemmas)]))
-		# lemma = next(iter(unidic[194862]))
-		pattern1 = shlex.quote(f'>{lemma.orthBase}<')
-		pattern2 = shlex.quote(f'>{lemma.pronBase}<')
-		if subprocess.call(f'gunzip -c tmp/JMdict_e.gz | rg -F -q -e {pattern1} -e {pattern2}', shell=True) == 0:
-			pattern = shlex.quote(f',{lemma.lemma_id}$')
-			os.system(f'rg {pattern} tmp/unidic-cwj-2.3.0/lex.csv')
-			input('continue?')
+		# if entry.is_common() and have_possible_map(entry):
+		print('Unmapped common:\n', entry)
+		input()
 
 	exit()
 
 	if DEBUG:
 		exit()
-	freqs = process_corpus(unidic2jmdict_ids)
+	freqs = process_corpus(mapping)
 	return [(k,v) for k, v in freqs.items() if v >= 77]
 
 def save_freqs(freqs):
