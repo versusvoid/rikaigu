@@ -75,6 +75,7 @@ def download_dump():
 			'jawiki-articles.xml.bz2'
 		)
 		print("Stripping wiki markup")
+		print("FIXME the extractor process will hang at the end")
 		subprocess.check_call([' | '.join([
 			'tmp/wikiextractor-master/WikiExtractor.py -q -o - --no-templates -s --lists tmp/jawiki-articles.xml.bz2',
 			# 'head -n 400000',
