@@ -653,10 +653,18 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 		if complex_mapping_node is None:
 			break
 
-		continuous_orth += kata_to_hira(sentence[current_index][ORTH_INDEX + 1])
-		continuous_orth_base += kata_to_hira(sentence[current_index][ORTH_BASE_INDEX + 1])
-		continuous_pron += kata_to_hira(sentence[current_index][PRON_INDEX + 1])
-		continuous_pron_base += kata_to_hira(sentence[current_index][PRON_BASE_INDEX + 1])
+		if len(sentence[current_index]) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+			continuous_orth += kata_to_hira(sentence[current_index][ORTH_INDEX + 1])
+			continuous_orth_base += kata_to_hira(sentence[current_index][ORTH_BASE_INDEX + 1])
+			continuous_pron += kata_to_hira(sentence[current_index][PRON_INDEX + 1])
+			continuous_pron_base += kata_to_hira(sentence[current_index][PRON_BASE_INDEX + 1])
+		else:
+			continuous_orth += sentence[current_index][0]
+			continuous_orth_base += sentence[current_index][0]
+			# TODO? regex for unknown prons as in mapping
+			continuous_pron += sentence[current_index][0]
+			continuous_pron_base += sentence[current_index][0]
+
 		if complex_mapping_node.jmdict_ids is None:
 			possible_ends.append(None)
 		else:
@@ -712,7 +720,7 @@ def try_record_simple_mapping(parse_line, unidic2jmdict_mapping: SimpleU2JMappin
 				freqs[jmdict_id] += 1
 
 def process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdict, freqs):
-	parse_mecab_variants(sentence, one=True)
+	sentence = parse_mecab_variants(sentence, one=True)
 	i = -1
 	while i + 1 < len(sentence):
 		i += 1
@@ -739,20 +747,26 @@ def process_corpus(unidic2jmdict_mapping, u2j_complex_mapping, jmdict):
 		try:
 			line_no, l = next(iterator)
 			if l.startswith('EOS'):
-				process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdict, freqs)
+				if len(sentence) > 0:
+					process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdict, freqs)
 				sentence.clear()
 			else:
-				assert '\t' in l
-				sentence.append(l)
+				if '\t' not in l:
+					print(f'strange parse line: "{l}"')
+				else:
+					sentence.append(l)
 
 			if (line_no + 1) % 1000000 == 0:
 				print(line_no + 1)
 		except (StopIteration, KeyboardInterrupt):
 			break
+		except UnicodeDecodeError:
+			continue
 		except Exception:
 			import traceback
 			print('some error:')
 			traceback.print_exc()
+			input()
 			continue
 
 	return freqs
@@ -967,6 +981,8 @@ def compute_freqs():
 
 	del jindex
 	gc.collect()
+
+	print(len(mapping), len(complex_mapping))
 
 	freqs = process_corpus(mapping, complex_mapping, jmdict)
 	return [(k,v) for k, v in freqs.items() if v >= 77]
