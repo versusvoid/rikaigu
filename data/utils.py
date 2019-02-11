@@ -79,11 +79,12 @@ _o_row = set('お こ ご そ ぞ と ど の ほ ぼ ぽ も よ ょ ろ'.split
 _long_vowel_mark_mapping = dict(itertools.chain(
 	map(lambda k: (k, 'あ'), 'あ か が さ ざ た だ な は ば ぱ ま や ゃ ら わ'.split()),
 	map(lambda k: (k, 'い'), 'い き ぎ し じ ち ぢ に ひ び ぴ み 　 　 り ゐ'.split()),
-  	map(lambda k: (k, 'う'), 'う く ぐ す ず つ づ ぬ ふ ぶ ぷ む ゆ ゅ る'.split()),
-  	map(lambda k: (k, 'い'), _e_row),
-  	map(lambda k: (k, 'う'), _o_row),
+	map(lambda k: (k, 'う'), 'う く ぐ す ず つ づ ぬ ふ ぶ ぷ む ゆ ゅ る'.split()),
+	map(lambda k: (k, 'い'), _e_row),
+ 	map(lambda k: (k, 'う'), _o_row),
 	map(lambda k: (k, 'ー'), 'ぁ ぃ ぅ ぇ ぉ ゔ ゎ'.split()),
 ))
+print('\n\n\tWARNING: check if new kata_to_hira() is suitable for final dictionary index\n\n')
 def kata_to_hira(w, full_or_none=False):
 	res = []
 	prev = None
@@ -100,6 +101,10 @@ def kata_to_hira(w, full_or_none=False):
 
 		if res[-1] == 'を':
 			res[-1] = 'お'
+		if res[-1] == 'づ':
+			res[-1] = 'ず'
+		if res[-1] == 'は':
+			res[-1] = 'わ'
 
 		if len(res) > 1:
 			if res[-1] == 'お' and res[-2] in _o_row:

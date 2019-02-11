@@ -654,10 +654,10 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 			break
 
 		if len(sentence[current_index]) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-			continuous_orth += kata_to_hira(sentence[current_index][ORTH_INDEX + 1])
-			continuous_orth_base += kata_to_hira(sentence[current_index][ORTH_BASE_INDEX + 1])
-			continuous_pron += kata_to_hira(sentence[current_index][PRON_INDEX + 1])
-			continuous_pron_base += kata_to_hira(sentence[current_index][PRON_BASE_INDEX + 1])
+			continuous_orth += sentence[current_index][ORTH_INDEX + 1]
+			continuous_orth_base += sentence[current_index][ORTH_BASE_INDEX + 1]
+			continuous_pron += sentence[current_index][PRON_INDEX + 1]
+			continuous_pron_base += sentence[current_index][PRON_BASE_INDEX + 1]
 		else:
 			continuous_orth += sentence[current_index][0]
 			continuous_orth_base += sentence[current_index][0]
@@ -670,10 +670,10 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 		else:
 			possible_ends.append((
 				complex_mapping_node.jmdict_ids,
-				continuous_orth,
-				continuous_orth_base,
-				continuous_pron,
-				continuous_pron_base,
+				kata_to_hira(continuous_orth),
+				kata_to_hira(continuous_orth_base),
+				kata_to_hira(continuous_pron),
+				kata_to_hira(continuous_pron_base),
 			))
 		current_index += 1
 		current_level = complex_mapping_node.children
@@ -816,17 +816,18 @@ def compute_reading(variant):
 	reading = []
 	for l in variant:
 		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-			reading.append(kata_to_hira(l[PRON_INDEX + 1]))
+			reading.append(l[PRON_INDEX + 1])
 		else:
 			reading.append('.+')
 			is_regex = True
-	reading = ''.join(reading)
+	reading = kata_to_hira(''.join(reading))
 	if is_regex:
 		return regex.compile(reading)
 	else:
 		return reading
 
 def reading_matches(parsed_reading, dictionary_reading):
+	#print(f'reading_matches({parsed_reading}, {dictionary_reading})')
 	if type(parsed_reading) == str:
 		return parsed_reading == dictionary_reading
 	else:
@@ -922,30 +923,44 @@ def compute_complex_mapping(jmdict, already_mapped_jmdict_ids) -> Tuple[ComplexM
 	mapped_jmdict_ids = set()
 
 	for entry_index, entry in enumerate(jmdict.values()):
-		if (entry_index + 1) % 1000 == 0:
+		if (entry_index + 1) % 10000 == 0:
 			print(f'complex mappings {entry_index + 1}/{len(jmdict)}')
 
 		if entry.id in already_mapped_jmdict_ids:
 			continue
 		for i, k in enumerate(entry.kanjis):
 			assert ',' not in k
-			parse = mecab.parseNBest(5, k.text)
+			# correct parse for entry 1177810 appears after 15+ variants
+			# similar at entry 1363410
+			# entry 1269140 have alterations in reading preventing match
+			# similar at entry 1379410
+			parse = mecab.parseNBest(10, k.text)
 			variants = parse_mecab_variants(parse, one=False)
 			matching_variant = match_reading_to_any_variant(entry, i, variants)
 			if matching_variant is None:
-				print('ERROR: unmatched reading:', k.text, entry, parse, sep='\n')
+				#print('ERROR: unmatched reading:', k.text, entry, parse, sep='\n')
 				continue
 			record_complex_mapping(mapping, matching_variant, entry.id, kata_to_hira(k.text))
 			mapped_jmdict_ids.add(entry.id)
 			del k
 
 		for i, r in enumerate(entry.readings):
-			if all(is_hiragana(c) for c in r.text) and not r.nokanji and not have_uk_for_reading(entry, i):
+			if (
+					len(entry.kanjis) > 0
+					and
+					any(not is_katakana(c) for c in r.text)
+					and
+					not r.nokanji
+					and
+					not have_uk_for_reading(entry, i)
+					):
+
 				continue
+
 			variant = parse_mecab_variants(mecab.parse(r.text), one=True)
-			if any(len(l) < 28 for l in variant):
-				# some part of reading was parsed as unknown
-				continue
+			if any(len(l) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1 for l in variant) and (len(variant) > 1 or not all(is_katakana(c) for c in r.text)):
+				#print('WARNING: strange reading parse:', r.text)
+				pass
 			record_complex_mapping(mapping, variant, entry.id, kata_to_hira(r.text))
 			mapped_jmdict_ids.add(entry.id)
 
@@ -972,6 +987,11 @@ def compute_freqs():
 		complex_mapping, new_mapped_jmdict_ids = compute_complex_mapping(jmdict, mapped_jmdict_ids)
 		mapped_jmdict_ids.update(new_mapped_jmdict_ids)
 		print(len(mapped_jmdict_ids), 'mapped jmdict entries')
+		print(sum(1 for entry in jmdict.values() if entry.is_common() and entry.id not in mapped_jmdict_ids), 'unmapped commons')
+		for entry in jmdict.values():
+			if entry.is_common() and entry.id not in mapped_jmdict_ids:
+				print(entry)
+				input()
 		del mapped_jmdict_ids, new_mapped_jmdict_ids
 		gc.collect()
 
