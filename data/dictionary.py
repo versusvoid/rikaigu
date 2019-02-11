@@ -247,7 +247,7 @@ def dictionary_reader(dictionary='JMdict_e.gz'):
 	for _, elem in ET.iterparse(source):
 		if elem.tag == 'entry':
 			entry_no += 1
-			if entry_no % 1000 == 0:
+			if entry_no % 10000 == 0:
 				print(dictionary, entry_no)
 			entry = make_entry(elem, entities)
 			yield entry, elem
@@ -269,17 +269,21 @@ def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> 
 DictionaryType = Dict[int, Entry]
 def load_dictionary(
 		dictionary='JMdict_e.gz',
+		index=False,
 		convert_to_hiragana_for_index=True,
 		variate=False) -> Tuple[DictionaryType, IndexedDictionaryType]:
 
-	print('loading dictionary')
-	if os.path.exists('tmp/parsed-jmdict.pkl'):
-		with open('tmp/parsed-jmdict.pkl', 'rb') as f:
+	print('loading dictionary', dictionary)
+	filename = f'tmp/parsed-{dictionary}.pkl'
+	if os.path.exists(filename):
+		with open(filename, 'rb') as f:
 			entries = pickle.load(f)
 	else:
 		entries = {e.id: e for e, _ in dictionary_reader(dictionary)}
-		with open('tmp/parsed-jmdict.pkl', 'wb') as f:
+		with open(filename, 'wb') as f:
 			pickle.dump(entries, f)
 
-	indexed = make_indexed_dictionary(entries.values(), convert_to_hiragana_for_index, variate)
-	return entries, indexed
+	if index:
+		return entries, make_indexed_dictionary(entries.values(), convert_to_hiragana_for_index, variate)
+	else:
+		return entries

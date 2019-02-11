@@ -35,6 +35,7 @@ UnidicLex = namedtuple('UnidicLex', 'pos, orthBase, pronBase, lemma_id')
 UnidicPosType = Tuple[str, str, str, str]
 UnidicType = Dict[int, Set[UnidicLex]]
 UnidicIndexType = DefaultDict[str, Set[int]]
+UNIDIC_NAME_POS = ('名詞', '固有名詞')
 
 def split_lex(l):
 	if l.startswith('""'):
@@ -102,25 +103,18 @@ def download_unidic():
 		universal_newlines=True
 	)
 
-# for magic numbers see `dicrc` file from unidic
-NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM = 28
-ORTH_INDEX = 9
-PRON_INDEX = 9
-ORTH_BASE_INDEX = 10
-PRON_BASE_INDEX = 11
-# -1 'cos some fields in unidic may contain commas in them
-# and mecab does not print them in unambiguous way (using quotes like in unidic/lex.csv),
-# so lemma_id may be at position 28, 29 or 30, but it's always last
-LEMMA_ID_INDEX = -1
+
+################# SIMPLE MAPPING #################
 
 def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType):
 	writing = kata_to_hira(lex.orthBase)
 	reading = kata_to_hira(lex.pronBase)
 
 	entries = jindex.get(writing, ())
-	if lex.pos[:2] == ('名詞', '固有名詞') and len(entries) > 1:
-		return
 	for entry in entries:
+		if lex.pos[:2] == UNIDIC_NAME_POS and all('n' not in sg.pos for sg in entry.sense_groups):
+			continue
+
 		if reading == writing:
 			condition1 = len(entry.kanjis) == 0
 			condition2 = condition1 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings)
@@ -160,8 +154,12 @@ def record_pos_mapping(entry: dictionary.Entry, lex: UnidicLex, unidic_pos2jmdic
 			return
 
 		for p in sg.pos:
-			if p != 'exp':
-				unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
+			if p == 'exp':
+				continue
+			if lex.pos[:2] == UNIDIC_NAME_POS and not p.startswith('n'):
+				continue
+
+			unidic_pos2jmdict_pos.setdefault((lex.pos, p), (lex, entry.id))
 
 PosMappingType = Set[Tuple[UnidicPosType, str]]
 def match_unidic_jmdict_one2one(
@@ -206,6 +204,9 @@ def match_unidic_jmdict_one2one(
 	del jmdict2unidic, unidic2jmdict, unidic_pos2jmdict_pos
 	gc.collect()
 	return res
+
+
+################## POS AND REFINED MAPPING ##################
 
 def u2j_match_pos_single(entry, lex, u2j_pos):
 	for sg in entry.sense_groups:
@@ -342,24 +343,225 @@ def match_unidic_jmdict_with_refining(
 	cut_out_redundunt_mappings_for_fully_covered_nodes(jmdict, jmdict2unidic, unidic, unidic2jmdict)
 	cut_out_redundunt_mappings_for_fully_covered_nodes(unidic, unidic2jmdict, jmdict, jmdict2unidic)
 
-	test_jmdict_ids = ()
-	test_unidic_ids = ()
-	print(*(f'{i}:{jmdict2unidic.get(i)}' for i in test_jmdict_ids))
-	print(*(f'{i}:{unidic2jmdict.get(i)}' for i in test_unidic_ids))
-
-	for uid in set(itertools.chain.from_iterable(jmdict2unidic.get(i, ()) for i in test_jmdict_ids)):
-		print(*unidic[uid], sep='\n')
-	for jid in set(itertools.chain.from_iterable(unidic2jmdict.get(i, ()) for i in test_unidic_ids)):
-		print(jmdict[jid], sep='\n')
-	if len(test_jmdict_ids) + len(test_unidic_ids) > 0:
-		input()
-
 	print('computing mappings')
 	mapping = compute_final_unambiguous_unidic2jmdict_mapping(jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id)
 	print(len(mapping), 'unidic ids')
 
 	del jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id
 	return mapping
+
+
+################## COMPLEX MAPPING ##################
+
+# for magic numbers see `dicrc` file from unidic
+NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM = 29
+POS_INDEX = 1
+ORTH_INDEX = 9
+PRON_INDEX = 10
+ORTH_BASE_INDEX = 11
+PRON_BASE_INDEX = 12
+# -1 'cos some fields in unidic may contain commas in them
+# and mecab does not print them in unambiguous way (using quotes like in unidic/lex.csv),
+# so lemma_id may be at position 28, 29 or 30, but it's always last
+LEMMA_ID_INDEX = -1
+
+def compute_reading(variant):
+	is_regex = False
+	reading = []
+	for l in variant:
+		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+			reading.append(l[PRON_INDEX])
+		else:
+			reading.append('.+')
+			is_regex = True
+	reading = kata_to_hira(''.join(reading))
+	if is_regex:
+		return re.compile(reading)
+	else:
+		return reading
+
+def reading_matches(parsed_reading, dictionary_reading):
+	#print(f'reading_matches({parsed_reading}, {dictionary_reading})')
+	if type(parsed_reading) == str:
+		return parsed_reading == dictionary_reading
+	else:
+		return parsed_reading.fullmatch(dictionary_reading) is not None
+
+def variant_matches_reading(entry, kanji_index, variant):
+	if len(variant) == 1 and len(variant[0]) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+		return True
+	parsed_reading = compute_reading(variant)
+	for r in entry.readings:
+		if (
+				not r.nokanji
+				and
+				(
+					r.kanji_restriction is None
+					or
+					kanji_index in r.kanji_restriction
+				)
+				and
+				reading_matches(parsed_reading, kata_to_hira(r.text))
+			):
+
+			return True
+
+	return False
+
+def match_reading_to_any_variant(entry, kanji_index, variants):
+	for variant in variants:
+		if variant_matches_reading(entry, kanji_index, variant):
+			return variant
+	return None
+
+@dataclass
+class ComplexMappingNode(object):
+	jmdict_ids: int
+	children: Dict[int, ComplexMappingNode]
+
+def get_complex_mapping_key(parse_line):
+	if len(parse_line) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+		return parse_line[LEMMA_ID_INDEX]
+	else:
+		return parse_line[0]
+
+ComplexMappingType = Dict[Union[str, int], ComplexMappingNode]
+def record_complex_mapping(mapping: ComplexMappingType, parse, id, text):
+	key = get_complex_mapping_key(parse[0])
+	target = mapping.get(key)
+	if target is None:
+		target = ComplexMappingNode(set(), {})
+		mapping[key] = target
+
+	for l in parse[1:]:
+		key = get_complex_mapping_key(l)
+		new_target = target.children.get(key)
+		if new_target is None:
+			new_target = ComplexMappingNode(set(), {})
+			target.children[key] = new_target
+		target = new_target
+
+	target.jmdict_ids.add(id)
+
+def have_uk_for_reading(entry, reading_index):
+	for sg in entry.sense_groups:
+		for s in sg.senses:
+			if s.reading_restriction is not None and reading_index not in s.reading_restriction:
+				continue
+			if 'uk' in s.misc:
+				return True
+
+def parse_mecab_variants(parse, one):
+	if type(parse) == str:
+		parse = parse.split('\n')[:(-1 if one else -2)]
+	variants = [[]]
+	for l in parse:
+		if l.startswith('EOS'):
+			variants.append([])
+			continue
+
+		l = l.split('\t')
+		l.extend(l.pop().split(','))
+		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+			l[LEMMA_ID_INDEX] = int(l[LEMMA_ID_INDEX])
+		variants[-1].append(l)
+
+	if one:
+		return variants[0]
+	else:
+		return variants
+
+def compute_complex_mapping(jmdict, already_mapped_jmdict_ids) -> Tuple[ComplexMappingType, Set[int]]:
+	mapping = {}
+	mecab = MeCab.Tagger('-d tmp/unidic-cwj-2.3.0')
+	mapped_jmdict_ids = set()
+
+	for entry_index, entry in enumerate(jmdict.values()):
+		if (entry_index + 1) % 10000 == 0:
+			print(f'complex mappings {entry_index + 1}/{len(jmdict)}')
+
+		if entry.id in already_mapped_jmdict_ids:
+			continue
+		for i, k in enumerate(entry.kanjis):
+			assert ',' not in k
+			# correct parse for entry 1177810 appears after 15+ variants
+			# similar at entry 1363410
+			# entry 1269140 have alterations in reading preventing match
+			# similar at entry 1379410
+			parse = mecab.parseNBest(10, k.text)
+			variants = parse_mecab_variants(parse, one=False)
+			matching_variant = match_reading_to_any_variant(entry, i, variants)
+			if matching_variant is None:
+				#print('ERROR: unmatched reading:', k.text, entry, parse, sep='\n')
+				continue
+			record_complex_mapping(mapping, matching_variant, entry.id, kata_to_hira(k.text))
+			mapped_jmdict_ids.add(entry.id)
+			del k
+
+		for i, r in enumerate(entry.readings):
+			if (
+					len(entry.kanjis) > 0
+					and
+					any(not is_katakana(c) for c in r.text)
+					and
+					not r.nokanji
+					and
+					not have_uk_for_reading(entry, i)
+					):
+
+				continue
+
+			variant = parse_mecab_variants(mecab.parse(r.text), one=True)
+			if any(len(l) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM for l in variant) and (len(variant) > 1 or not all(is_katakana(c) for c in r.text)):
+				#print('WARNING: strange reading parse:', r.text)
+				pass
+			record_complex_mapping(mapping, variant, entry.id, kata_to_hira(r.text))
+			mapped_jmdict_ids.add(entry.id)
+
+	del mecab
+	return mapping, mapped_jmdict_ids
+
+
+################## JMNEDICT ##################
+
+def unidic2jmnedict_simple_match(lex, jindex):
+	writing = kata_to_hira(lex.orthBase)
+	reading = kata_to_hira(lex.pronBase)
+
+	entries = jindex.get(writing, ())
+	for entry in entries:
+		if reading == writing:
+			if any(r.text == writing for r in entry.readings):
+				yield entry
+		elif any(kata_to_hira(r.text) == reading for r in entry.readings):
+			yield entry
+
+def match_unidic_jmnedict(
+		jmnedict: dictionary.DictionaryType, jindex: dictionary.IndexedDictionaryType,
+		unidic: UnidicType) -> Dict[int, Set[int]]:
+
+	mapping = {}
+
+	mapped = set()
+	print('mapping jmnedict')
+	for lemma_lexes in unidic.values():
+		lemma_id = None
+		for lex in lemma_lexes:
+			lemma_id = lex.lemma_id
+			if lex.pos[:2] != UNIDIC_NAME_POS:
+				continue
+			for entry in unidic2jmnedict_simple_match(lex, jindex):
+				mapped.add(entry.id)
+
+		if len(mapped) > 0:
+			mapping[lemma_id] = mapped.copy()
+		mapped.clear()
+
+	gc.collect()
+	return mapping
+
+
+################## CORPUS PROCESSING ##################
 
 def have_matching_writing(entry, orth, orth_base):
 	return any(kata_to_hira(k.text) in (orth, orth_base) for k in entry.kanjis)
@@ -396,11 +598,11 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 		if complex_mapping_node is None:
 			break
 
-		if len(sentence[current_index]) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-			continuous_orth += sentence[current_index][ORTH_INDEX + 1]
-			continuous_orth_base += sentence[current_index][ORTH_BASE_INDEX + 1]
-			continuous_pron += sentence[current_index][PRON_INDEX + 1]
-			continuous_pron_base += sentence[current_index][PRON_BASE_INDEX + 1]
+		if len(sentence[current_index]) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+			continuous_orth += sentence[current_index][ORTH_INDEX]
+			continuous_orth_base += sentence[current_index][ORTH_BASE_INDEX]
+			continuous_pron += sentence[current_index][PRON_INDEX]
+			continuous_pron_base += sentence[current_index][PRON_BASE_INDEX]
 		else:
 			continuous_orth += sentence[current_index][0]
 			continuous_orth_base += sentence[current_index][0]
@@ -443,28 +645,42 @@ def try_extract_and_record_complex_mapping(sentence, word_index, u2j_complex_map
 				return current_index
 
 def try_record_simple_mapping(parse_line, unidic2jmdict_mapping: SimpleU2JMappingType, freqs):
-	if len(parse_line) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
+	if len(parse_line) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
 		return
 
 	lemma_mapping = unidic2jmdict_mapping.get(parse_line[LEMMA_ID_INDEX])
 	if lemma_mapping is None:
 		return
 
+	mapped = False
 	if type(lemma_mapping) == int:
 		freqs[lemma_mapping] += 1
-		return
+		mapped = True
 	elif type(lemma_mapping) == set:
 		for jmdict_id in lemma_mapping:
 			assert type(jmdict_id) == int
 			freqs[jmdict_id] += 1
+			mapped = True
 	else:
-		coerced_writing = kata_to_hira(parse_line[ORTH_BASE_INDEX + 1])
+		coerced_writing = kata_to_hira(parse_line[ORTH_BASE_INDEX])
 		assert type(lemma_mapping) == list
 		for writing, jmdict_id in lemma_mapping:
 			if coerced_writing == writing:
 				freqs[jmdict_id] += 1
+				mapped = True
 
-def process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdict, freqs):
+	return mapped
+
+def try_record_jmnedict_mapping(parse_line, u2jmnedict_mapping, freqs):
+	if len(parse_line) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM:
+		return
+	if parse_line[POS_INDEX:POS_INDEX+2] != UNIDIC_NAME_POS:
+		return
+
+	for jmnedict_id in u2jmnedict_mapping.get(parse_line[-1], ()):
+		freqs[jmnedict_id] += 1
+
+def process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, u2jmnedict_mapping, jmdict, freqs):
 	sentence = parse_mecab_variants(sentence, one=True)
 	i = -1
 	while i + 1 < len(sentence):
@@ -476,9 +692,12 @@ def process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdic
 				i += skip
 				continue
 
-		try_record_simple_mapping(sentence[i], unidic2jmdict_mapping, freqs)
+		if try_record_simple_mapping(sentence[i], unidic2jmdict_mapping, freqs):
+			continue
 
-def process_corpus(unidic2jmdict_mapping, u2j_complex_mapping, jmdict):
+		try_record_jmnedict_mapping(sentence[i], u2jmnedict_mapping, freqs)
+
+def process_corpus(unidic2jmdict_mapping, u2j_complex_mapping, u2jmnedict_mapping, jmdict):
 	extracted_dump = download_dump()
 	# with open('tmp/raw-corpus.txt', 'wb') as of:
 	mecab = subprocess.Popen([f'unxz -c {extracted_dump} | mecab -d tmp/unidic-cwj-2.3.0'],
@@ -493,7 +712,12 @@ def process_corpus(unidic2jmdict_mapping, u2j_complex_mapping, jmdict):
 			line_no, l = next(iterator)
 			if l.startswith('EOS'):
 				if len(sentence) > 0:
-					process_sentence(sentence, unidic2jmdict_mapping, u2j_complex_mapping, jmdict, freqs)
+					process_sentence(
+						sentence,
+						unidic2jmdict_mapping, u2j_complex_mapping, u2jmnedict_mapping,
+						jmdict,
+						freqs
+					)
 				sentence.clear()
 			else:
 				if '\t' not in l:
@@ -556,202 +780,71 @@ def get_mapped_jmdict_ids(mapping):
 					mapped_jmdict_ids.add(s[1])
 	return mapped_jmdict_ids
 
-def compute_reading(variant):
-	is_regex = False
-	reading = []
-	for l in variant:
-		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-			reading.append(l[PRON_INDEX + 1])
-		else:
-			reading.append('.+')
-			is_regex = True
-	reading = kata_to_hira(''.join(reading))
-	if is_regex:
-		return re.compile(reading)
-	else:
-		return reading
+def load_mappings(filename):
+	with open(filename, 'rb') as f:
+		mapping = pickle.load(f)
+		complex_mapping = pickle.load(f)
+		jmnedict_mapping = pickle.load(f)
+		return mapping, complex_mapping, jmnedict_mapping
 
-def reading_matches(parsed_reading, dictionary_reading):
-	#print(f'reading_matches({parsed_reading}, {dictionary_reading})')
-	if type(parsed_reading) == str:
-		return parsed_reading == dictionary_reading
-	else:
-		return parsed_reading.fullmatch(dictionary_reading) is not None
+def compute_mappings():
+	unidic, uindex = load_unidic()
 
-def variant_matches_reading(entry, kanji_index, variant):
-	if len(variant) == 1 and len(variant[0]) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-		return True
-	parsed_reading = compute_reading(variant)
-	for r in entry.readings:
-		if (
-				not r.nokanji
-				and
-				(
-					r.kanji_restriction is None
-					or
-					kanji_index in r.kanji_restriction
-				)
-				and
-				reading_matches(parsed_reading, kata_to_hira(r.text))
-			):
+	jmnedict, jmnedict_index = dictionary.load_dictionary('JMnedict.xml.gz', index=True)
+	jmnedict_mapping = match_unidic_jmnedict(jmnedict, jmnedict_index, unidic)
 
-			return True
-
-	return False
-
-def match_reading_to_any_variant(entry, kanji_index, variants):
-	for variant in variants:
-		if variant_matches_reading(entry, kanji_index, variant):
-			return variant
-	return None
-
-@dataclass
-class ComplexMappingNode(object):
-	jmdict_ids: int
-	children: Dict[int, ComplexMappingNode]
-
-def get_complex_mapping_key(parse_line):
-	if len(parse_line) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-		return parse_line[LEMMA_ID_INDEX]
-	else:
-		return parse_line[0]
-
-ComplexMappingType = Dict[Union[str, int], ComplexMappingNode]
-def record_complex_mapping(mapping: ComplexMappingType, parse, id, text):
-	key = get_complex_mapping_key(parse[0])
-	target = mapping.get(key)
-	if target is None:
-		target = ComplexMappingNode(set(), {})
-		mapping[key] = target
-
-	for l in parse[1:]:
-		key = get_complex_mapping_key(l)
-		new_target = target.children.get(key)
-		if new_target is None:
-			new_target = ComplexMappingNode(set(), {})
-			target.children[key] = new_target
-		target = new_target
-
-	target.jmdict_ids.add(id)
-
-def have_uk_for_reading(entry, reading_index):
-	for sg in entry.sense_groups:
-		for s in sg.senses:
-			if s.reading_restriction is not None and reading_index not in s.reading_restriction:
-				continue
-			if 'uk' in s.misc:
-				return True
-
-def parse_mecab_variants(parse, one):
-	if type(parse) == str:
-		parse = parse.split('\n')[:(-1 if one else -2)]
-	variants = [[]]
-	for l in parse:
-		if l.startswith('EOS'):
-			variants.append([])
-			continue
-
-		l = l.split('\t')
-		l.extend(l.pop().split(','))
-		if len(l) >= NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1:
-			l[LEMMA_ID_INDEX] = int(l[LEMMA_ID_INDEX])
-		variants[-1].append(l)
-
-	if one:
-		return variants[0]
-	else:
-		return variants
-
-def compute_complex_mapping(jmdict, already_mapped_jmdict_ids) -> Tuple[ComplexMappingType, Set[int]]:
-	mapping = {}
-	mecab = MeCab.Tagger('-d tmp/unidic-cwj-2.3.0')
-	mapped_jmdict_ids = set()
-
-	for entry_index, entry in enumerate(jmdict.values()):
-		if (entry_index + 1) % 10000 == 0:
-			print(f'complex mappings {entry_index + 1}/{len(jmdict)}')
-
-		if entry.id in already_mapped_jmdict_ids:
-			continue
-		for i, k in enumerate(entry.kanjis):
-			assert ',' not in k
-			# correct parse for entry 1177810 appears after 15+ variants
-			# similar at entry 1363410
-			# entry 1269140 have alterations in reading preventing match
-			# similar at entry 1379410
-			parse = mecab.parseNBest(10, k.text)
-			variants = parse_mecab_variants(parse, one=False)
-			matching_variant = match_reading_to_any_variant(entry, i, variants)
-			if matching_variant is None:
-				#print('ERROR: unmatched reading:', k.text, entry, parse, sep='\n')
-				continue
-			record_complex_mapping(mapping, matching_variant, entry.id, kata_to_hira(k.text))
-			mapped_jmdict_ids.add(entry.id)
-			del k
-
-		for i, r in enumerate(entry.readings):
-			if (
-					len(entry.kanjis) > 0
-					and
-					any(not is_katakana(c) for c in r.text)
-					and
-					not r.nokanji
-					and
-					not have_uk_for_reading(entry, i)
-					):
-
-				continue
-
-			variant = parse_mecab_variants(mecab.parse(r.text), one=True)
-			if any(len(l) < NUMBER_OF_PROPERTIES_OF_KNOWN_UNIDIC_LEXEM + 1 for l in variant) and (len(variant) > 1 or not all(is_katakana(c) for c in r.text)):
-				#print('WARNING: strange reading parse:', r.text)
-				pass
-			record_complex_mapping(mapping, variant, entry.id, kata_to_hira(r.text))
-			mapped_jmdict_ids.add(entry.id)
-
-	del mecab
-	return mapping, mapped_jmdict_ids
-
-def compute_freqs():
-	jmdict, jindex = dictionary.load_dictionary()
-
-	print('\n\tFIXME: compute names mapping!\n')
-
-	filename = 'tmp/unidic2jmdict-mapping.pkl'
-	if os.path.exists(filename):
-		with open(filename, 'rb') as f:
-			mapping = pickle.load(f)
-			complex_mapping = pickle.load(f)
-	else:
-		unidic, uindex = load_unidic()
-		u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
-		load_additional_pos_mapping(u2j_pos)
-		mapping = match_unidic_jmdict_with_refining(jmdict, jindex, unidic, uindex, u2j_pos)
-		del unidic, uindex, u2j_pos
-		gc.collect()
-
-		mapped_jmdict_ids = get_mapped_jmdict_ids(mapping)
-		complex_mapping, new_mapped_jmdict_ids = compute_complex_mapping(jmdict, mapped_jmdict_ids)
-		mapped_jmdict_ids.update(new_mapped_jmdict_ids)
-		print(len(mapped_jmdict_ids), 'mapped jmdict entries')
-		print(sum(1 for entry in jmdict.values() if entry.is_common() and entry.id not in mapped_jmdict_ids), 'unmapped commons')
-		for entry in jmdict.values():
-			if entry.is_common() and entry.id not in mapped_jmdict_ids:
-				print(entry)
-				input()
-		del mapped_jmdict_ids, new_mapped_jmdict_ids
-		gc.collect()
-
-		with open(filename, 'wb') as of:
-			pickle.dump(mapping, of)
-			pickle.dump(complex_mapping, of)
-
-	del jindex
+	del jmnedict, jmnedict_index
 	gc.collect()
 
-	print(len(mapping), len(complex_mapping))
+	jmdict, jindex = dictionary.load_dictionary(index=True)
 
-	freqs = process_corpus(mapping, complex_mapping, jmdict)
+	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
+	load_additional_pos_mapping(u2j_pos)
+
+	mapping = match_unidic_jmdict_with_refining(jmdict, jindex, unidic, uindex, u2j_pos)
+
+	del unidic, uindex, u2j_pos, jindex
+	gc.collect()
+
+	mapped_jmdict_ids = get_mapped_jmdict_ids(mapping)
+	complex_mapping, new_mapped_jmdict_ids = compute_complex_mapping(jmdict, mapped_jmdict_ids)
+	mapped_jmdict_ids.update(new_mapped_jmdict_ids)
+
+	print(len(mapped_jmdict_ids), 'mapped jmdict entries')
+	print(
+		sum(1 for entry in jmdict.values() if entry.is_common() and entry.id not in mapped_jmdict_ids),
+		'unmapped commons'
+	)
+	print('Here they are:')
+	for entry in jmdict.values():
+		if entry.is_common() and entry.id not in mapped_jmdict_ids:
+			print(entry)
+
+	del mapped_jmdict_ids, new_mapped_jmdict_ids
+	gc.collect()
+
+	return jmdict, mapping, complex_mapping, jmnedict_mapping
+
+def dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping):
+	with open(filename, 'wb') as of:
+		pickle.dump(jmdict_mapping, of)
+		pickle.dump(jmdict_complex_mapping, of)
+		pickle.dump(jmnedict_mapping, of)
+
+def get_mappings_and_dictionaries():
+	filename = 'tmp/unidic2jmdict-mapping.pkl'
+	if os.path.exists(filename):
+		jmdict = dictionary.load_dictionary()
+		return (jmdict, *load_mappings(filename))
+	else:
+		jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = compute_mappings()
+		dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
+		return jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping
+
+def compute_freqs():
+	jmdict, mapping, complex_mapping, jmnedict_mapping = get_mappings_and_dictionaries()
+
+	freqs = process_corpus(mapping, complex_mapping, jmnedict_mapping, jmdict)
 	return [(k,v) for k, v in freqs.items() if v >= 77]
 
 def save_freqs(freqs):
