@@ -139,15 +139,11 @@ conversion_table["ええ"] = ["ee", "ē"]
 conversion_table["おう"] = ["ou", "ō"]
 conversion_table["おお"] = ["oo", "ō"]
 
-skip = 180
-count = 0
 def is_romajination(hiragana, word):
-	global skip, count
 	if len(word) < len(hiragana):
 		return False
 	# original_hiragana = hiragana
 	word = word.lower()
-	original_word = word
 	while len(hiragana) > 0 and len(word) > 0:
 		for i in range(4, 0, -1):
 			values = conversion_table.get(hiragana[:i])
@@ -165,10 +161,4 @@ def is_romajination(hiragana, word):
 			break
 
 	res = len(hiragana) == 0 and len(word) == 0
-	if not res and re.fullmatch('[a-z]+', original_word) is not None:
-		count += 1
-		#print(count, original_hiragana, original_word, file=sys.stderr)
-		if count > skip:
-			#input()
-			pass
 	return res

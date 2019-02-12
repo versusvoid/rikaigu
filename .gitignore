@@ -6,7 +6,6 @@ dist
 data/*.dat
 data/*.idx
 data/*.bin
-data/expressions.dat
 cpp/rikai.asm.*
 cpp/release
 cpp/client/config.h

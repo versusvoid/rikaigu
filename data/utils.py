@@ -84,35 +84,30 @@ _long_vowel_mark_mapping = dict(itertools.chain(
  	map(lambda k: (k, 'う'), _o_row),
 	map(lambda k: (k, 'ー'), 'ぁ ぃ ぅ ぇ ぉ ゔ ゎ'.split()),
 ))
-print('\n\n\tWARNING: check if new kata_to_hira() is suitable for final dictionary index\n\n')
-def kata_to_hira(w, full_or_none=False):
+def kata_to_hira(w, agressive=True):
 	res = []
-	prev = None
 	for c in w:
 		code = ord(c)
 		if code >= 0x30a1 and code <= 0x30f6:
 			res.append(chr(ord(c) - ord('ァ') + ord('ぁ')))
 		elif c == 'ー' and len(res) > 0 and res[-1] in _long_vowel_mark_mapping:
 			res.append(_long_vowel_mark_mapping[res[-1]])
-		elif full_or_none and not is_hiragana(c):
-			return w
 		else:
 			res.append(c)
 
-		if res[-1] == 'を':
-			res[-1] = 'お'
-		if res[-1] == 'づ':
-			res[-1] = 'ず'
-		if res[-1] == 'は':
-			res[-1] = 'わ'
+		if agressive:
+			if res[-1] == 'を':
+				res[-1] = 'お'
+			if res[-1] == 'づ':
+				res[-1] = 'ず'
+			if res[-1] == 'は':
+				res[-1] = 'わ'
 
-		if len(res) > 1:
-			if res[-1] == 'お' and res[-2] in _o_row:
-				res[-1] = 'う'
-			if res[-1] == 'え' and res[-2] in _e_row:
-				res[-1] = 'い'
-
-		prev = c
+			if len(res) > 1:
+				if res[-1] == 'お' and res[-2] in _o_row:
+					res[-1] = 'う'
+				if res[-1] == 'え' and res[-2] in _e_row:
+					res[-1] = 'い'
 
 	return ''.join(res)
 

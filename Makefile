@@ -1,6 +1,6 @@
 CSS = css/options.css css/popup-common.css css/popup-black.css css/popup-blue.css css/popup-lightblue.css css/popup-yellow.css
 DICT_STATIC = data/kanji.dat data/radicals.dat data/deinflect.dat
-DICT_DYNAMIC = data/dict.dat data/dict.idx data/names.dat data/names.idx data/kanji.idx data/expressions.dat
+DICT_DYNAMIC = data/dict.dat data/dict.idx data/names.dat data/names.idx data/kanji.idx
 IMG = images/ba.png images/icon128.png images/icon48.png
 HTML = html/background.html html/options.html html/scratchpad.html html/popup.html
 JS = js/background.js js/config.js js/options.js js/rikaicontent.js js/selection.js js/highlight.js js/scratchpad.js js/popup.js
@@ -12,7 +12,7 @@ CPP_RELEASE = cpp/release/rikai.asm.js cpp/release/rikai.asm.wasm cpp/release/ri
 all: cpp/rikai.asm.js
 release: dist/rikaigu.zip
 
-$(DICT_DYNAMIC): data/dictionary.py data/expressions.py data/prepare-dict.py data/utils.py data/index.py data/freqs.py data/romaji.py data/expressions.dat.in
+$(DICT_DYNAMIC): data/dictionary.py data/prepare-dict.py data/utils.py data/index.py data/freqs.py data/romaji.py
 	data/prepare-dict.py
 
 $(CPP_DEV): $(DICT_DYNAMIC)
@@ -29,7 +29,7 @@ dist/rikaigu.zip: manifest.json $(CSS) $(DICT_STATIC) $(IMG) $(HTML) $(JS) $(DIC
 	ln -sfr $(JS) dist/rikaigu/js
 	ln -sfr $(CPP_RELEASE) dist/rikaigu/cpp
 	ln -sfr data/radicals.dat data/deinflect.dat \
-		data/dict.idx data/names.idx data/kanji.idx data/expressions.dat \
+		data/dict.idx data/names.idx data/kanji.idx \
 		dist/rikaigu/data
 	cp manifest.json dist/rikaigu/
 	sed -i 's/rikaigu (devel)/rikaigu/g' dist/rikaigu/manifest.json

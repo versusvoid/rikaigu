@@ -790,13 +790,13 @@ def load_mappings(filename):
 def compute_mappings():
 	unidic, uindex = load_unidic()
 
-	jmnedict, jmnedict_index = dictionary.load_dictionary('JMnedict.xml.gz', index=True)
+	jmnedict, jmnedict_index = dictionary.load_dictionary('JMnedict.xml.gz')
 	jmnedict_mapping = match_unidic_jmnedict(jmnedict, jmnedict_index, unidic)
 
 	del jmnedict, jmnedict_index
 	gc.collect()
 
-	jmdict, jindex = dictionary.load_dictionary(index=True)
+	jmdict, jindex = dictionary.load_dictionary()
 
 	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
 	load_additional_pos_mapping(u2j_pos)
@@ -834,7 +834,7 @@ def dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_map
 def get_mappings_and_dictionaries():
 	filename = 'tmp/unidic2jmdict-mapping.pkl'
 	if os.path.exists(filename):
-		jmdict = dictionary.load_dictionary()
+		jmdict = dictionary.load_dictionary(index=False)
 		return (jmdict, *load_mappings(filename))
 	else:
 		jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = compute_mappings()
@@ -845,7 +845,7 @@ def compute_freqs():
 	jmdict, mapping, complex_mapping, jmnedict_mapping = get_mappings_and_dictionaries()
 
 	freqs = process_corpus(mapping, complex_mapping, jmnedict_mapping, jmdict)
-	return [(k,v) for k, v in freqs.items() if v >= 77]
+	return list(freqs.items())
 
 def save_freqs(freqs):
 	with open('tmp/jmdict-freqs.dat', 'w') as of:
@@ -856,7 +856,7 @@ def load_freqs():
 	res = []
 	with open('tmp/jmdict-freqs.dat') as f:
 		for l in f:
-			k, v = l.strip().split()
+			k, v = map(int, l.strip().split())
 			res.append((k, v))
 	return res
 
@@ -867,8 +867,8 @@ def compute_freq_order():
 		freqs = compute_freqs()
 		save_freqs(freqs)
 
-	freqs.sort(key=lambda p: int(p[1]), reverse=True)
-	return {k:i for i, (k, _) in enumerate(freqs)}
+	freqs.sort(key=lambda p: p[1], reverse=True)
+	return {k:i for i, (k, v) in enumerate(freqs) if v >= 77}
 
 __freq_order = compute_freq_order()
 def get_frequency(entry):

@@ -191,45 +191,6 @@ def make_entry(elem, entities):
 
 	return entry
 
-def find_entry(k, r, d=None, with_keys=False):
-	if d is None:
-		d = _dictionary
-	entries = d.get(k)
-	if entries is None:
-		entries = d.get(kata_to_hira(k))
-	if entries is None:
-		return []
-
-	if len(entries) == 1:
-		return (entries if with_keys else [entries[0][1]])
-
-	i = -1
-	while i + 1 < len(entries):
-		i += 1
-		found = False
-		for sg in entries[i][1].sense_groups:
-			for sense in sg.senses:
-				if 'arch' not in sense.misc:
-					found = True
-					break
-			if found:
-				break
-
-		if not found:
-			entries.pop(i)
-			i -= 1
-
-	if r is None:
-		return (entries if with_keys else list(map(lambda p: p[1], entries)))
-
-	r = kata_to_hira(r)
-	for key_sources, e in entries:
-		for reading in e.readings:
-			if kata_to_hira(reading.text) == r:
-				return ([(key_sources, e)] if with_keys else [e])
-
-	raise Exception(f'Unknown entry {k}|{r}:\n{entries}')
-
 def dictionary_reader(dictionary='JMdict_e.gz'):
 	dictionary_path = download('http://ftp.monash.edu.au/pub/nihongo/' + dictionary, dictionary)
 	entities = {}
@@ -250,17 +211,27 @@ def dictionary_reader(dictionary='JMdict_e.gz'):
 			if entry_no % 10000 == 0:
 				print(dictionary, entry_no)
 			entry = make_entry(elem, entities)
-			yield entry, elem
+			yield entry
 			elem.clear()
 		elif elem.tag in ('JMdict', 'JMnedict'):
 			elem.clear()
 
 IndexedDictionaryType = Dict[str, List[Entry]]
-def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> IndexedDictionaryType:
+def make_indexed_dictionary(
+		entries,
+		variate,
+		convert_to_hiragana_for_index,
+		agressive_conversion) -> IndexedDictionaryType:
+
 	print('indexing dictionary')
 	res = {}
 	for e in entries:
-		for key in index_keys(e, variate=variate, convert_to_hiragana=convert_to_hiragana_for_index):
+		keys = index_keys(e,
+			variate=variate,
+			convert_to_hiragana=convert_to_hiragana_for_index,
+			agressive_conversion=agressive_conversion
+		)
+		for key in keys:
 			other_entries = res.setdefault(key, [])
 			if len(other_entries) == 0 or other_entries[-1].id != e.id:
 				other_entries.append(e)
@@ -269,9 +240,10 @@ def make_indexed_dictionary(entries, convert_to_hiragana_for_index, variate) -> 
 DictionaryType = Dict[int, Entry]
 def load_dictionary(
 		dictionary='JMdict_e.gz',
-		index=False,
+		index=True,
+		variate=False,
 		convert_to_hiragana_for_index=True,
-		variate=False) -> Tuple[DictionaryType, IndexedDictionaryType]:
+		agressive_conversion=True) -> Tuple[DictionaryType, IndexedDictionaryType]:
 
 	print('loading dictionary', dictionary)
 	filename = f'tmp/parsed-{dictionary}.pkl'
@@ -279,11 +251,16 @@ def load_dictionary(
 		with open(filename, 'rb') as f:
 			entries = pickle.load(f)
 	else:
-		entries = {e.id: e for e, _ in dictionary_reader(dictionary)}
+		entries = {e.id: e for e in dictionary_reader(dictionary)}
 		with open(filename, 'wb') as f:
 			pickle.dump(entries, f)
 
 	if index:
-		return entries, make_indexed_dictionary(entries.values(), convert_to_hiragana_for_index, variate)
+		return entries, make_indexed_dictionary(
+			entries.values(),
+			variate,
+			convert_to_hiragana_for_index,
+			agressive_conversion
+		)
 	else:
 		return entries

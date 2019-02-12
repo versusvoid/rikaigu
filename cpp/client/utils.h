@@ -43,7 +43,6 @@ struct Config
 {
 	bool only_reading;
 	bool kanji_components;
-	bool deinflect_expressions;
 	Dictionary default_dictionary;
 	std::set<std::string> kanji_info;
 	std::map<uint32_t, std::string> review_list;

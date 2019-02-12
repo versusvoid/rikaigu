@@ -46,7 +46,6 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 		'<tr><td>A</td><td>Alternate popup location</td></tr>' +
 		'<tr><td>Y</td><td>Move popup location down</td></tr>' +
 		'<tr><td>D</td><td>Hide/show definitions</td></tr>' +
-		'<tr><td>E</td><td>Recognize expressions</td></tr>' +
 		'<tr><td>Shift/Enter&nbsp;&nbsp;</td><td>Switch dictionaries</td></tr>' +
 		'</table>';
 
@@ -163,7 +162,6 @@ function rikaiguEnable(tab) {
 					loadFile('data/names.idx'),
 					loadFile('data/kanji.idx'),
 					loadFile('data/deinflect.dat'),
-					loadFile('data/expressions.dat'),
 				]).then(onLoaded.bind(null, tab), onLoadError);
 		}
 	};

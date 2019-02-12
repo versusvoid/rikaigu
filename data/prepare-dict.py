@@ -3,7 +3,6 @@
 import re
 import struct
 
-import expressions
 import dictionary
 import freqs
 from utils import kata_to_hira
@@ -13,11 +12,13 @@ from romaji import is_romajination
 control_sense_symbols = re.compile('[\\`]')
 def format_sense(sense, entry):
 	parts = []
-	if len(sense.kanji_restriction) + len(sense.reading_restriction) > 0:
+	kanji_restriction = sense.kanji_restriction or ()
+	reading_restriction = sense.reading_restriction or ()
+	if len(kanji_restriction) + len(reading_restriction) > 0:
 		restrictions = []
-		for ki in sense.kanji_restriction:
+		for ki in kanji_restriction:
 			restrictions.append(entry.kanjis[ki].text)
-		for ri in sense.reading_restriction:
+		for ri in reading_restriction:
 			restrictions.append(entry.readings[ri].text)
 		parts.append('(only ' + ','.join(restrictions) + ')')
 
@@ -70,7 +71,8 @@ def format_entry(entry):
 		'''
 		kanji_index_to_readings = {}
 		for ri, r in enumerate(entry.readings):
-			for ki in r.kanjis:
+			kanji_indices = r.kanji_restriction or range(len(entry.kanjis))
+			for ki in kanji_indices:
 				kanji_index_to_readings.setdefault(ki, []).append(ri)
 
 		grouped_readings_to_kanji_offsets = {}
@@ -127,6 +129,7 @@ def format_entry(entry):
 		'''
 		sense_groups = []
 		for g in entry.sense_groups:
+			# TODO use mecab to infer additional pos for exp entries
 			sense_groups.append(','.join(g.pos) + ';' + '`'.join(map(lambda s: format_sense(s, entry), g.senses)))
 		parts.append('\\'.join(sense_groups))
 		del sense_groups
@@ -180,7 +183,7 @@ def prepare_names():
 	offset = 0
 	combined_entries = {}
 	with open(f'data/names.dat', 'wb') as of:
-		for entry, _ in dictionary.dictionary_reader('JMnedict.xml.gz'):
+		for entry in dictionary.dictionary_reader('JMnedict.xml.gz'):
 			if len(entry.readings) == 1 and len(entry.transes) == 1 and len(entry.transes[0].glosses) == 1:
 				key = entry.readings[0].text + ' - ' + ','.join(entry.transes[0].types)
 				combined_entry = combined_entries.get(key)
@@ -200,7 +203,6 @@ def prepare_names():
 			offset += len(l) + 1
 
 		for combined_entry in combined_entries.values():
-			combined_entry.readings[0] = combined_entry.readings[0]._replace(kanjis=range(len(combined_entry.kanjis)))
 			entry_index_keys = index_keys(combined_entry, variate=False)
 			for key in entry_index_keys:
 				index.setdefault(key, set()).add(offset)
@@ -212,49 +214,19 @@ def prepare_names():
 
 	write_index(index, 'names')
 
-def prepare_dict(process_expressions):
-
-	if not process_expressions:
-		expression_ids = {}
-		with open('data/expressions.dat.in') as f:
-			for l in f:
-				l = l.strip().split('\t')
-				if len(l) == 1 or len(l[0]) == 0 or l[0][0] == '#': continue
-				expression_ids[l[4]] = '?'
-
+def prepare_dict():
 	index = {}
 	offset = 0
 	with open(f'data/dict.dat', 'wb') as of:
-		for entry, elem in dictionary.dictionary_reader('JMdict_e.gz'):
+		for entry in dictionary.dictionary_reader('JMdict_e.gz'):
 			entry_index_keys = index_keys(entry, variate=True)
 			for key in entry_index_keys:
 				index.setdefault(key, set()).add(offset)
-			if process_expressions:
-				expressions.record_entry(entry, entry_index_keys, elem)
-			elif entry.id in expression_ids:
-				expression_ids[entry.id] = offset
 
 			l = format_entry(entry).encode('utf-8')
 			of.write(l)
 			of.write(b'\n')
 			offset += len(l) + 1
-
-	if process_expressions:
-		expressions.dump_expressions()
-	else:
-		with open('data/expressions.dat.in') as f, open('data/expressions.dat', 'w') as of:
-			for l in f:
-				l = l.strip()
-				if len(l) == 0 or l[0] == '#': continue
-				parts = l.split('\t')
-				if len(parts) == 1:
-					print(parts[0], file=of)
-					continue
-
-				offset = expression_ids.get(parts[4])
-				assert offset != '?', "Can't find expression in dictionary: " + str(parts)
-				parts[4] = offset
-				print(*parts, sep='\t', file=of)
 
 	write_index(index, 'dict')
 
@@ -276,7 +248,7 @@ def index_kanji():
 		for kanji_code_point, offset in index:
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
-prepare_dict(False)
+prepare_dict()
 prepare_names()
 # TODO generate kanji.dat
 index_kanji()

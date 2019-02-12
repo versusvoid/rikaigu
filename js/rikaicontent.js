@@ -477,12 +477,6 @@ function onKeyDown(ev) {
 				extractTextAndSearch();
 			});
 			break;
-		case 'KeyE':
-			chrome.storage.local.set({deinflectExpressions: !rikaigu.config.deinflectExpressions}, function() {
-				rikaigu.shownMatch = null;
-				extractTextAndSearch();
-			});
-			break;
 		case 'KeyF':
 			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
 				el.classList.toggle('rikaigu-hidden');

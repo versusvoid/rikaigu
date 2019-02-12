@@ -4,30 +4,21 @@
 
 #include <map>
 
-struct ExpressionResult
-{
-	DEntry dentry;
-	std::string reason;
-};
-
 struct WordResult
 {
 	DEntry dentry;
 	std::string reason;
 	size_t match_symbols_length;
 	size_t match_bytes_length;
-	std::vector<ExpressionResult> expressions;
 
 	WordResult(const DEntry& dentry,
 			const std::string& reason = "",
 			size_t match_symbols_length = 0,
-			size_t match_bytes_length = 0,
-			const std::vector<ExpressionResult>&& expressions = {})
+			size_t match_bytes_length = 0)
 		: dentry(dentry)
 		, reason(reason)
 		, match_symbols_length(match_symbols_length)
 		, match_bytes_length(match_bytes_length)
-		, expressions(std::move(expressions))
 	{}
 };
 

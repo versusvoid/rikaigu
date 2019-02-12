@@ -2,6 +2,7 @@
 import sys
 import re
 import os
+import functools
 from collections import defaultdict
 from utils import is_katakana, is_kanji, is_hiragana, kata_to_hira
 
@@ -224,21 +225,23 @@ def is_variable_word(w):
 	return True
 
 
-def index_keys(entry, variate=True, convert_to_hiragana=True, with_source=False):
-	transform = kata_to_hira if convert_to_hiragana else (lambda x: x)
+def index_keys(entry, variate=False, convert_to_hiragana=True, agressive_conversion=False):
+	if convert_to_hiragana:
+		transform = functools.partial(kata_to_hira, agressive=agressive_conversion)
+	else:
+		transform = lambda x: x
+
 	res = defaultdict(set)
 	for k in entry.kanjis:
 		res[transform(k.text)].add(k.text)
 	for r in entry.readings:
 		res[transform(r.text)].add(r.text)
 		if variate:
-			for ki in r.kanjis:
+			kanji_indices = r.kanji_restriction or range(len(entry.kanjis))
+			for ki in kanji_indices:
 				k = entry.kanjis[ki]
 				if not is_variable_word(k.text): continue
 				for key in compute_variations(k.text, r.text):
 					res[key].add(k.text)
 
-	if with_source:
-		return res
-	else:
-		return set(res)
+	return set(res)

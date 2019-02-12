@@ -325,6 +325,8 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 
 	if (!config.only_reading)
 	{
+		buffer += std::to_string(word.dentry.freq());
+		buffer += "<br />";
 		for (auto sense_group : word.dentry.sense_groups())
 		{
 			buffer += "<span class=\"w-pos\">";
@@ -377,6 +379,7 @@ void render_entries(SearchResult& result)
 	{
 		buffer += "<div class=\"w-title\">Names Dictionary</div>";
 	}
+	// TODO? get rid of <table> since we have expressions no more
 	buffer += "<table>";
 
 	for (auto i = 0u; i < result.data.size(); ++i)
@@ -394,33 +397,12 @@ void render_entries(SearchResult& result)
 			part = result.source.substr(0, result.data[i].match_bytes_length);
 		}
 
-		buffer += "<td class=\"word";
-		if (!result.data[i].expressions.empty())
-		{
-			buffer += " expression";
-		}
-		else
-		{
-			buffer += "\" colspan=\"10";
-		}
-		buffer += "\" id=";
+		buffer += "<td class=\"word\" id=";
 		buffer += std::to_string(result.data[i].dentry.id());
 		buffer += '>';
 
 		entry_to_html(result.data[i], part);
-		buffer += "</td>";
-
-		for(auto it = result.data[i].expressions.rbegin(); it != result.data[i].expressions.rend(); ++it)
-		{
-			buffer += "<td class=\"word expression\" id=";
-			buffer += std::to_string(it->dentry.id());
-			buffer += ">+";
-			WordResult tmp_result(it->dentry, it->reason);
-			entry_to_html(tmp_result);
-			buffer += "</td>";
-		}
-
-		buffer += "</tr>";
+		buffer += "</td></tr>";
 	}
 	buffer += "</table>";
 	if (result.data.size() > 1)

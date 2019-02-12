@@ -77,7 +77,6 @@ static const KanjiIndexEntry* kanji_index = nullptr;
 static uint32_t kanji_index_length = 0;
 
 static string_view deinflect;
-static string_view expressions;
 static std::shared_ptr<Deinflector> deinflector;
 
 
@@ -259,17 +258,13 @@ static bool compare(WordResult& a, WordResult& b)
 	{
 		return a.dentry.name() < b.dentry.name();
 	}
-	if (a.expressions.empty() != b.expressions.empty())
-	{
-		return a.expressions.empty() > b.expressions.empty();
-	}
 	return a.reason.empty() > b.reason.empty();
 }
 
 static size_t line_buffer_size = 0;
 static char* line = nullptr;
 
-const std::size_t MAX_ENTRIES = 32; 
+const std::size_t MAX_ENTRIES = 32;
 inline void sort_and_limit(SearchResult& res)
 {
 	// Sort by match length and then by commonnesss
@@ -390,26 +385,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 					max_length = true_length;
 				}
 
-				std::vector<ExpressionResult> expressions;
-				for (auto i = 0U; i < u.expressions.size(); ++i)
-				{
-					const CandidateExpression& expr = u.expressions[i];
-					fseek(dict, expr.expression_rule->offset, SEEK_SET);
-					ssize_t line_length = getline(&line, &line_buffer_size, dict);
-					if (line_length == -1)
-					{
-						std::cerr << "Too bad" << std::endl;
-						continue;
-					}
-					DEntry expression_dentry(expr.expression_rule->offset, std::string(line, line_length - 1),
-						names_dictionary);
-					expression_dentry.filter_writings(expr.expression_writing);
-					expression_dentry.filter_senses(expr.expression_rule->sense_indices);
-					expressions.emplace_back(ExpressionResult{expression_dentry, expr.reason});
-				}
-				result.data.emplace_back(dentry, u.reason,
-					true_length, convertor.out.length(),
-					std::move(expressions));
+				result.data.emplace_back(dentry, u.reason, true_length, convertor.out.length());
 			}
 		}
 		if (count >= maxTrim) break;
@@ -587,17 +563,8 @@ bool dictionaries_init(const char* filename, const char* content, uint32_t lengt
 	else if (0 == strcmp(filename, "data/deinflect.dat"))
 	{
 		deinflect.assign(content, length);
-	}
-	else if (0 == strcmp(filename, "data/expressions.dat"))
-	{
-		expressions.assign(content, length);
-	}
-
-	if (deinflect && expressions)
-	{
-		deinflector = std::make_shared<Deinflector>(deinflect, expressions);
+		deinflector = std::make_shared<Deinflector>(deinflect);
 		deinflect.reset();
-		expressions.reset();
 	}
 
 	return true;

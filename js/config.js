@@ -40,13 +40,13 @@ if (localStorage.length > 0) {
 }
 
 var config = null;
-var cppConfig = ['onlyReadings', 'showKanjiComponents', 'deinflectExpressions', 'defaultDict', 'kanjiInfo'];
+var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
 function updateCppConfig() {
 	if (!window.Module) return;
 	var cppConfigValues = cppConfig.map(key => config[key]);
 	cppConfigValues.push(Object.entries(config['reviewList']).map(kv => kv.join(',')).join('|'));
 	Module.ccall('rikaigu_set_config', null,
-		['number', 'number', 'number', 'number', 'string', 'string'], cppConfigValues);
+		['number', 'number', 'number', 'string', 'string'], cppConfigValues);
 }
 
 function onConfigChange(configChange) {
@@ -63,7 +63,6 @@ function onConfigChange(configChange) {
 
 function initConfig(config) {
 	const defaultConfig = {
-		"deinflectExpressions": true,
 		"popupColor": "blue",
 		"matchHighlight": true,
 		"onlyReadings": false,

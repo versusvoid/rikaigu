@@ -728,7 +728,10 @@ _wikinode_actions = {
 }
 
 def japanese_dictionary_reader():
-	dictionary_path = download("https://dumps.wikimedia.org/jawiktionary/latest/jawiktionary-latest-pages-articles-multistream.xml.bz2", "jawiktionary.xml.bz2")
+	dictionary_path = download(
+		"https://dumps.wikimedia.org/jawiktionary/latest/jawiktionary-latest-pages-articles-multistream.xml.bz2",
+		"jawiktionary.xml.bz2"
+	)
 	with bz2.open(dictionary_path, 'rt') as f:
 		repack = f.readline().strip() != '<mediawiki>'
 
