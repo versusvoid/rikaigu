@@ -873,3 +873,21 @@ def compute_freq_order():
 __freq_order = compute_freq_order()
 def get_frequency(entry):
 	return __freq_order.get(entry.id)
+
+if __name__ == '__main__':
+	a, b, c = load_mappings('tmp/unidic2jmdict-mapping.pkl')
+	for k, vs in a.items():
+		if type(vs) == int:
+			if vs == 1135480:
+				print(k)
+		elif type(vs) == set:
+			if 1135480 in vs:
+				print(k)
+		elif type(vs) == list:
+			for w, v in vs:
+				if v == 1135480:
+					print(w, k)
+		else:
+			assert False
+raise Exception('FIXME ent_seq 1135480 absolutely incorrectly maps to 37876 物,接頭辞')
+raise Exception('FIXME ent_seq 1502390 does not displays')
