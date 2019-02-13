@@ -76,8 +76,8 @@ def format_entry(entry):
 				kanji_index_to_readings.setdefault(ki, []).append(ri)
 
 		grouped_readings_to_kanji_offsets = {}
-		for ki, reading_offsets in kanji_index_to_readings.items():
-			grouped_readings_to_kanji_offsets.setdefault(','.join(map(str, reading_offsets)), []).append(ki)
+		for ki, reading_indices in kanji_index_to_readings.items():
+			grouped_readings_to_kanji_offsets.setdefault(tuple(reading_indices), []).append(ki)
 		del kanji_index_to_readings
 
 		'''
@@ -85,7 +85,7 @@ def format_entry(entry):
 		'''
 		groups = []
 		seen = set()
-		for readings, kanji_offsets in grouped_readings_to_kanji_offsets.items():
+		for reading_indices, kanji_offsets in grouped_readings_to_kanji_offsets.items():
 			for i, ki in enumerate(kanji_offsets):
 				seen.add(ki)
 				k = entry.kanjis[ki]
@@ -95,8 +95,8 @@ def format_entry(entry):
 					kanji_offsets[i] += '|U'
 
 			groups.append(','.join(kanji_offsets))
-			if len(readings) != len(entry.readings)*2 - 1:
-				groups[-1] += '#' + readings
+			if len(reading_indices) != len(entry.readings):
+				groups[-1] += '#' + ','.join(map(str, reading_indices))
 
 		'''
 		Format ungrouped kanjis

@@ -149,6 +149,9 @@ const std::vector<KanjiGroup>& DEntry::kanji_groups()
 {
 	if (!kanji_string.empty())
 	{
+		// Make sure readings are parsed before parsing kanji
+		readings(); // FIXME WTF T___T
+
 		parse_kanji_groups();
 	}
 	return _kanji_groups;
@@ -250,6 +253,11 @@ void DEntry::parse_kanji_groups()
 			});
 		}
 		_kanji_groups.push_back(kanji_group);
+
+		if (kanji_group.readings.empty())
+		{
+			std::cerr << "NO READINGS FOR " << kanji_group.kanjis.at(0).text << std::endl;
+		}
 	}
 	kanji_string.clear();
 }

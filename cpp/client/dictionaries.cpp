@@ -248,17 +248,7 @@ static bool compare(WordResult& a, WordResult& b)
 	// and, generally, use better model, you dummy
 	if (a.dentry.freq() != b.dentry.freq())
 	{
-
-		std::cout << a.dentry.kanji_groups().at(0).kanjis.at(0).text.c_str()
-			<< ' ' << a.dentry.freq()
-			<< ' ' << a.match_bytes_length
-			<< ' ' << (std::log(a.dentry.freq() + 1) - a.match_bytes_length)
-			<< ", " << b.dentry.kanji_groups().at(0).kanjis.at(0).text.c_str()
-			<< ' ' <<b.dentry.freq()
-			<< ' ' << b.match_bytes_length
-			<< ' ' << (std::log(b.dentry.freq() + 1) - b.match_bytes_length)
-			<< std::endl;
-		return std::log(a.dentry.freq() + 1) - a.match_bytes_length < std::log(b.dentry.freq() + 1) - b.match_symbols_length;
+		return std::log(a.dentry.freq() + 1) - a.match_symbols_length < std::log(b.dentry.freq() + 1) - b.match_symbols_length;
 	}
 	if (a.match_symbols_length != b.match_symbols_length)
 	{
