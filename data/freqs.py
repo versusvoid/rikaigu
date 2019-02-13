@@ -10,6 +10,7 @@ import pickle
 import itertools
 import gc
 import re
+import multiprocessing
 from dataclasses import dataclass
 from typing import Tuple, Set, List, Dict, DefaultDict, Union
 from collections import namedtuple, defaultdict
@@ -116,6 +117,9 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 			continue
 
 		if reading == writing:
+			if all(r.text != lex.orthBase for r in entry.readings):
+				continue
+
 			condition1 = len(entry.kanjis) == 0
 			condition2 = condition1 or any(r.text == lex.orthBase and r.nokanji for r in entry.readings)
 			condition3 = condition2 or (len(entries) == 1 and any(
@@ -124,7 +128,7 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 				if not sg.is_archaic()
 			))
 			if condition3:
-				yield entry, writing
+				yield entry, lex.orthBase
 		elif (
 				any(kata_to_hira(r.text) == reading for r in entry.readings)
 				# or # 取り鍋, but it's a strange thing
@@ -179,7 +183,7 @@ def match_unidic_jmdict_one2one(
 
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
-	# print(jmdict2unidic.get(1000430), jmdict2unidic.get(1000420))
+	# print('1135480: ', jmdict2unidic.get(1135480))
 	# print(unidic2jmdict.get(911), unidic2jmdict.get(912), unidic2jmdict.get(6965))
 
 	print('computing unambiguous mappings')
@@ -537,7 +541,7 @@ def unidic2jmnedict_simple_match(lex, jindex):
 			yield entry
 
 def match_unidic_jmnedict(
-		jmnedict: dictionary.DictionaryType, jindex: dictionary.IndexedDictionaryType,
+		jindex: dictionary.IndexedDictionaryType,
 		unidic: UnidicType) -> Dict[int, Set[int]]:
 
 	mapping = {}
@@ -662,12 +666,15 @@ def try_record_simple_mapping(parse_line, unidic2jmdict_mapping: SimpleU2JMappin
 			freqs[jmdict_id] += 1
 			mapped = True
 	else:
-		coerced_writing = kata_to_hira(parse_line[ORTH_BASE_INDEX])
 		assert type(lemma_mapping) == list
-		for writing, jmdict_id in lemma_mapping:
-			if coerced_writing == writing:
-				freqs[jmdict_id] += 1
-				mapped = True
+		for coerced_writing in (parse_line[ORTH_BASE_INDEX], kata_to_hira(parse_line[ORTH_BASE_INDEX])):
+			for writing, jmdict_id in lemma_mapping:
+				if coerced_writing == writing:
+					freqs[jmdict_id] += 1
+					mapped = True
+
+			if mapped:
+				break
 
 	return mapped
 
@@ -791,7 +798,7 @@ def compute_mappings():
 	unidic, uindex = load_unidic()
 
 	jmnedict, jmnedict_index = dictionary.load_dictionary('JMnedict.xml.gz')
-	jmnedict_mapping = match_unidic_jmnedict(jmnedict, jmnedict_index, unidic)
+	jmnedict_mapping = match_unidic_jmnedict(jmnedict_index, unidic)
 
 	del jmnedict, jmnedict_index
 	gc.collect()
@@ -837,7 +844,9 @@ def get_mappings_and_dictionaries():
 		jmdict = dictionary.load_dictionary(index=False)
 		return (jmdict, *load_mappings(filename))
 	else:
-		jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = compute_mappings()
+		# Using `multiprocessing` to reduce memory consumption after mappings computation
+		with multiprocessing.Pool(1) as p:
+			jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = p.apply(compute_mappings)
 		dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
 		return jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping
 
@@ -870,24 +879,14 @@ def compute_freq_order():
 	freqs.sort(key=lambda p: p[1], reverse=True)
 	return {k:i for i, (k, v) in enumerate(freqs) if v >= 77}
 
-__freq_order = compute_freq_order()
+__freq_order = None
+def initialize():
+	global __freq_order
+	if __freq_order is None:
+		__freq_order = compute_freq_order()
+
 def get_frequency(entry):
 	return __freq_order.get(entry.id)
 
 if __name__ == '__main__':
-	a, b, c = load_mappings('tmp/unidic2jmdict-mapping.pkl')
-	for k, vs in a.items():
-		if type(vs) == int:
-			if vs == 1135480:
-				print(k)
-		elif type(vs) == set:
-			if 1135480 in vs:
-				print(k)
-		elif type(vs) == list:
-			for w, v in vs:
-				if v == 1135480:
-					print(w, k)
-		else:
-			assert False
-raise Exception('FIXME ent_seq 1135480 absolutely incorrectly maps to 37876 物,接頭辞')
-raise Exception('FIXME ent_seq 1502390 does not displays')
+	initialize()

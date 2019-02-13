@@ -248,6 +248,7 @@ def index_kanji():
 		for kanji_code_point, offset in index:
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
+freqs.initialize()
 prepare_dict()
 prepare_names()
 # TODO generate kanji.dat
