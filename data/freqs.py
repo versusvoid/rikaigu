@@ -137,12 +137,14 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 
 			yield entry, writing
 
-def find_one2ones(a2b, b2a):
+def find_one2ones(jmdict2unidic, unidic2jmdict):
 	one2ones = []
-	for k, vs in a2b.items():
-		v = next(iter(vs))
-		if len(vs) == 1 and len(b2a[v]) == 1:
-			one2ones.append((k, v))
+	for lemma_id, jmdict_ids in unidic2jmdict.items():
+		# jmdict_id = next(iter(jmdict_ids))
+		# if len(jmdict_ids) == 1 and len(jmdict2unidic[jmdict_id]) == 1:
+		# 	one2ones.append((lemma_id, jmdict_id))
+		if len(jmdict_ids) == 1:
+			one2ones.append((lemma_id, next(iter(jmdict_ids))))
 
 	return one2ones
 
@@ -183,15 +185,15 @@ def match_unidic_jmdict_one2one(
 
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
-	# print('1135480: ', jmdict2unidic.get(1135480))
-	# print(unidic2jmdict.get(911), unidic2jmdict.get(912), unidic2jmdict.get(6965))
+	print('2028940: ', jmdict2unidic.get(2028940))
+	print('37562: ', unidic2jmdict.get(37562))
 
 	print('computing unambiguous mappings')
 	one2ones = find_one2ones(jmdict2unidic, unidic2jmdict)
 	print(len(one2ones), 'unambiguouses')
 
 	unidic_pos2jmdict_pos = {}
-	for jmdict_id, lemma_id in one2ones:
+	for lemma_id, jmdict_id in one2ones:
 		record_pos_mapping(jmdict[jmdict_id], next(iter(unidic[lemma_id])), unidic_pos2jmdict_pos)
 	del one2ones
 
@@ -764,16 +766,6 @@ def load_unidic() -> Tuple[UnidicType, UnidicIndexType]:
 
 	return res, index
 
-def load_additional_pos_mapping(u2j_pos: PosMappingType):
-	with open('data/unidic-jmdict-pos-mapping.dat') as f:
-		for l in f:
-			l = l.strip()
-			if len(l) == 0 or l.startswith('#'):
-				continue
-			upos, jpos = l.split()[:2]
-			upos = tuple(upos.split(','))
-			u2j_pos.add((upos, jpos))
-
 def get_mapped_jmdict_ids(mapping):
 	mapped_jmdict_ids = set()
 	for v in mapping.values():
@@ -799,17 +791,12 @@ def compute_mappings():
 
 	jmnedict, jmnedict_index = dictionary.load_dictionary('JMnedict.xml.gz')
 	jmnedict_mapping = match_unidic_jmnedict(jmnedict_index, unidic)
-
 	del jmnedict, jmnedict_index
 	gc.collect()
 
 	jmdict, jindex = dictionary.load_dictionary()
-
 	u2j_pos = match_unidic_jmdict_one2one(jmdict, jindex, unidic, uindex)
-	load_additional_pos_mapping(u2j_pos)
-
 	mapping = match_unidic_jmdict_with_refining(jmdict, jindex, unidic, uindex, u2j_pos)
-
 	del unidic, uindex, u2j_pos, jindex
 	gc.collect()
 
@@ -853,7 +840,28 @@ def get_mappings_and_dictionaries():
 def compute_freqs():
 	jmdict, mapping, complex_mapping, jmnedict_mapping = get_mappings_and_dictionaries()
 
+	print('lemma 37562:',mapping.get(37562))
+	jmdict_id = 2028940
+	for k, v in mapping.items():
+		if type(v) == int:
+			if v == jmdict_id:
+				print(f'entry {jmdict_id}: {k}')
+		elif type(v) == set:
+			if 1502390 in v:
+				print(f'entry {jmdict_id}: {k}')
+		elif type(v) == list:
+			for w, v in v:
+				if v == jmdict_id:
+					print(f'entry {jmdict_id}: {k} {w}')
+		else:
+			assert False
+	print('lemma 37562:', complex_mapping[37562])
+
 	freqs = process_corpus(mapping, complex_mapping, jmnedict_mapping, jmdict)
+
+	del jmdict, mapping, complex_mapping, jmnedict_mapping
+	gc.collect()
+
 	return list(freqs.items())
 
 def save_freqs(freqs):
