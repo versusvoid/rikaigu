@@ -50,7 +50,7 @@ public:
 
 	uint32_t id();
 	bool name();
-	int freq();
+	int freq() const;
 	uint32_t all_pos();
 
 	// TODO mb filter in render?

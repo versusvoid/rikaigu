@@ -3,6 +3,7 @@
 #include "dentry.h"
 
 #include <map>
+#include <cmath>
 
 struct WordResult
 {
@@ -20,6 +21,13 @@ struct WordResult
 		, match_symbols_length(match_symbols_length)
 		, match_bytes_length(match_bytes_length)
 	{}
+
+	inline double score() const
+	{
+		const auto scale = 0.3;
+		const auto bias = 1.0;
+		return scale*std::log(dentry.freq() + 1) - match_symbols_length + bias;
+	}
 };
 
 

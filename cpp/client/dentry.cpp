@@ -50,7 +50,7 @@ bool DEntry::name()
 	return _name;
 }
 
-int DEntry::freq()
+int DEntry::freq() const
 {
 	return _freq;
 }

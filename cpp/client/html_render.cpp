@@ -327,6 +327,8 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 	{
 		buffer += std::to_string(word.dentry.freq());
 		buffer += "<br />";
+		buffer += std::to_string(word.score());
+		buffer += "<br />";
 		for (auto sense_group : word.dentry.sense_groups())
 		{
 			buffer += "<span class=\"w-pos\">";

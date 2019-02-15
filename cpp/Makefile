@@ -45,8 +45,7 @@ release/rikai.asm.js: $(JS_OBJECTS) ../data/dict.dat ../data/names.dat ../data/k
 	emcc $(JS_CXXFLAGS) $< -o $@
 
 %.bc.d : %.cpp
-	emcc $(JS_CXXFLAGS) -MM $< -MT $(<:%.cpp=%.bc.d) -o $@
-	sed 's#^\($(<:%.cpp=%.bc.d)\)#\1 $@#g' -i $@
+	emcc $(JS_CXXFLAGS) -MM $< -MT "$@ $(<:%.cpp=%.bc)" -o $@
 
 ifneq ($(MAKECMDGOALS),clean)
 include $(JS_SOURCES:%.cpp=%.bc.d)
