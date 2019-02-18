@@ -253,11 +253,6 @@ void DEntry::parse_kanji_groups()
 			});
 		}
 		_kanji_groups.push_back(kanji_group);
-
-		if (kanji_group.readings.empty())
-		{
-			std::cerr << "NO READINGS FOR " << kanji_group.kanjis.at(0).text << std::endl;
-		}
 	}
 	kanji_string.clear();
 }
