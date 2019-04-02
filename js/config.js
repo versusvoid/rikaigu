@@ -40,11 +40,11 @@ if (localStorage.length > 0) {
 }
 
 var config = null;
-var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo'];
+var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo', 'reviewList'];
 function updateCppConfig() {
 	if (!window.Module) return;
 	var cppConfigValues = cppConfig.map(key => config[key]);
-	cppConfigValues.push(Object.entries(config['reviewList']).map(kv => kv.join(',')).join('|'));
+	cppConfigValues[cppConfigValues.length - 1] = Object.entries(config['reviewList']).map(kv => kv.join(',')).join('|');
 	Module.ccall('rikaigu_set_config', null,
 		['number', 'number', 'number', 'string', 'string'], cppConfigValues);
 }

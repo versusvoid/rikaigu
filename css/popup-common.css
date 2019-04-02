@@ -269,25 +269,24 @@
 	font-size: 12px !important;
 }
 
-.rikaigu-window .rikaigu-add-to-review-list {
+.rikaigu-window .rikaigu-change-review-list {
 	float: right !important;
 	top: 5px !important;
 
 	background-color: #000 !important;
-	border-radius: 10px !important;
+	border-radius: 50% !important;
 	width: 20px !important;
 	height: 20px !important;
-	position: relative !important;
+	display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 	cursor: pointer !important;
 }
 
-.rikaigu-window .rikaigu-add-to-review-list:before {
+.rikaigu-window .rikaigu-change-review-list span {
 	color: #fff !important;
-	padding-left: 3.5px !important;
-	line-height: 21px !important;
 	font-weight: bold !important;
 	font-size: 25px !important;
-	content: "+" !important;
 }
 
 /* manual query */

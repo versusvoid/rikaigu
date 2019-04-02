@@ -234,7 +234,11 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 	bool from_review_list = review_list_entry != config.review_list.end();
 	if (!from_review_list && !word.dentry.name())
 	{
-		buffer += "<div class=\"rikaigu-add-to-review-list\"></div>";
+		buffer += "<div class=\"rikaigu-change-review-list\"><span>+</span></div>";
+	}
+	else if (from_review_list)
+	{
+		buffer += "<div class=\"rikaigu-change-review-list\"><span style=\"margin-top: -5px !important;\">-</span></div>";
 	}
 
 	if (!word.dentry.readings().empty())
@@ -326,7 +330,7 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 	if (!config.only_reading)
 	{
 		buffer += std::to_string(word.dentry.freq());
-		buffer += "<br />";
+		buffer += ' ';
 		buffer += std::to_string(word.score());
 		buffer += "<br />";
 		for (auto sense_group : word.dentry.sense_groups())
@@ -387,7 +391,7 @@ void render_entries(SearchResult& result)
 	for (auto i = 0u; i < result.data.size(); ++i)
 	{
 		buffer += "<tr class=\"";
-		if (i > 0)
+		if (i > 5)
 		{
 			buffer += " rikaigu-second-and-further rikaigu-hidden";
 		}

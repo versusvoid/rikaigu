@@ -209,13 +209,25 @@ function onClick(ev) {
 		_getPopupAndUpdateItsPosition();
 		return;
 	}
-	if (!ev.target.classList.contains('rikaigu-add-to-review-list') && !window.debugMode) {
+	let changeRevlistNode = null;
+	if (ev.target.classList.contains('rikaigu-change-review-list')) {
+		changeRevlistNode = ev.target;
+	} else if (ev.target.parentNode.classList.contains('rikaigu-change-review-list')) {
+		changeRevlistNode = ev.target.parentNode;
+	}
+	if (!changeRevlistNode && !window.debugMode) {
 		return requestHidePopup();
 	}
-	var wordNode = ev.target.parentNode;
-	rikaigu.config.reviewList[wordNode.getAttribute('id')] = getCurrentWordContext();
+
+	var wordNode = changeRevlistNode.parentNode;
+	if (changeRevlistNode.innerText === '+') {
+		rikaigu.config.reviewList[wordNode.getAttribute('id')] = getCurrentWordContext();
+	} else {
+		delete rikaigu.config.reviewList[wordNode.getAttribute('id')];
+	}
 	chrome.storage.local.set({reviewList: rikaigu.config.reviewList}, function() {
-		wordNode.removeChild(ev.target);
+		// TODO swap symbols
+		wordNode.removeChild(changeRevlistNode);
 	});
 }
 
