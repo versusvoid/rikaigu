@@ -37,6 +37,8 @@ import MeCab # https://github.com/SamuraiT/mecab-python3
 from utils import download, is_katakana, is_kana, kata_to_hira, any, all, is_hiragana
 import dictionary
 
+raise Exception('FIXME id-based debug hooks')
+
 '''
 Full representation for lines from UniDic's lex.csv
 '''
@@ -119,7 +121,13 @@ def download_unidic():
 
 ################# SIMPLE MAPPING #################
 
-def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType):
+def is_noun_entry(entry):
+	return any('n' in sg.pos for sg in entry.sense_groups)
+
+def is_noun_lex(lex):
+	return lex.pos[0] == '名詞'
+
+def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, unidic: UnidicType, uindex: UnidicIndexType):
 	'''
 		Very simple match unidic lexem to JMdict entries.
 	'''
@@ -127,17 +135,27 @@ def u2j_simple_match(lex, jindex: dictionary.IndexedDictionaryType, uindex: Unid
 	reading = kata_to_hira(lex.pronBase)
 
 	entries = jindex.get(writing, ())
+	'''
+		There are a lot of false matches between unidic proper nouns and
+		different JMdict entries, but we can't simply skip them, as such common
+		names like "Asia" are in JMdict and we want to match them,
+		so we explicitely process proper nouns here.
+	'''
+	name_lex = lex.pos[:2] == UNIDIC_NAME_POS
+	if name_lex:
+		noun_entries = [e for e in entries if is_noun_entry(e)]
+		if len(noun_entries) > 1:
+			return
+		entries = noun_entries
+
+		noun_lemmas = 0
+		for lemma_id in uindex[writing]:
+			if any(is_noun_lex(l) for l in unidic[lemma_id]):
+				noun_lemmas += 1
+		if noun_lemmas > 1:
+			return
+
 	for entry in entries:
-
-		'''
-			There are a lot of false matches between unidic proper nouns and
-			different JMdict entries, but we can't simply skip them, as such common
-			names like "Asia" are in JMdict and we want to match them,
-			so we explicitely process proper nouns here.
-		'''
-		if lex.pos[:2] == UNIDIC_NAME_POS and all('n' not in sg.pos for sg in entry.sense_groups):
-			continue
-
 		if reading == writing:
 			'''
 				Lexem with "surface" in (one or another or both) kana
@@ -222,9 +240,13 @@ def match_unidic_jmdict_pos(
 	print('simple matching')
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
-			for entry, _ in u2j_simple_match(lex, jindex, uindex):
+			for entry, _ in u2j_simple_match(lex, jindex, unidic, uindex):
 				unidic2jmdict[lex.lemma_id].add(entry.id)
 	del lemma_lexes, lex
+
+	print('651:', unidic2jmdict.get(651))
+	print('1015840:', [k for k, v in unidic2jmdict.items() if 1015840 in v])
+	input()
 
 	print('mappings u2j:', len(unidic2jmdict))
 
@@ -265,11 +287,13 @@ def check_u2j_pos_match(entry, lex, u2j_pos):
 			return True
 	return False
 
-def u2j_match_with_pos(lex, jindex: dictionary.IndexedDictionaryType, uindex: UnidicIndexType, u2j_pos):
+def u2j_match_with_pos(
+		lex, jindex: dictionary.IndexedDictionaryType, unidic: UnidicType, uindex: UnidicIndexType, u2j_pos
+		):
 	'''
 		Like `u2j_simple_match()`, but additionaly checks POS mapping.
 	'''
-	for entry, writing in u2j_simple_match(lex, jindex, uindex):
+	for entry, writing in u2j_simple_match(lex, jindex, unidic, uindex):
 		if check_u2j_pos_match(entry, lex, u2j_pos):
 			yield entry, writing
 
@@ -436,20 +460,44 @@ def match_unidic_jmdict_with_refining(
 	print('pos matching')
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
-			for entry, writing in u2j_match_with_pos(lex, jindex, uindex, u2j_pos):
+			for entry, writing in u2j_match_with_pos(lex, jindex, unidic, uindex, u2j_pos):
 				jmdict2unidic[entry.id].add(lex.lemma_id)
 				unidic2jmdict[lex.lemma_id].add(entry.id)
 				lemma_id2writing2jmdict_id[lex.lemma_id][writing].add(entry.id)
 	del lex
 
+	print('651:', unidic2jmdict.get(651))
+	print('651 2:', lemma_id2writing2jmdict_id.get(651))
+	print('1015840:', jmdict2unidic.get(1015840))
+	input()
+
 	try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex, lemma_id2writing2jmdict_id)
 	assert all(len(vs) > 0 for vs in jmdict2unidic.values())
 	assert all(len(vs) > 0 for vs in unidic2jmdict.values())
 
+	print('taue')
+	print('651:', unidic2jmdict.get(651))
+	print('651 2:', lemma_id2writing2jmdict_id.get(651))
+	print('1015840:', jmdict2unidic.get(1015840))
+	input()
+
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
 	cut_out_redundunt_mappings_for_fully_covered_nodes(jmdict, jmdict2unidic, unidic, unidic2jmdict)
+
+	print('cormffcn1')
+	print('651:', unidic2jmdict.get(651))
+	print('651 2:', lemma_id2writing2jmdict_id.get(651))
+	print('1015840:', jmdict2unidic.get(1015840))
+	input()
+
 	cut_out_redundunt_mappings_for_fully_covered_nodes(unidic, unidic2jmdict, jmdict, jmdict2unidic)
+
+	print('cormffcn2')
+	print('651:', unidic2jmdict.get(651))
+	print('651 2:', lemma_id2writing2jmdict_id.get(651))
+	print('1015840:', jmdict2unidic.get(1015840))
+	input()
 
 	print('computing mappings')
 	mapping = compute_final_unambiguous_unidic2jmdict_mapping(jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id)
@@ -1067,22 +1115,23 @@ def get_mappings_and_dictionaries():
 		return (jmdict, *load_mappings(filename))
 	else:
 		# Using `multiprocessing` to reduce memory consumption after mappings computation
-		with multiprocessing.Pool(1) as p:
-			jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = p.apply(compute_mappings)
-		dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
+		#with multiprocessing.Pool(1) as p:
+		#	jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = p.apply(compute_mappings)
+		jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = compute_mappings()
+		#dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
 		return jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping
 
 def compute_freqs():
 	jmdict, mapping, complex_mapping, jmnedict_mapping = get_mappings_and_dictionaries()
 
-	print('lemma 37562:',mapping.get(37562))
-	jmdict_id = 2028940
+	print('lemma 651:', mapping.get(651))
+	jmdict_id = 1015840
 	for k, v in mapping.items():
 		if type(v) == int:
 			if v == jmdict_id:
 				print(f'entry {jmdict_id}: {k}')
 		elif type(v) == set:
-			if 1502390 in v:
+			if jmdict_id in v:
 				print(f'entry {jmdict_id}: {k}')
 		elif type(v) == list:
 			for w, v in v:
@@ -1090,7 +1139,8 @@ def compute_freqs():
 					print(f'entry {jmdict_id}: {k} {w}')
 		else:
 			assert False
-	print('lemma 37562:', complex_mapping[37562])
+	print('lemma 651 complex:', complex_mapping.get(651))
+	exit(1)
 
 	freqs = process_corpus(mapping, complex_mapping, jmnedict_mapping, jmdict)
 
