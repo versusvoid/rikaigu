@@ -119,8 +119,7 @@ def download(url, filename):
 		print(f"Downloading {filename}")
 		tmp_path = path + '-part'
 		subprocess.check_call(
-			['curl', '-C', url, '-o', tmp_path, '--create-dirs'],
-			stderr=subprocess.PIPE,
+			['curl', '-C', '-', url, '-o', tmp_path, '--create-dirs'],
 			universal_newlines=True
 		)
 		os.rename(tmp_path, path)

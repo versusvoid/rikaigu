@@ -37,8 +37,6 @@ import MeCab # https://github.com/SamuraiT/mecab-python3
 from utils import download, is_katakana, is_kana, kata_to_hira, any, all, is_hiragana
 import dictionary
 
-raise Exception('FIXME id-based debug hooks')
-
 '''
 Full representation for lines from UniDic's lex.csv
 '''
@@ -65,7 +63,56 @@ UnidicIndexType = DefaultDict[str, Set[int]]
 
 UNIDIC_NAME_POS = ('名詞', '固有名詞')
 
-def download_dump():
+SMALL = True
+MIN_FREQ = 7 if SMALL else 77
+TRACE_LEMMA_IDS = set([])
+TRACE_ENTRY_IDS = set([1527770])
+PAUSE_ON_MATCH = False
+
+def debug(lemma_id, entry_id, *args):
+	if lemma_id in TRACE_LEMMA_IDS or entry_id in TRACE_ENTRY_IDS:
+		print(f'[DEBUG] lemma=#{lemma_id} entry=#{id}', *args)
+		if PAUSE_ON_MATCH:
+			input()
+
+def symmetric_debug(node, key, *args):
+	if type(node) == dictionary.Entry:
+		debug(key, node.id, '<-', *args)
+	else:
+		debug(next(iter(node)).lemma_id, key, '->', *args)
+
+def debug_iter(lemma_ids, entry_ids, *args):
+	lemma_ids = lemma_ids if hasattr(lemma_ids, '__iter__') else (lemma_ids,)
+	entry_ids = entry_ids if hasattr(entry_ids, '__iter__') else (entry_ids,)
+	for lemma_id in lemma_ids:
+		for entry_id in entry_ids:
+			debug(lemma_id, entry_id, *args)
+
+def pass_function(*args): pass
+
+DEBUG = False
+if __name__ == '__main__':
+	DEBUG = bool(TRACE_ENTRY_IDS) or bool(TRACE_LEMMA_IDS)
+if not DEBUG:
+	debug = pass_function
+	symmetric_debug = pass_function
+	debug_iter = pass_function
+
+
+def download_dump_small():
+	extracted_dump = 'tmp/wiki-corpus.txt.xz'
+	if not os.path.exists(extracted_dump):
+		subprocess.check_call([' | '.join([
+			'curl -L https://alaginrc.nict.go.jp/WikiCorpus/cgi-bin/dl1.cgi'
+			'tar -O -xf -',
+			'grep "<j>"',
+			'sed "s#</\?j>##g"',
+			f'xz > {extracted_dump}',
+		])], shell=True)
+
+	return extracted_dump
+
+def download_dump_big():
 	'''
 		Downloads, extracts and strips markup from ja.wikipedia dump
 		Lazy at every stage, but does not handle aborts and will happily
@@ -90,9 +137,15 @@ def download_dump():
 			'tmp/wikiextractor-master/WikiExtractor.py -q -o - --no-templates -s --lists tmp/jawiki-articles.xml.bz2',
 			# 'head -n 400000',
 			'egrep -v "^<"',
-			'xz > tmp/jawiki-text.xz'])], shell=True)
+			f'xz > {extracted_dump}'])], shell=True)
 
 	return extracted_dump
+
+def download_dump():
+	if DEBUG or SMALL:
+		return download_dump_small()
+	else:
+		return download_dump_big()
 
 def download_unidic():
 	'''
@@ -241,12 +294,9 @@ def match_unidic_jmdict_pos(
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
 			for entry, _ in u2j_simple_match(lex, jindex, unidic, uindex):
+				debug(lex.lemma_id, entry.id, 'simple match')
 				unidic2jmdict[lex.lemma_id].add(entry.id)
 	del lemma_lexes, lex
-
-	print('651:', unidic2jmdict.get(651))
-	print('1015840:', [k for k, v in unidic2jmdict.items() if 1015840 in v])
-	input()
 
 	print('mappings u2j:', len(unidic2jmdict))
 
@@ -256,6 +306,7 @@ def match_unidic_jmdict_pos(
 
 	unidic_pos2jmdict_pos = {}
 	for lemma_id, jmdict_id in unidic2jmdict_unique:
+		debug(lemma_id, jmdict_id, 'unique mapping')
 		record_pos_mapping(jmdict[jmdict_id], next(iter(unidic[lemma_id])), unidic_pos2jmdict_pos)
 	del unidic2jmdict_unique
 
@@ -313,12 +364,16 @@ def compute_final_unambiguous_unidic2jmdict_mapping(
 			''' One2one mapping case '''
 			mapping[lemma_id] = next(iter(jmdict_ids))
 
+			debug(lemma_id, mapping[lemma_id], 'one2one final mapping')
+
 		elif all(len(jmdict2unidic[jmdict_id]) == 1 for jmdict_id in jmdict_ids):
 			'''
 				Star mapping case: one UniDic lemma maps unambiguously
 				to several JMdict entries
 			'''
 			mapping[lemma_id] = jmdict_ids
+
+			debug_iter(lemma_id, jmdict_ids, 'star final mapping')
 
 		else:
 			'''
@@ -330,7 +385,10 @@ def compute_final_unambiguous_unidic2jmdict_mapping(
 			writing2jmdict_ids = lemma_id2writing2jmdict_id.get(lemma_id)
 			for w, sub_jmdict_ids in writing2jmdict_ids.items():
 				if len(sub_jmdict_ids) == 1:
-					mapping.setdefault(lemma_id, []).append((w, next(iter(sub_jmdict_ids))))
+					l = mapping.setdefault(lemma_id, [])
+					l.append((w, next(iter(sub_jmdict_ids))))
+
+					debug(lemma_id, l[-1][1], 'ambiguous mapping', l[-1][0])
 
 	return mapping
 
@@ -402,18 +460,25 @@ def cut_out_redundunt_mappings_for_fully_covered_nodes(dict1, dict1_to_dict2, di
 			''' Already a star case, no need to reduce further '''
 			continue
 
-		single_cover_dict2_key = find_single_cover(dict1[dict1_key], dict2, dict2_keys)
+		dict1_node = dict1[dict1_key]
+		single_cover_dict2_key = find_single_cover(dict1_node, dict2, dict2_keys)
 		if single_cover_dict2_key is None:
 			continue
 
+		symmetric_debug(dict1_node, single_cover_dict2_key, 'single cover')
+
 		''' Removing mapping and back-mapping to other entries (lemmas) '''
 		for other_dict2_key in dict2_keys:
-			if other_dict2_key != single_cover_dict2_key:
-				dict1_keys = dict2_to_dict1.get(other_dict2_key)
-				if len(dict1_keys) == 1:
-					dict2_to_dict1.pop(other_dict2_key)
-				else:
-					dict1_keys.remove(dict1_key)
+			if other_dict2_key == single_cover_dict2_key:
+				continue
+
+			symmetric_debug(dict1_node, other_dict2_key, 'cut due to single mapping')
+
+			dict1_keys = dict2_to_dict1.get(other_dict2_key)
+			if len(dict1_keys) == 1:
+				dict2_to_dict1.pop(other_dict2_key)
+			else:
+				dict1_keys.remove(dict1_key)
 
 		dict2_keys.clear()
 		dict2_keys.add(single_cover_dict2_key)
@@ -437,6 +502,7 @@ def try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex, lemm
 			lemma_ids = uindex.get(text, ())
 			if len(lemma_ids) == 1:
 				lemma_id = next(iter(lemma_ids))
+				debug(lemma_id, entry.id, 'try_add_unmatched_entires')
 				jmdict2unidic[entry.id].add(lemma_id)
 				unidic2jmdict[lemma_id].add(entry.id)
 				lemma_id2writing2jmdict_id[lemma_id][text].add(entry.id)
@@ -461,43 +527,20 @@ def match_unidic_jmdict_with_refining(
 	for lemma_lexes in unidic.values():
 		for lex in lemma_lexes:
 			for entry, writing in u2j_match_with_pos(lex, jindex, unidic, uindex, u2j_pos):
+				debug(lex.lemma_id, entry.id, 'pos match')
 				jmdict2unidic[entry.id].add(lex.lemma_id)
 				unidic2jmdict[lex.lemma_id].add(entry.id)
 				lemma_id2writing2jmdict_id[lex.lemma_id][writing].add(entry.id)
 	del lex
 
-	print('651:', unidic2jmdict.get(651))
-	print('651 2:', lemma_id2writing2jmdict_id.get(651))
-	print('1015840:', jmdict2unidic.get(1015840))
-	input()
-
 	try_add_unmatched_entires(jmdict, jmdict2unidic, unidic2jmdict, uindex, lemma_id2writing2jmdict_id)
 	assert all(len(vs) > 0 for vs in jmdict2unidic.values())
 	assert all(len(vs) > 0 for vs in unidic2jmdict.values())
 
-	print('taue')
-	print('651:', unidic2jmdict.get(651))
-	print('651 2:', lemma_id2writing2jmdict_id.get(651))
-	print('1015840:', jmdict2unidic.get(1015840))
-	input()
-
 	print(f'mappings: j2u: {len(jmdict2unidic)}, u2j: {len(unidic2jmdict)}')
 
 	cut_out_redundunt_mappings_for_fully_covered_nodes(jmdict, jmdict2unidic, unidic, unidic2jmdict)
-
-	print('cormffcn1')
-	print('651:', unidic2jmdict.get(651))
-	print('651 2:', lemma_id2writing2jmdict_id.get(651))
-	print('1015840:', jmdict2unidic.get(1015840))
-	input()
-
 	cut_out_redundunt_mappings_for_fully_covered_nodes(unidic, unidic2jmdict, jmdict, jmdict2unidic)
-
-	print('cormffcn2')
-	print('651:', unidic2jmdict.get(651))
-	print('651 2:', lemma_id2writing2jmdict_id.get(651))
-	print('1015840:', jmdict2unidic.get(1015840))
-	input()
 
 	print('computing mappings')
 	mapping = compute_final_unambiguous_unidic2jmdict_mapping(jmdict2unidic, unidic2jmdict, lemma_id2writing2jmdict_id)
@@ -1092,10 +1135,11 @@ def compute_mappings():
 		sum(1 for entry in jmdict.values() if entry.is_common() and entry.id not in mapped_jmdict_ids),
 		'unmapped commons'
 	)
-	print('Here they are:')
-	for entry in jmdict.values():
-		if entry.is_common() and entry.id not in mapped_jmdict_ids:
-			print(entry)
+	if DEBUG:
+		print('Here they are:')
+		for entry in jmdict.values():
+			if entry.is_common() and entry.id not in mapped_jmdict_ids:
+				print(entry)
 
 	del mapped_jmdict_ids, new_mapped_jmdict_ids
 	gc.collect()
@@ -1109,38 +1153,22 @@ def dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_map
 		pickle.dump(jmnedict_mapping, of)
 
 def get_mappings_and_dictionaries():
+	if DEBUG:
+		return compute_mappings()
+
 	filename = 'tmp/unidic2jmdict-mapping.pkl'
 	if os.path.exists(filename):
 		jmdict = dictionary.load_dictionary(index=False)
 		return (jmdict, *load_mappings(filename))
 	else:
 		# Using `multiprocessing` to reduce memory consumption after mappings computation
-		#with multiprocessing.Pool(1) as p:
-		#	jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = p.apply(compute_mappings)
-		jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = compute_mappings()
-		#dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
+		with multiprocessing.Pool(1) as p:
+			jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping = p.apply(compute_mappings)
+		dump_mappings(filename, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping)
 		return jmdict, jmdict_mapping, jmdict_complex_mapping, jmnedict_mapping
 
 def compute_freqs():
 	jmdict, mapping, complex_mapping, jmnedict_mapping = get_mappings_and_dictionaries()
-
-	print('lemma 651:', mapping.get(651))
-	jmdict_id = 1015840
-	for k, v in mapping.items():
-		if type(v) == int:
-			if v == jmdict_id:
-				print(f'entry {jmdict_id}: {k}')
-		elif type(v) == set:
-			if jmdict_id in v:
-				print(f'entry {jmdict_id}: {k}')
-		elif type(v) == list:
-			for w, v in v:
-				if v == jmdict_id:
-					print(f'entry {jmdict_id}: {k} {w}')
-		else:
-			assert False
-	print('lemma 651 complex:', complex_mapping.get(651))
-	exit(1)
 
 	freqs = process_corpus(mapping, complex_mapping, jmnedict_mapping, jmdict)
 
@@ -1163,14 +1191,20 @@ def load_freqs():
 	return res
 
 def compute_freq_order():
-	if os.path.exists('tmp/jmdict-freqs.dat'):
+	if DEBUG:
+		freqs = compute_freqs()
+	elif os.path.exists('tmp/jmdict-freqs.dat'):
 		freqs = load_freqs()
 	else:
 		freqs = compute_freqs()
 		save_freqs(freqs)
 
 	freqs.sort(key=lambda p: p[1], reverse=True)
-	return {k:i for i, (k, v) in enumerate(freqs) if v >= 77}
+	res = {k:i for i, (k, v) in enumerate(freqs) if v >= MIN_FREQ}
+	with open('cpp/client/config.h', 'w') as of:
+		print(f'#define UNKNOWN_WORD_FREQ_ORDER {len(res)}', file=of)
+
+	return res
 
 __freq_order = None
 def initialize():

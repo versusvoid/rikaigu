@@ -221,12 +221,13 @@ function onClick(ev) {
 
 	var wordNode = changeRevlistNode.parentNode;
 	if (changeRevlistNode.innerText === '+') {
+		// TODO do not record context == some writing or reading
 		rikaigu.config.reviewList[wordNode.getAttribute('id')] = getCurrentWordContext();
 	} else {
 		delete rikaigu.config.reviewList[wordNode.getAttribute('id')];
 	}
 	chrome.storage.local.set({reviewList: rikaigu.config.reviewList}, function() {
-		// TODO swap symbols
+		// TODO swap +/- symbols
 		wordNode.removeChild(changeRevlistNode);
 	});
 }
