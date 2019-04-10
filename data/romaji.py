@@ -162,3 +162,5 @@ def is_romajination(hiragana, word):
 
 	res = len(hiragana) == 0 and len(word) == 0
 	return res
+
+assert is_romajination('みはる', 'Miharu')

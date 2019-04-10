@@ -209,27 +209,43 @@ function onClick(ev) {
 		_getPopupAndUpdateItsPosition();
 		return;
 	}
-	let changeRevlistNode = null;
-	if (ev.target.classList.contains('rikaigu-change-review-list')) {
-		changeRevlistNode = ev.target;
-	} else if (ev.target.parentNode.classList.contains('rikaigu-change-review-list')) {
-		changeRevlistNode = ev.target.parentNode;
+
+	const popup = document.getElementById('rikaigu-window');
+	let wordNode = ev.target;
+	if (!popup.contains(wordNode)) {
+		return !window.debugMode ? requestHidePopup() : null;
 	}
-	if (!changeRevlistNode && !window.debugMode) {
-		return requestHidePopup();
+	while (wordNode !== popup && !wordNode.classList.contains('reviewable')) {
+		wordNode = wordNode.parentNode;
+	}
+	if (wordNode === popup) {
+		return;
 	}
 
-	var wordNode = changeRevlistNode.parentNode;
-	if (changeRevlistNode.innerText === '+') {
-		// TODO do not record context == some writing or reading
-		rikaigu.config.reviewList[wordNode.getAttribute('id')] = getCurrentWordContext();
+	console.log('wordNode =', wordNode);
+	if (!wordNode.classList.contains('reviewed')) {
+		let context = getCurrentWordContext();
+		console.log('context:', context);
+		for (const el of wordNode.querySelectorAll('.w-kanji, .w-kana')) {
+			if (context === el.innerText) {
+				console.log('matching context');
+				context = '';
+				break;
+			}
+		}
+
+		rikaigu.config.reviewList[wordNode.getAttribute('jmdict-id')] = context;
+		wordNode.getElementsByClassName('w-review-context')[0].innerHTML = context;
 	} else {
-		delete rikaigu.config.reviewList[wordNode.getAttribute('id')];
+		delete rikaigu.config.reviewList[wordNode.getAttribute('jmdict-id')];
 	}
-	chrome.storage.local.set({reviewList: rikaigu.config.reviewList}, function() {
-		// TODO swap +/- symbols
-		wordNode.removeChild(changeRevlistNode);
-	});
+
+	for (const el of wordNode.getElementsByClassName('rikaigu-review-listed')) {
+		el.classList.toggle('rikaigu-hidden');
+	}
+	wordNode.classList.toggle('reviewed');
+
+	chrome.storage.local.set({reviewList: rikaigu.config.reviewList});
 }
 
 const _PADDING_AND_BORDER = 4 + 1;
@@ -485,10 +501,10 @@ function onKeyDown(ev) {
 			_getPopupAndUpdateItsPosition();
 			break;
 		case 'KeyD':
-			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings}, function() {
-				rikaigu.shownMatch = null;
-				extractTextAndSearch();
-			});
+			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings});
+			for (var el of document.getElementsByClassName('rikaigu-pos-and-def')) {
+				el.classList.toggle('rikaigu-hidden');
+			}
 			break;
 		case 'KeyF':
 			for (var el of document.getElementsByClassName('rikaigu-second-and-further')) {
@@ -542,12 +558,14 @@ function processSearchResult(selectionRange, prefixSelectionRange, result) {
 		rikaigu.lastShownRangeOffset = selectionRange.offset;
 	}
 
+	/*
 	chrome.runtime.sendMessage(
 		{
 			"type": "review",
 			"text": getCurrentWordSentence(),
 		}
 	);
+	*/
 }
 
 function makeFake(real) {

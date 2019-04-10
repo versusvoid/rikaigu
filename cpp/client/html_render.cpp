@@ -228,18 +228,9 @@ inline void conditionaly_add_class(bool add, const std::string_view& class_name)
 	}
 }
 
-void entry_to_html(WordResult& word, const std::string& partial = "")
+void entry_to_html(WordResult& word, const std::string& partial, const std::string* review_list_context)
 {
-	const auto& review_list_entry = config.review_list.find(word.dentry.id());
-	bool from_review_list = review_list_entry != config.review_list.end();
-	if (!from_review_list && !word.dentry.name())
-	{
-		buffer += "<div class=\"rikaigu-change-review-list\"><span>+</span></div>";
-	}
-	else if (from_review_list)
-	{
-		buffer += "<div class=\"rikaigu-change-review-list\"><span style=\"margin-top: -5px !important;\">-</span></div>";
-	}
+	const bool from_review_list = review_list_context != nullptr;
 
 	if (!word.dentry.readings().empty())
 	{
@@ -268,9 +259,9 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 				{
 					buffer += u8"、";
 				}
-				buffer += "<span class=\"w-kana";
+				buffer += "<span class=\"w-kana rikaigu-review-listed";
 				conditionaly_add_class(!r.common, "uncommon");
-				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
+				conditionaly_add_class(from_review_list, "rikaigu-hidden");
 				buffer += "\">";
 				buffer += r.text;
 				buffer += "</span>";
@@ -320,66 +311,73 @@ void entry_to_html(WordResult& word, const std::string& partial = "")
 		buffer += "<br />";
 	}
 
-	if (from_review_list)
+	if (!word.dentry.name())
 	{
-		buffer += "<span class=\"w-review-context rikaigu-review-listed\">";
-		buffer += review_list_entry->second;
-		buffer += "<br /></span>";
+		buffer += "<p class=\"w-review-context rikaigu-review-listed";
+		conditionaly_add_class(!from_review_list, "rikaigu-hidden");
+		buffer += "\">";
+		buffer += review_list_context == nullptr ? "" : *review_list_context;
+		buffer += "</p>";
 	}
 
-	if (!config.only_reading)
+	buffer += "<div class=\"rikaigu-pos-and-def";
+	conditionaly_add_class(config.only_reading, "rikaigu-hidden");
+	buffer += "\">";
+
+	buffer += std::to_string(word.dentry.freq());
+	buffer += ' ';
+	buffer += std::to_string(word.score());
+	buffer += "<br />";
+	for (auto sense_group : word.dentry.sense_groups())
 	{
-		buffer += std::to_string(word.dentry.freq());
-		buffer += ' ';
-		buffer += std::to_string(word.score());
-		buffer += "<br />";
-		for (auto sense_group : word.dentry.sense_groups())
+		buffer += "<span class=\"w-pos\">";
+		for (auto i = 0U; i < sense_group.types.size(); ++i)
 		{
-			buffer += "<span class=\"w-pos\">";
-			for (auto i = 0U; i < sense_group.types.size(); ++i)
+			if (i > 0)
+			{
+				buffer += ", ";
+			}
+			buffer += sense_group.types[i];
+		}
+		buffer += "</span><span class=\"rikaigu-review-listed";
+		conditionaly_add_class(!from_review_list, "rikaigu-hidden");
+		buffer += "\">; </span>";
+
+		if (sense_group.senses.size() > 1)
+		{
+			buffer += "<ul class=\"w-def rikaigu-review-listed";
+			conditionaly_add_class(from_review_list, "rikaigu-hidden");
+			buffer += "\"><li>";
+			for (auto i = 0U; i < sense_group.senses.size(); ++i)
 			{
 				if (i > 0)
 				{
-					buffer += ", ";
+					buffer += "</li><li>";
 				}
-				buffer += sense_group.types[i];
+				buffer += sense_group.senses[i];
 			}
-			buffer += "</span>";
-			if (sense_group.senses.size() > 1)
-			{
-				buffer += "<ul class=\"w-def";
-				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
-				buffer += "\"><li>";
-				for (auto i = 0U; i < sense_group.senses.size(); ++i)
-				{
-					if (i > 0)
-					{
-						buffer += "</li><li>";
-					}
-					buffer += sense_group.senses[i];
-				}
-				buffer += "</li></ul>";
-			}
-			else
-			{
-				// TODO? generate readings for names
-				assert(sense_group.senses.size() == 1);
-				buffer += " <span class=\"w-def";
-				conditionaly_add_class(from_review_list, "rikaigu-hidden rikaigu-review-listed");
-				buffer += "\">";
-				buffer += sense_group.senses.at(0);
-				buffer += "</span><br />";
-			}
+			buffer += "</li></ul>";
+		}
+		else
+		{
+			// TODO? generate readings for names
+			assert(sense_group.senses.size() == 1);
+			buffer += " <span class=\"w-def rikaigu-review-listed";
+			conditionaly_add_class(from_review_list, "rikaigu-hidden");
+			buffer += "\">";
+			buffer += sense_group.senses.at(0);
+			buffer += "</span><br />";
 		}
 	}
+
+	buffer += "</div>";
 }
 
 void render_entries(SearchResult& result)
 {
-	if (config.only_reading)
-	{
-		buffer += "<span class=\"note\">`D` - show definitions</span><div class=\"clearfix\"></div>";
-	}
+	buffer += "<span class=\"note rikaigu-pos-and-def";
+	conditionaly_add_class(!config.only_reading, "rikaigu-hidden");
+	buffer += "\">`D` - show definitions</span><div class=\"clearfix\"></div>";
 
 	if (result.names)
 	{
@@ -403,11 +401,19 @@ void render_entries(SearchResult& result)
 			part = result.source.substr(0, result.data[i].match_bytes_length);
 		}
 
-		buffer += "<td class=\"word\" id=";
+		const auto& review_list_entry = config.review_list.find(result.data[i].dentry.id());
+		std::string* review_list_context = (
+			review_list_entry == config.review_list.end() ? nullptr : &review_list_entry->second
+		);
+
+		buffer += "<td class=\"word";
+		conditionaly_add_class(review_list_context != nullptr, "reviewed");
+		conditionaly_add_class(!result.data[i].dentry.name(), "reviewable");
+		buffer += "\" jmdict-id=";
 		buffer += std::to_string(result.data[i].dentry.id());
 		buffer += '>';
 
-		entry_to_html(result.data[i], part);
+		entry_to_html(result.data[i], part, review_list_context);
 		buffer += "</td></tr>";
 	}
 	buffer += "</table>";

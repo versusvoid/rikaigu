@@ -60,7 +60,7 @@
 	border-width: 1px !important;
 }
 
-.rikaigu-hidden {
+.rikaigu-window .rikaigu-hidden {
 	display: none !important;
 }
 
@@ -68,7 +68,7 @@
 	font-style: italic !important;
 }
 
-.rikaigu-lurk-moar {
+.rikaigu-window .rikaigu-lurk-moar {
 	text-align: center !important;
 	background-color: #ffffff55 !important;
 	user-select: none !important;
@@ -76,7 +76,7 @@
 	position: sticky !important;
 }
 
-.rikaigu-lurk-moar:hover {
+.rikaigu-window .rikaigu-lurk-moar:hover {
 	background-color: #ffffff99 !important;
 }
 
@@ -254,6 +254,17 @@
 	padding: 1px 3px !important;
 }
 
+.rikaigu-window .reviewable:hover {
+	background-color: rgba(0, 0, 0, .1) !important;
+}
+
+.rikaigu-window .reviewable.reviewed {
+	background-color: rgba(0, 0, 0, .1) !important;
+}
+
+.rikaigu-window .reviewable.reviewed:hover {
+	background-color: none !important;
+}
 
 /* kanji: misc index */
 
