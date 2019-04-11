@@ -48,9 +48,9 @@ trans_type_abbreviations = {
 def format_trans(trans, name):
 	parts = []
 	parts.append(','.join(map(trans_type_abbreviations.__getitem__, trans.types)))
-	parts.append(';')
+	parts.append(';')  # FIXME не всегда нужен
 	if (len(trans.glosses) == 1 and len(name.readings) == 1
-			and is_romajination(kata_to_hira(name.readings[0].text), trans.glosses[0])):
+				and is_romajination(kata_to_hira(name.readings[0].text, agressive=False), trans.glosses[0])):
 		#parts.append('*')
 		pass
 	else:

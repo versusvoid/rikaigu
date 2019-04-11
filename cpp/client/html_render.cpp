@@ -373,6 +373,8 @@ void entry_to_html(WordResult& word, const std::string& partial, const std::stri
 	buffer += "</div>";
 }
 
+#define MOAR_CUT 5
+
 void render_entries(SearchResult& result)
 {
 	buffer += "<span class=\"note rikaigu-pos-and-def";
@@ -389,7 +391,7 @@ void render_entries(SearchResult& result)
 	for (auto i = 0u; i < result.data.size(); ++i)
 	{
 		buffer += "<tr class=\"";
-		if (i > 5)
+		if (i >= MOAR_CUT)
 		{
 			buffer += " rikaigu-second-and-further rikaigu-hidden";
 		}
@@ -417,7 +419,7 @@ void render_entries(SearchResult& result)
 		buffer += "</td></tr>";
 	}
 	buffer += "</table>";
-	if (result.data.size() > 1)
+	if (result.data.size() > MOAR_CUT)
 	{
 		buffer += u8"<div class=\"rikaigu-lurk-moar\">▼</div>";
 	}

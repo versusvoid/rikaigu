@@ -1,9 +1,5 @@
 import os
-import time
 import subprocess
-from collections import namedtuple
-import gzip
-import xml.etree.ElementTree as ET
 import builtins
 import itertools
 
@@ -125,4 +121,3 @@ def download(url, filename):
 		os.rename(tmp_path, path)
 		print(f"\nDownloaded {filename}")
 	return path
-

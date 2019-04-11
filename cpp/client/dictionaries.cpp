@@ -263,11 +263,25 @@ static bool compare(WordResult& a, WordResult& b)
 static size_t line_buffer_size = 0;
 static char* line = nullptr;
 
+void squash_names(std::vector<WordResult>& res)
+{
+	for (auto i = 1U; i < res.size(); ++i)
+	{
+		if (res[i - 1].match_symbols_length != res[i].match_symbols_length) continue;
+		if (res[i - 1].dentry.try_join(res[i].dentry))
+		{
+			res.erase(res.begin() + i);
+			i -= 1;
+		}
+	}
+}
+
 const std::size_t MAX_ENTRIES = 32;
 inline void sort_and_limit(SearchResult& res)
 {
 	// Sort by match length and then by commonnesss
 	std::sort(res.data.begin(), res.data.end(), compare);
+	squash_names(res.data);
 	if (res.data.size() > MAX_ENTRIES) {
 		res.more = true;
 	}

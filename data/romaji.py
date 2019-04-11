@@ -163,4 +163,6 @@ def is_romajination(hiragana, word):
 	res = len(hiragana) == 0 and len(word) == 0
 	return res
 
-assert is_romajination('みはる', 'Miharu')
+if __name__ == '__main__':
+	from utils import kata_to_hira
+	assert is_romajination(kata_to_hira('みはる', agressive=False), 'Miharu')

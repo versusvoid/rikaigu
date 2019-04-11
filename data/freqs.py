@@ -32,9 +32,9 @@ from dataclasses import dataclass
 from typing import Tuple, Set, List, Dict, DefaultDict, Union
 from collections import namedtuple, defaultdict
 
-import MeCab # https://github.com/SamuraiT/mecab-python3
+import MeCab  # https://github.com/SamuraiT/mecab-python3
 
-from utils import download, is_katakana, is_kana, kata_to_hira, any, all, is_hiragana
+from utils import download, is_katakana, kata_to_hira, any, all
 import dictionary
 
 '''
@@ -88,7 +88,8 @@ def debug_iter(lemma_ids, entry_ids, *args):
 		for entry_id in entry_ids:
 			debug(lemma_id, entry_id, *args)
 
-def pass_function(*args): pass
+def pass_function(*args):
+	pass
 
 DEBUG = False
 if __name__ == '__main__':
@@ -102,13 +103,15 @@ if not DEBUG:
 def download_dump_small():
 	extracted_dump = 'tmp/wiki-corpus.txt.xz'
 	if not os.path.exists(extracted_dump):
-		subprocess.check_call([' | '.join([
-			'curl -L https://alaginrc.nict.go.jp/WikiCorpus/cgi-bin/dl1.cgi'
-			'tar -O -xf -',
-			'grep "<j>"',
-			'sed "s#</\?j>##g"',
+		cmd = ' | '.join([
+			'curl -L https://alaginrc.nict.go.jp/WikiCorpus/cgi-bin/dl1.cgi',
+			'tar -O -xzf -',
+			'grep -F "<j>"',
+			r'sed "s#</\?j>##g"',
 			f'xz > {extracted_dump}',
-		])], shell=True)
+		])
+		print('Running', cmd)
+		subprocess.check_call([cmd], shell=True)
 
 	return extracted_dump
 
@@ -163,7 +166,7 @@ def download_unidic():
 	print('Extracting unidic')
 	subprocess.check_call(
 		[
-			'bsdtar', '-xv',
+			'tar', '-xv',
 			'-C', 'tmp',
 			'-f', filename,
 		] + [f'unidic-cwj-2.3.0/{f}' for f in files],

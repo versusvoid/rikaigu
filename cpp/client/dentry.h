@@ -9,7 +9,6 @@ struct SenseGroup
 {
 	std::vector<std::string> types;
 	std::vector<std::string> senses;
-
 };
 
 struct Writing
@@ -60,6 +59,8 @@ public:
 	const std::vector<SenseGroup>& sense_groups();
 	const std::vector<KanjiGroup>& kanji_groups();
 	const std::vector<Writing>& readings();
+
+	bool try_join(DEntry& other);
 };
 
 #endif // DENTRY_H

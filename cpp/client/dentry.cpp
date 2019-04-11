@@ -256,3 +256,72 @@ void DEntry::parse_kanji_groups()
 	}
 	kanji_string.clear();
 }
+
+template<typename O>
+inline bool equal(const std::vector<O>& a, const std::vector<O>& b)
+{
+	return std::equal(a.begin(), a.end(), b.begin(), b.end());
+}
+
+template<typename O, typename P>
+inline bool equal(const std::vector<O>& a, const std::vector<O>& b, P p)
+{
+	return std::equal(a.begin(), a.end(), b.begin(), b.end(), p);
+}
+
+bool sense_groups_equal(const SenseGroup& a, const SenseGroup& b)
+{
+	return equal(a.types, b.types) && equal(a.senses, b.senses);
+}
+
+bool writings_equal(const Writing& a, const Writing& b)
+{
+	return a.common == b.common && a.text == b.text;
+}
+
+bool kanji_groups_equal(const KanjiGroup& a, const KanjiGroup& b)
+{
+	return equal(a.kanjis, b.kanjis, writings_equal);
+}
+
+bool DEntry::try_join(DEntry& other)
+{
+	if (this->_name != other._name) return false;
+	if (!equal(this->sense_groups(), other.sense_groups(), sense_groups_equal))
+	{
+		return false;
+	}
+
+	// TODO additional reading restrictions check
+	bool kanjis_equal = equal(this->kanji_groups(), other.kanji_groups(), kanji_groups_equal);
+	bool readings_equal = equal(this->readings(), other.readings(), writings_equal);
+	if (!kanjis_equal && !readings_equal)
+	{
+		return false;
+	}
+
+	if (kanjis_equal)
+	{
+		auto old_size = this->_readings.size();
+		this->_readings.insert(
+			this->_readings.end(),
+			other.readings().begin(), other.readings().end()
+		);
+		for (auto& g : this->_kanji_groups)
+		{
+			for (auto i = old_size; i < this->_readings.size(); ++i)
+			{
+				g.readings.push_back(i);
+			}
+		}
+	}
+	else
+	{
+		this->_kanji_groups.insert(
+			this->_kanji_groups.end(),
+			other.kanji_groups().begin(), other.kanji_groups().end()
+		);
+	}
+
+	return true;
+}
