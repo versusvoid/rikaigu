@@ -210,6 +210,7 @@ function onClick(ev) {
 		return;
 	}
 
+	// TODO handle select in popup
 	const popup = document.getElementById('rikaigu-window');
 	let wordNode = ev.target;
 	if (!popup.contains(wordNode)) {

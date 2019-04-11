@@ -373,7 +373,7 @@ void entry_to_html(WordResult& word, const std::string& partial, const std::stri
 	buffer += "</div>";
 }
 
-#define MOAR_CUT 5
+#define MOAR_CUT 2
 
 void render_entries(SearchResult& result)
 {
