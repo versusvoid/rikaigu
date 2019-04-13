@@ -77,9 +77,22 @@ _long_vowel_mark_mapping = dict(itertools.chain(
 	map(lambda k: (k, 'い'), 'い き ぎ し じ ち ぢ に ひ び ぴ み 　 　 り ゐ'.split()),
 	map(lambda k: (k, 'う'), 'う く ぐ す ず つ づ ぬ ふ ぶ ぷ む ゆ ゅ る'.split()),
 	map(lambda k: (k, 'い'), _e_row),
- 	map(lambda k: (k, 'う'), _o_row),
+	map(lambda k: (k, 'う'), _o_row),
 	map(lambda k: (k, 'ー'), 'ぁ ぃ ぅ ぇ ぉ ゔ ゎ'.split()),
 ))
+
+if __name__ == '__main__':
+	a = min(_long_vowel_mark_mapping.keys())
+	b = max(_long_vowel_mark_mapping.keys())
+	print(f"static const wchar_t long_vowel_mark_mapping_min = L'{a}';")
+	print(f"static const wchar_t long_vowel_mark_mapping_max = L'{b}';")
+	table = [(chr(k), _long_vowel_mark_mapping.get(chr(k), r'\0')) for k in range(ord(a), ord(b)+1)]
+	print('static const wchar_t long_vowel_mark_mapping[] = {')
+	step = 8
+	for i in range(0, len(table), step):
+		print('\t', ', '.join(f"/*{k}:*/L'{v}'" for k, v in table[i:i+step]), ',', sep='')
+	print('};')
+
 def kata_to_hira(w, agressive=True):
 	res = []
 	for c in w:

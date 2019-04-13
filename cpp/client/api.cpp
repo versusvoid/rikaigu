@@ -48,23 +48,22 @@ bool rikaigu_set_file(const char* filename, char* data, uint32_t length)
 	}
 }
 
-const char* rikaigu_search(const char* utf8_text, const char* utf8_prefix,
-		int32_t* match_symbols_length, int32_t* prefix_symbols_length)
+const char* rikaigu_search(const char16_t* utf16_text, int32_t* match_symbols_length)
 {
 	PROFILE
 
-//	printf("rikaigu_search(%s, %s)\n", utf8_text, utf8_prefix);
-	SearchResult res = search(utf8_text);
-	*prefix_symbols_length = 0;
+	SearchResult res = search(utf16_text);
 //	printf("Plain search res.max_match_symbols_length = %zu\n", res.max_match_symbols_length);
-	*match_symbols_length = int32_t(res.max_match_symbols_length) - *prefix_symbols_length;
+	*match_symbols_length = int32_t(res.max_match_symbols_length);
 	return make_html(res);
 }
 
-const char* rikaigu_review_entries_for_sentence(const char* utf8_text)
+const char* rikaigu_review_entries_for_sentence(const char*)
 {
+	throw std::runtime_error("not tested");
 	PROFILE
 
+	/*
 	mbstate_t ps;
 	memset(&ps, 0, sizeof(ps));
 
@@ -92,4 +91,5 @@ const char* rikaigu_review_entries_for_sentence(const char* utf8_text)
 		pos += mbrlen(utf8_text + pos, end - pos, &ps);
 	}
 	return buffer.c_str();
+	*/
 }

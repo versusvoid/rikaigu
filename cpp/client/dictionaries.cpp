@@ -90,109 +90,157 @@ SearchResult::SearchResult(const KanjiResult& kanji)
 {}
 
 	// Katakana -> hiragana conversion tables
-static wchar_t ch[] = {
+static const wchar_t ch[] = {
 	0x3092, 0x3041, 0x3043, 0x3045, 0x3047, 0x3049, 0x3083, 0x3085, 0x3087, 0x3063, 0x30FC, 0x3042, 0x3044, 0x3046,
 	0x3048, 0x304A, 0x304B, 0x304D, 0x304F, 0x3051, 0x3053, 0x3055, 0x3057, 0x3059, 0x305B, 0x305D, 0x305F, 0x3061,
 	0x3064, 0x3066, 0x3068, 0x306A, 0x306B, 0x306C, 0x306D, 0x306E, 0x306F, 0x3072, 0x3075, 0x3078, 0x307B, 0x307E,
 	0x307F, 0x3080, 0x3081, 0x3082, 0x3084, 0x3086, 0x3088, 0x3089, 0x308A, 0x308B, 0x308C, 0x308D, 0x308F, 0x3093
 };
-static wchar_t cv[] = {
+static const wchar_t cv[] = {
 	0x30F4, 0xFF74, 0xFF75, 0x304C, 0x304E, 0x3050, 0x3052, 0x3054, 0x3056, 0x3058, 0x305A, 0x305C, 0x305E, 0x3060,
 	0x3062, 0x3065, 0x3067, 0x3069, 0xFF85, 0xFF86, 0xFF87, 0xFF88, 0xFF89, 0x3070, 0x3073, 0x3076, 0x3079, 0x307C
 };
-static wchar_t cs[] = {0x3071, 0x3074, 0x3077, 0x307A, 0x307D};
+static const wchar_t cs[] = {0x3071, 0x3074, 0x3077, 0x307A, 0x307D};
 
-struct KanaConvertor
-{
-	wchar_t previous;
-	std::string out;
-	size_t out_offset;
-	std::vector<size_t> true_length_mapping;
-
-	KanaConvertor()
-		: previous(0)
-		, out_offset(0)
-		, true_length_mapping({0})
-	{}
-
-	void reserve(const size_t bytes)
-	{
-		out.resize(bytes);
-	}
-
-	void drop_last()
-	{
-		size_t j = out_offset - 1;
-		while ((out.at(j) & 0b11000000) == 0b10000000) {
-			j -= 1;
-		}
-		out_offset = j;
-	}
-
-	void shrink()
-	{
-		out.resize(out_offset);
-	}
-
-	bool operator() (const size_t i, wchar_t u, const char*, const size_t)
-	{
-		// Half & full-width katakana to hiragana conversion.
-		// Note: katakana `vu` is never converted to hiragana
-		wchar_t v = u;
-
-		if (u <= 0x3000) return false;
-
-		// Full-width katakana to hiragana
-		if ((u >= 0x30A1) && (u <= 0x30F3)) {
-			u -= 0x60;
-		}
-		// Half-width katakana to hiragana
-		else if ((u >= 0xFF66) && (u <= 0xFF9D)) {
-			u = ch[u - 0xFF66];
-		}
-		// Voiced (used in half-width katakana) to hiragana
-		else if (u == 0xFF9E) {
-			if ((previous >= 0xFF73) && (previous <= 0xFF8E)) {
-				drop_last();
-				u = cv[previous - 0xFF73];
-			}
-		}
-		// Semi-voiced (used in half-width katakana) to hiragana
-		else if (u == 0xFF9F) {
-			if ((previous >= 0xFF8A) && (previous <= 0xFF8E)) {
-				drop_last();
-				u = cs[previous - 0xFF8A];
-			}
-		}
-		// Ignore J~
-		else if (u == 0xFF5E) {
-			previous = 0;
-			return true;
-		}
-
-		if (out_offset + 4 > out.size())
-		{
-			out.resize(out.size() * 2);
-		}
-		int written = wctomb(&out[0] + out_offset, u);
-		if (written < 0)
-		{
-			out.clear();
-			return false;
-		}
-		out_offset += size_t(written);
-		true_length_mapping.resize(out_offset + 1, 0);
-		true_length_mapping.at(out_offset) = i + 1; // Need to keep real length because of the half-width semi/voiced conversion
-		previous = v;
-
-		return true;
-	}
+static const wchar_t long_vowel_mark_mapping_min = L'ぁ';
+static const wchar_t long_vowel_mark_mapping_max = L'ゔ';
+static const wchar_t long_vowel_mark_mapping[] = {
+	/*ぁ:*/L'ー', /*あ:*/L'あ', /*ぃ:*/L'ー', /*い:*/L'い', /*ぅ:*/L'ー', /*う:*/L'う', /*ぇ:*/L'ー', /*え:*/L'い',
+	/*ぉ:*/L'ー', /*お:*/L'う', /*か:*/L'あ', /*が:*/L'あ', /*き:*/L'い', /*ぎ:*/L'い', /*く:*/L'う', /*ぐ:*/L'う',
+	/*け:*/L'い', /*げ:*/L'い', /*こ:*/L'う', /*ご:*/L'う', /*さ:*/L'あ', /*ざ:*/L'あ', /*し:*/L'い', /*じ:*/L'い',
+	/*す:*/L'う', /*ず:*/L'う', /*せ:*/L'い', /*ぜ:*/L'い', /*そ:*/L'う', /*ぞ:*/L'う', /*た:*/L'あ', /*だ:*/L'あ',
+	/*ち:*/L'い', /*ぢ:*/L'い', /*っ:*/L'\0', /*つ:*/L'う', /*づ:*/L'う', /*て:*/L'い', /*で:*/L'い', /*と:*/L'う',
+	/*ど:*/L'う', /*な:*/L'あ', /*に:*/L'い', /*ぬ:*/L'う', /*ね:*/L'い', /*の:*/L'う', /*は:*/L'あ', /*ば:*/L'あ',
+	/*ぱ:*/L'あ', /*ひ:*/L'い', /*び:*/L'い', /*ぴ:*/L'い', /*ふ:*/L'う', /*ぶ:*/L'う', /*ぷ:*/L'う', /*へ:*/L'い',
+	/*べ:*/L'い', /*ぺ:*/L'い', /*ほ:*/L'う', /*ぼ:*/L'う', /*ぽ:*/L'う', /*ま:*/L'あ', /*み:*/L'い', /*む:*/L'う',
+	/*め:*/L'い', /*も:*/L'う', /*ゃ:*/L'あ', /*や:*/L'あ', /*ゅ:*/L'う', /*ゆ:*/L'う', /*ょ:*/L'う', /*よ:*/L'う',
+	/*ら:*/L'あ', /*り:*/L'い', /*る:*/L'う', /*れ:*/L'い', /*ろ:*/L'う', /*ゎ:*/L'ー', /*わ:*/L'あ', /*ゐ:*/L'い',
+	/*ゑ:*/L'い', /*を:*/L'\0', /*ん:*/L'\0', /*ゔ:*/L'ー',
 };
+
+void drop_last_utf8(std::string& utf8_text)
+{
+	size_t j = utf8_text.length() - 1;
+	while ((utf8_text.at(j) & 0b11000000) == 0b10000000)
+	{
+		j -= 1;
+	}
+	utf8_text.resize(j);
+}
+
+wchar_t utf16_to_wchar(const char16_t* utf16)
+{
+	if (*utf16 >= 0xD800 && *utf16 <= 0xDBFF)
+	{
+		return 0x10000 + (wchar_t(*utf16 - 0xD800) << 10) + wchar_t(*(utf16 + 1) - 0xDC00);
+	}
+	else
+	{
+		return *utf16;
+	}
+}
+
+wchar_t kata_to_hira_character(const wchar_t c, const wchar_t previous, std::vector<wchar_t> out)
+{
+	// Full-width katakana to hiragana
+	if (c >= L'ァ' && c <= L'ン')
+	{
+		return c - 0x60;
+	}
+	// Half-width katakana to hiragana
+	else if (c >= L'ｦ' && c <= L'ﾝ')
+	{
+		return ch[c - L'ｦ'];
+	}
+	// Voiced (used in half-width katakana) to hiragana
+	else if (c == L'ﾞ')
+	{
+		if (previous >= L'ｳ' && previous <= L'ﾎ')
+		{
+			out.pop_back();
+			return cv[previous - L'ｳ'];
+		}
+	}
+	// Semi-voiced (used in half-width katakana) to hiragana
+	else if (c == L'ﾟ')
+	{
+		if (previous >= L'ﾊ' && previous <= L'ﾎ')
+		{
+			out.pop_back();
+			return cs[previous - L'ﾊ'];
+		}
+	}
+	else if (c == L'ー' && previous != 0 && previous >= long_vowel_mark_mapping_min && previous <= long_vowel_mark_mapping_max)
+	{
+		auto mapped = long_vowel_mark_mapping[previous - long_vowel_mark_mapping_min];
+		//printf("Have long vovel and mapped: %d\n", mapped);
+		if (mapped != 0)
+		{
+			return mapped;
+		}
+	}
+	return c;
+}
+
+std::pair<std::string, std::vector<size_t>> kata_utf16_to_hira_utf8(const char16_t* utf16_text)
+{
+	std::vector<wchar_t> res;
+	std::vector<size_t> code_points_length_mapping;
+
+	size_t in_offset = 0;
+	size_t num_code_points = 0;
+	while (utf16_text[in_offset] != 0)
+	{
+		wchar_t c = utf16_to_wchar(utf16_text + in_offset);
+		if (c > 0xFFFF)
+		{
+			in_offset += 2;
+		}
+		else
+		{
+			in_offset += 1;
+		}
+		num_code_points += 1;
+
+		if (c <= 0x3000 || c == L'～')
+		{
+			break;
+		}
+
+		c = kata_to_hira_character(c, res.size() > 0 ? res.back() : 0, res);
+		res.push_back(c);
+
+		if (code_points_length_mapping.size() < res.size())
+		{
+			code_points_length_mapping.push_back(num_code_points);
+		}
+		else
+		{
+			code_points_length_mapping.back() = num_code_points;
+		}
+	}
+	res.push_back(L'\0');
+
+	std::string utf8;
+	utf8.resize(res.size()*4);
+	size_t written = wcstombs(utf8.data(), res.data(), utf8.size());
+	if (written == size_t(-1))
+	{
+		utf8.clear();
+		code_points_length_mapping.clear();
+		printf("Error converting to utf8");
+	}
+	else
+	{
+		utf8.resize(written);
+	}
+	return {utf8, code_points_length_mapping};
+}
 
 std::vector<uint32_t> find(IndexFile* index, const std::string& word)
 {
 	PROFILE
-//	printf("find(%s)\n", word.c_str());
+	//printf("find(%s)\n", word.c_str());
 
 	const char* beg = index->index_start;
 	const char* end = index->index_end;
@@ -288,19 +336,12 @@ inline void sort_and_limit(SearchResult& res)
 	res.data.erase(res.data.begin() + std::min(MAX_ENTRIES, res.data.size()), res.data.end());
 }
 
-SearchResult word_search(const char* word, bool names_dictionary)
+SearchResult word_search(std::string utf8_text, std::vector<size_t> code_points_length_mapping, bool names_dictionary)
 {
 	PROFILE
-//	std::cout << "word_search( " << word << " )" << std::endl;
-	KanaConvertor convertor;
+	//std::cout << "word_search( " << word << " )" << std::endl;
 	SearchResult result;
-	if (!stream_utf8_convertor(word, convertor))
-	{
-		return result;
-	}
-	convertor.shrink();
-	result.source = convertor.out;
-//	printf("convertor.out = %s\n", convertor.out.c_str());
+	result.source = utf8_text;
 
 	FILE* dict = nullptr;
 	IndexFile* index = nullptr;
@@ -312,7 +353,7 @@ SearchResult word_search(const char* word, bool names_dictionary)
 		index = &names_index;
 		maxTrim = 7;
 		result.names = true;
-//		std::cout << "doNames" << std::endl;
+		//std::cout << "doNames" << std::endl;
 	}
 	else
 	{
@@ -331,17 +372,17 @@ SearchResult word_search(const char* word, bool names_dictionary)
 	std::map<std::string, std::vector<uint32_t>> cache;
 	std::set<size_t> have;
 	int count = 0;
-	while (convertor.out.length() > 0)
+	while (utf8_text.length() > 0)
 	{
 		std::list<Candidate> trys;
 
 		if (names_dictionary)
 		{
-			trys.emplace_back(convertor.out, 0);
+			trys.emplace_back(utf8_text, 0);
 		}
 		else
 		{
-			trys = deinflector->deinflect(convertor.out);
+			trys = deinflector->deinflect(utf8_text);
 		}
 
 		for (auto candidate_it = trys.begin(); candidate_it != trys.end(); ++candidate_it)
@@ -349,7 +390,8 @@ SearchResult word_search(const char* word, bool names_dictionary)
 			Candidate& u = *candidate_it;
 
 			auto it = cache.find(u.word);
-			if (it == cache.end()) {
+			if (it == cache.end())
+			{
 				std::vector<uint32_t> ix = find(index, u.word);
 				it = cache.insert(std::make_pair(u.word, ix)).first;
 			}
@@ -365,26 +407,28 @@ SearchResult word_search(const char* word, bool names_dictionary)
 					std::cerr << "Too bad" << std::endl;
 					continue;
 				}
-//				printf("Line at index %u for word '%s' is '%.*s'\n", ofs, u.word.c_str(), line_length, line);
-//				std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
+				//printf("Line at index %u for word '%s' is '%.*s'\n", ofs, u.word.c_str(), line_length, line);
+				//std::cout << "dentry: " << std::string(line, line_length - 1) << std::endl;
 
 				DEntry dentry(ofs, std::string(line, line_length - 1), names_dictionary);
 				if (names_dictionary)
 				{
-					dentry.filter_writings(convertor.out);
+					dentry.filter_writings(utf8_text);
 				}
 
 				// > second and further - a de-inflected word.
 				// Each type has associated bit. If bit-and gives 0
 				// than deinflected word does not match this dentry.
-				if (candidate_it != trys.begin() && (dentry.all_pos() & u.type) == 0) {
-//					std::cout << "Mismatch: "
-//						<< std::bitset<32>(dentry.all_pos()).to_string() << " and "
-//						<< std::bitset<32>(u.type).to_string() << std::endl;
+				if (candidate_it != trys.begin() && (dentry.all_pos() & u.type) == 0)
+				{
+					//std::cout << "Mismatch: "
+						//<< std::bitset<32>(dentry.all_pos()).to_string() << " and "
+						//<< std::bitset<32>(u.type).to_string() << std::endl;
 					continue;
 				}
 				// TODO confugirable number of entries
-				if (count >= maxTrim) {
+				if (count >= maxTrim)
+				{
 					result.more = true;
 					if (names_dictionary) break;
 				}
@@ -392,19 +436,18 @@ SearchResult word_search(const char* word, bool names_dictionary)
 				have.insert(ofs);
 				++count;
 
-				size_t true_length = convertor.true_length_mapping.at(convertor.out.length());
 				if (max_length == 0)
 				{
-					max_length = true_length;
+					max_length = code_points_length_mapping.back();
 				}
 
-				result.data.emplace_back(dentry, u.reason, true_length, convertor.out.length());
+				result.data.emplace_back(dentry, u.reason, code_points_length_mapping.back(), utf8_text.length());
 			}
 		}
 		if (count >= maxTrim) break;
 
-		convertor.drop_last();
-		convertor.shrink();
+		drop_last_utf8(utf8_text);
+		code_points_length_mapping.pop_back();
 	} // while word.length > 0
 
 	fclose(dict);
@@ -437,26 +480,16 @@ std::string find_kanji(const uint32_t kanji_code_point)
 }
 
 static const char* hex = "0123456789ABCDEF";
-KanjiResult kanji_search(const char* kanji)
+KanjiResult kanji_search(const char16_t* kanji)
 {
-
 	KanjiResult result;
 
-	wchar_t kanji_code;
-	mbstate_t ps;
-	memset(&ps, 0, sizeof(ps));
-	size_t len = mbrtowc(&kanji_code, kanji, strlen(kanji), &ps);
-	if (len == size_t(-1) || len == size_t(-2))
-	{
-		std::cerr << "Invalid utf8: " << kanji << std::endl;
-		return result;
-	}
-
-	std::string kanji_str(kanji, len);
+	wchar_t kanji_code = utf16_to_wchar(kanji);
 	if (kanji_code < 0x3000)
 	{
 		return result;
 	}
+
 
 	std::string kanji_definition = find_kanji(uint32_t(kanji_code));
 	if (kanji_definition.empty())
@@ -521,10 +554,12 @@ KanjiResult kanji_search(const char* kanji)
 	return result;
 }
 
-SearchResult search(const char* text)
+SearchResult search(const char16_t* utf16_text)
 {
 	PROFILE
 	Dictionary dictionary = config.default_dictionary;
+	const auto& [utf8, code_points_length_mapping] = kata_utf16_to_hira_utf8(utf16_text);
+	//printf("Converted to: %s\n", utf8.c_str());
 
 	SearchResult res;
 	do
@@ -532,20 +567,20 @@ SearchResult search(const char* text)
 		switch (dictionary)
 		{
 			case WORDS:
-				res = word_search(text, false);
+				res = word_search(utf8, code_points_length_mapping, false);
 				if (dictionary == config.default_dictionary)
 				{
-					SearchResult res2 = word_search(text, true);
+					SearchResult res2 = word_search(utf8, code_points_length_mapping, true);
 					res.data.insert(res.data.end(), res2.data.begin(), res2.data.end());
 					res.max_match_symbols_length = std::max(res.max_match_symbols_length, res2.max_match_symbols_length);
 					sort_and_limit(res);
 				}
 				break;
 			case NAMES:
-				res = word_search(text, true);
+				res = word_search(utf8, code_points_length_mapping, true);
 				break;
 			case KANJI:
-				res = kanji_search(text);
+				res = kanji_search(utf16_text);
 				break;
 		}
 		if (res.max_match_symbols_length > 0) break;

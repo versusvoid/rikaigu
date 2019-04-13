@@ -152,10 +152,11 @@ def format_entry(entry):
 	return '\t'.join(parts)
 
 def write_index(index, label):
-	# try trie
+	# try utf16
 	index = list(index.items())
 	index.sort()
 	words_bytes = bytearray()
+	w2 = bytearray()
 	offsets_bytes = bytearray()
 	offsets_index = 0
 	for w, offsets in index:

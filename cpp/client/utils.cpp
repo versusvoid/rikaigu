@@ -38,7 +38,8 @@ Config config = {
 	false, true,
 	WORDS,
 	// see `kanji_numbers` in html_render.cpp
-	{"H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"}
+	{"H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"},
+	{},
 };
 
 void rikaigu_set_config(

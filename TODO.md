@@ -5,7 +5,7 @@
 - [ ] Learning page for review list (flashcards, srs, you name it)
 - [ ] Generate kanji.dat. KANJIDIC is good enough, but Wiktionary (en and jp) has entries it hasn't
 - [ ] Documentation
-- [ ] Fix double UTF conversion (to UTF-8 when calling cpp code and back to UTF-16 in cpp code.
+- [x] Fix double UTF conversion (to UTF-8 when calling cpp code and back to UTF-16 in cpp code.
 It's not that slow, just ugly)
 - [ ] Check if TreeWalker is really necessary or simple iteration through DOM would be fast enough
 - [ ] Japanese dictionary (lexicon). Sanseido is fine if it has offline version, but I prefer Wiktionary

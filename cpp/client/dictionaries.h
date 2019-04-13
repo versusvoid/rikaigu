@@ -57,9 +57,7 @@ struct SearchResult
 
 };
 
-SearchResult search(const char* text);
-
-SearchResult word_search(const char* word, bool names_dictionary);
+SearchResult search(const char16_t* utf16_text);
 
 bool dictionaries_init(const char* filename, const char* content, uint32_t length);
 

@@ -11,15 +11,15 @@ clean:
 		rikai.asm.js rikai.asm.data \
 		rikai.asm.wasm rikai.asm.wasm.pre rikai.asm.wast
 
-COMMON_CXXFLAGS = -std=c++17 -O3 -Wall -I.
+COMMON_CXXFLAGS = -std=c++17 -O3 -Wall -Wextra -Wunused -I.
 
 JS_CXXFLAGS = $(COMMON_CXXFLAGS)
 JS_DEBUG_FLAGS = -g3 -s SAFE_HEAP=1 -s ASSERTIONS=1 -s WARN_UNALIGNED=1 -s DEMANGLE_SUPPORT=1 -s DISABLE_EXCEPTION_CATCHING=0
 EMCC = emcc
 EMCCFLAGS = \
-		-s TOTAL_MEMORY=40MB \
+		-s TOTAL_MEMORY=36MB \
 		-s LZ4=1 \
-		-s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "getValue"]' \
+		-s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "getValue", "stringToUTF16"]' \
 		-s WASM=1 \
 		--preload-file ../data/dict.dat@/dict.dat \
 		--preload-file ../data/names.dat@/names.dat \

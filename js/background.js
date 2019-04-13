@@ -190,16 +190,29 @@ function rikaiguDisable() {
 	location.reload();
 }
 
+var inTextBuffer = [0, 0];
+function stringToUTF16buffer(str) {
+	let [buf, length] = inTextBuffer;
+	if (length < str.length*2 + 2) {
+		Module._free(buf);
+		length = Math.max(64, str.length*2 + 2);
+		buf = Module._malloc(str.length*2 + 2);
+		inTextBuffer = [buf, length];
+	}
+	Module.stringToUTF16(str, buf, length);
+	return buf;
+}
+
+var matchLengthPtr = null;
+
 function search(request) {
-	var matchLengthPtr = Module._malloc(4);
-	var prefixLengthPtr = Module._malloc(4);
-	var html = Module.ccall('rikaigu_search', 'string', ['string', 'string', 'number', 'number'],
-			[request.text, request.prefix, matchLengthPtr, prefixLengthPtr]);
+	if (!matchLengthPtr) {
+		matchLengthPtr = Module._malloc(4);
+	}
+	const inText = stringToUTF16buffer(request.text);
+	var html = Module.ccall('rikaigu_search', 'string', ['number', 'number'], [inText, matchLengthPtr]);
 	var matchLength = Module.getValue(matchLengthPtr, 'i32');
-	var prefixLength = Module.getValue(prefixLengthPtr, 'i32');
-	Module._free(matchLengthPtr);
-	Module._free(prefixLengthPtr);
-	return [html, {matchLength, prefixLength}];
+	return [html, {matchLength, prefixLength: 0}];
 }
 
 function getReviewEntriesForSentence(text) {
