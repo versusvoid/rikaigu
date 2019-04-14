@@ -13,3 +13,4 @@ It's not that slow, just ugly)
 - [ ] Extract and process text from pictures!
 - [ ] Generate readings for counters
 - [ ] Leave only matching readgings/writings by default.
+- [ ] When searching for words, first entry must be word?
