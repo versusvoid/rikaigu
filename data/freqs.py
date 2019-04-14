@@ -1204,9 +1204,6 @@ def compute_freq_order():
 
 	freqs.sort(key=lambda p: p[1], reverse=True)
 	res = {k:i for i, (k, v) in enumerate(freqs) if v >= MIN_FREQ}
-	with open('cpp/client/config.h', 'w') as of:
-		print(f'#define UNKNOWN_WORD_FREQ_ORDER {len(res)}', file=of)
-
 	return res
 
 __freq_order = None
@@ -1217,6 +1214,9 @@ def initialize():
 
 def get_frequency(entry):
 	return __freq_order.get(entry.id)
+
+def get_unknown_word_freq_order():
+	return len(__freq_order)
 
 if __name__ == '__main__':
 	initialize()

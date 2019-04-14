@@ -2,6 +2,7 @@
 
 import re
 import struct
+from collections import defaultdict
 
 import dictionary
 import freqs
@@ -151,6 +152,8 @@ def format_entry(entry):
 
 	return '\t'.join(parts)
 
+common_unused_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
+label2utf16_index = {}
 def write_index(index, label):
 	# try utf16
 	index = list(index.items())
@@ -158,12 +161,37 @@ def write_index(index, label):
 	words_bytes = bytearray()
 	offsets_bytes = bytearray()
 	offsets_index = 0
+
+	utf16_index = []
+	unused_offsets_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
+	unused_utf16_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
 	for w, offsets in index:
 		w_utf8 = w.encode('utf-8')
 		assert w_utf8.find(0b11111000) == -1, w
 
 		words_bytes.extend(w_utf8)
 		assert offsets_index < 2**21
+
+		'''
+		# funny enough LZ4 compress 4 bytes offsets with 4 bytes markers better then
+		# 3 bytes offsets with 2 bytes markers
+		# Since we only really care for compressed index size AND extracting 4 bytes offset
+		# is easier, let's leave it thus
+		compressed_offsets_bytes = []
+		for ofs in offsets:
+			ofs = ofs // 2
+			assert ofs < 2**24
+			compressed_offsets_bytes.extend((ofs >> 16, (ofs >> 8) & 0xff, ofs & 0xff))
+		compressed_offsets_bytes = struct.pack('B'*len(compressed_offsets_bytes), *compressed_offsets_bytes)
+		'''
+		compressed_offsets_bytes = struct.pack('<' + 'I' * len(offsets), *offsets)
+		for i in range(0, len(compressed_offsets_bytes) - 1):
+			common_unused_byte_pairs.discard(compressed_offsets_bytes[i:i+2])
+		w_utf16 = w.encode('utf-16')
+		for i in range(0, len(w_utf16) - 1):
+			common_unused_byte_pairs.discard(w_utf16[i:i+2])
+		utf16_index.append((w_utf16, compressed_offsets_bytes))
+
 		# 0b11111000 is forbidden in current UTF-8
 		words_bytes.extend(struct.pack('BBBB', 0b11111000,
 			0b01111111 & offsets_index,
@@ -173,10 +201,34 @@ def write_index(index, label):
 		offsets_index += len(offsets)
 		offsets_bytes.extend(struct.pack('<' + 'I' * len(offsets), *offsets))
 
+	label2utf16_index[label] = utf16_index
+
 	with open(f'data/{label}.idx', 'wb') as of:
 		of.write(struct.pack('<I', 4 + len(offsets_bytes)))
 		of.write(offsets_bytes)
 		of.write(words_bytes)
+
+def write_utf16_index():
+	print('common unused byte pairs:', common_unused_byte_pairs)
+	if len(common_unused_byte_pairs) < 2:
+		print('Using 4 bytes markers')
+		start_marker = b'\x01\x03\x03\x07'
+		end_marker = b'\x48\x15\x16\x23'
+	else:
+		[start_marker, end_marker] = list(common_unused_byte_pairs)[:2]
+	for label, utf16_index in label2utf16_index.items():
+		with open(f'data/{label}.u16.idx', 'wb') as of:
+			for w, offsets in utf16_index:
+				assert start_marker not in w
+				assert end_marker not in w
+				of.write(w)
+				of.write(start_marker)
+				assert start_marker not in offsets
+				assert end_marker not in offsets
+				of.write(offsets)
+				of.write(end_marker)
+
+	return start_marker, end_marker
 
 def prepare_names():
 	index = defaultdict(set)
@@ -262,5 +314,14 @@ def index_kanji():
 freqs.initialize()
 prepare_dict()
 prepare_names()
+
+start_marker, end_marker = write_utf16_index()
+with open('cpp/client/config.h', 'a') as of:
+	print(f'#define UNKNOWN_WORD_FREQ_ORDER', freqs.get_unknown_word_freq_order(), file=of)
+	start = ''.join(f'{b:X}' for b in start_marker)
+	print('#define INDEX_OFFSETS_START 0x{start}', file=of)
+	end = ''.join(f'{b:X}' for b in end_marker)
+	print('#define INDEX_OFFSETS_END 0x{end}', file=of)
+
 # TODO generate kanji.dat
 index_kanji()
