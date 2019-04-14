@@ -53,6 +53,7 @@ std::vector<std::string> split(const std::string_view& str, char sep, bool add_e
 
 extern "C" {
 void EMSCRIPTEN_KEEPALIVE rikaigu_dump_profile_info();
+void EMSCRIPTEN_KEEPALIVE rikaigu_clear_profile_info();
 }
 
 //#define PROFILE profiler __profiler__(__FUNCTION__, __LINE__);

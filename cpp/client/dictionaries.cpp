@@ -353,7 +353,6 @@ SearchResult word_search(std::string utf8_text, std::vector<size_t> code_points_
 		index = &names_index;
 		maxTrim = 7;
 		result.names = true;
-		//std::cout << "doNames" << std::endl;
 	}
 	else
 	{

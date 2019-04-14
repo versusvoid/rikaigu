@@ -139,7 +139,12 @@ void rikaigu_dump_profile_info()
 	{
 		std::cout << std::get<0>(r) << ":" << std::get<1>(r) << " - "
 				<< float(std::get<2>(r)) / float(std::get<3>(r))
-				<< ", total: " << std::get<2>(r) << " " << std::get<3>(r)
+				<< "us/call, total: " << std::get<2>(r) << " us, " << std::get<3>(r) << " calls"
 				<< std::endl;
 	}
+}
+
+void EMSCRIPTEN_KEEPALIVE rikaigu_clear_profile_info()
+{
+	profile_info.clear();
 }

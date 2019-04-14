@@ -156,7 +156,6 @@ def write_index(index, label):
 	index = list(index.items())
 	index.sort()
 	words_bytes = bytearray()
-	w2 = bytearray()
 	offsets_bytes = bytearray()
 	offsets_index = 0
 	for w, offsets in index:
@@ -180,9 +179,10 @@ def write_index(index, label):
 		of.write(words_bytes)
 
 def prepare_names():
-	index = {}
+	index = defaultdict(set)
 	offset = 0
 	combined_entries = {}
+	line_lengths = []
 	with open(f'data/names.dat', 'wb') as of:
 		for entry in dictionary.dictionary_reader('JMnedict.xml.gz'):
 			if len(entry.readings) == 1 and len(entry.transes) == 1 and len(entry.transes[0].glosses) == 1:
@@ -196,9 +196,10 @@ def prepare_names():
 
 			entry_index_keys = index_keys(entry, variate=False)
 			for key in entry_index_keys:
-				index.setdefault(key, set()).add(offset)
+				index[key].add(offset)
 
 			l = format_entry(entry).encode('utf-8')
+			line_lengths.append(len(l))
 			of.write(l)
 			of.write(b'\n')
 			offset += len(l) + 1
@@ -206,28 +207,37 @@ def prepare_names():
 		for combined_entry in combined_entries.values():
 			entry_index_keys = index_keys(combined_entry, variate=False)
 			for key in entry_index_keys:
-				index.setdefault(key, set()).add(offset)
+				index[key].add(offset)
 
 			l = format_entry(combined_entry).encode('utf-8')
+			line_lengths.append(len(l))
 			of.write(l)
 			of.write(b'\n')
 			offset += len(l) + 1
+
+	line_lengths.sort()
+	print('names line length:', max(line_lengths), sum(line_lengths)/len(line_lengths), line_lengths[len(line_lengths)//2])
 
 	write_index(index, 'names')
 
 def prepare_dict():
-	index = {}
+	index = defaultdict(set)
 	offset = 0
+	line_lengths = []
 	with open(f'data/dict.dat', 'wb') as of:
 		for entry in dictionary.dictionary_reader('JMdict_e.gz'):
 			entry_index_keys = index_keys(entry, variate=True)
 			for key in entry_index_keys:
-				index.setdefault(key, set()).add(offset)
+				index[key].add(offset)
 
 			l = format_entry(entry).encode('utf-8')
+			line_lengths.append(len(l))
 			of.write(l)
 			of.write(b'\n')
 			offset += len(l) + 1
+
+	line_lengths.sort()
+	print('dict line length:', max(line_lengths), sum(line_lengths)/len(line_lengths), line_lengths[len(line_lengths)//2])
 
 	write_index(index, 'dict')
 

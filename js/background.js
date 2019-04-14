@@ -155,7 +155,7 @@ function rikaiguEnable(tab) {
 			updateCppConfig();
 			Promise.all([
 					/* names.dat, dict.dat, and kanji.dat are stored
-					 * compressed in virtual file system of asm.js.
+					 * compressed in emscripten's virtual file system.
 					 */
 					loadFile('data/radicals.dat'),
 					loadFile('data/dict.idx'),
@@ -201,6 +201,87 @@ function stringToUTF16buffer(str) {
 	}
 	Module.stringToUTF16(str, buf, length);
 	return buf;
+}
+
+async function getRoot() {
+	return new Promise(function(resolve, reject) {
+		chrome.runtime.getPackageDirectoryEntry(resolve);
+	});
+}
+
+async function getFileEntry(root, path) {
+	return new Promise(function(resolve, reject) {
+		root.getFile(path, {}, resolve, reject);
+	});
+}
+
+async function getFile(path) {
+	const root = await getRoot();
+	const entry = await getFileEntry(root, path);
+	return new Promise(function(resolve, reject) {
+		entry.file(resolve, reject);
+	});
+}
+
+var namesFile = null;
+var dictFile = null;
+
+getFile('data/names.dat').then(function(f){namesFile = f;});
+getFile('data/dict.dat').then(function(f){dictFile = f;});
+
+async function getLines(file, offsets) {
+	return Promise.all(offsets.map(offset => getLine(file, offset)));
+};
+
+async function getLine(file, offset) {
+	return new Promise(function(resolve, reject) {
+		var len = 75;
+		var blob = file.slice(offset, offset + len);
+
+		var reader = new FileReader();
+
+		reader.addEventListener("loadend", function() {
+			const view = new Uint8Array(reader.result);
+			const end = view.indexOf('\n'.charCodeAt(0));
+			if (end !== -1) {
+				resolve(reader.result.slice(0, end));
+			} else if (len > 7000) {
+				reject(`There is no end: ${file.name}, ${offset}, ${len}, ${reader.result}`);
+			} else {
+				len = len * 2;
+				blob = file.slice(offset, offset + len);
+				reader.readAsArrayBuffer(blob);
+			}
+		});
+		reader.readAsArrayBuffer(blob);
+	});
+}
+
+async function printOffsets() {
+	let readTimes = [];
+	for (const k of ['names_offsets', 'dict_offsets']) {
+		let v = Module.ccall(k, 'number', []);
+		console.log('printOffsets', k, v);
+		if (!v) continue;
+
+		let offsets = [];
+		let offset = Module.getValue(v, 'i32');
+		while(offset !== 0) {
+			offsets.push(offset);
+			v += 4;
+			offset = Module.getValue(v, 'i32');
+		}
+		console.log('printOffsets', k, offsets);
+
+		const start = Date.now();
+		const lines = await getLines(k.startsWith('names') ? namesFile : dictFile, offsets);
+		readTimes.push(Date.now() - start);
+		console.log(k, 'lines:', lines);
+	}
+
+	Module.ccall('rikaigu_dump_profile_info', null, []);
+	Module.ccall('rikaigu_clear_profile_info', null, []);
+	console.log('total read time:', readTimes.reduce((a,b) => a + b, 0), 'ms');
 }
 
 var matchLengthPtr = null;
