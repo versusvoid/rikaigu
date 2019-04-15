@@ -216,6 +216,8 @@ def write_utf16_index():
 		end_marker = b'\x48\x15\x16\x23'
 	else:
 		[start_marker, end_marker] = list(common_unused_byte_pairs)[:2]
+
+	line_lengths = []
 	for label, utf16_index in label2utf16_index.items():
 		with open(f'data/{label}.u16.idx', 'wb') as of:
 			for w, offsets in utf16_index:
@@ -227,6 +229,13 @@ def write_utf16_index():
 				assert end_marker not in offsets
 				of.write(offsets)
 				of.write(end_marker)
+				line_lengths.append(len(w) + len(start_marker) + len(offsets) + len(end_marker))
+
+	line_lengths.sort()
+	print(f'''utf16 index line stats:
+		min={line_lengths[0]} max={line_lengths[-1]}
+		mean={sum(line_lengths)/len(line_lengths)} med={line_lengths[len(line_lengths) // 2]}
+	''')
 
 	return start_marker, end_marker
 
@@ -316,12 +325,12 @@ prepare_dict()
 prepare_names()
 
 start_marker, end_marker = write_utf16_index()
-with open('cpp/client/config.h', 'a') as of:
+with open('cpp/client/config.h', 'w') as of:
 	print(f'#define UNKNOWN_WORD_FREQ_ORDER', freqs.get_unknown_word_freq_order(), file=of)
-	start = ''.join(f'{b:X}' for b in start_marker)
-	print('#define INDEX_OFFSETS_START 0x{start}', file=of)
-	end = ''.join(f'{b:X}' for b in end_marker)
-	print('#define INDEX_OFFSETS_END 0x{end}', file=of)
+	start = ''.join(f'{b:02X}' for b in start_marker)
+	print(f'#define INDEX_OFFSETS_START 0x{start}', file=of)
+	end = ''.join(f'{b:02X}' for b in end_marker)
+	print(f'#define INDEX_OFFSETS_END 0x{end}', file=of)
 
 # TODO generate kanji.dat
 index_kanji()
