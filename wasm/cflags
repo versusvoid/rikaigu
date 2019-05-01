@@ -1,0 +1,1 @@
+-std=c11 -g -Ofast -Weverything -Wno-c99-compat -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-pointer-arith -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-cast-align -Wno-error-padded -Werror -I.

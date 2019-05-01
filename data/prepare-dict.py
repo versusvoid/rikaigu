@@ -2,11 +2,13 @@
 
 import re
 import struct
+import itertools
 from collections import defaultdict
 
 import dictionary
 import freqs
-from utils import kata_to_hira
+import wasm_generator
+from utils import kata_to_hira, print_lengths_stats
 from index import index_keys
 from romaji import is_romajination
 
@@ -59,16 +61,21 @@ def format_trans(trans, name):
 	return ''.join(parts)
 
 
-control_kanji_symbols = re.compile('[#|,;\t]')
-control_reading_symbols = re.compile('[|;\t]')
+control_kanji_symbols = re.compile('[#|U,;\t]')
+control_reading_symbols = re.compile('[|U;\t]')
+max_readings_index = 0
 def format_entry(entry):
+	global max_readings_index
+
 	any_common_kanji = any(map(lambda k: k.common, entry.kanjis))
 	any_common_kana = any(map(lambda r: r.common, entry.readings))
 
 	parts = []
 	if len(entry.kanjis) > 0:
 		'''
-		Inverse kanjis-readings restrictions, because it's easier to show entries this way.
+		Inverse kanjis-readings restrictions, because we render kanjis first,
+		then readings, so kanjis rendered on this line must define which
+		readings are going to be rendered after
 		'''
 		kanji_index_to_readings = {}
 		for ri, r in enumerate(entry.readings):
@@ -93,21 +100,23 @@ def format_entry(entry):
 				assert control_kanji_symbols.search(k.text) is None
 				kanji_offsets[i] = k.text
 				if any_common_kanji and not k.common:
-					kanji_offsets[i] += '|U'
+					kanji_offsets[i] += 'U'
 
 			groups.append(','.join(kanji_offsets))
 			if len(reading_indices) != len(entry.readings):
+				max_readings_index = max(max_readings_index, *reading_indices)
 				groups[-1] += '#' + ','.join(map(str, reading_indices))
 
 		'''
 		Format ungrouped kanjis
 		'''
 		for ki, k in enumerate(entry.kanjis):
-			if ki in seen: continue
+			if ki in seen:
+				continue
 			assert control_kanji_symbols.search(k.text) is None
 			groups.append(k.text)
 			if any_common_kanji and not k.common:
-				groups[-1] += '|U'
+				groups[-1] += 'U'
 
 		parts.append(';'.join(groups))
 		del seen, groups
@@ -120,7 +129,7 @@ def format_entry(entry):
 		assert control_reading_symbols.search(r.text) is None
 		readings.append(r.text)
 		if any_common_kana and not r.common:
-			readings[-1] += '|U'
+			readings[-1] += 'U'
 	parts.append(';'.join(readings))
 	del readings
 
@@ -151,93 +160,6 @@ def format_entry(entry):
 			parts.append(str(freq))
 
 	return '\t'.join(parts)
-
-common_unused_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
-label2utf16_index = {}
-def write_index(index, label):
-	# try utf16
-	index = list(index.items())
-	index.sort()
-	words_bytes = bytearray()
-	offsets_bytes = bytearray()
-	offsets_index = 0
-
-	utf16_index = []
-	unused_offsets_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
-	unused_utf16_byte_pairs = set(bytes([v >> 8, v & 0xff]) for v in range(0, 2**16))
-	for w, offsets in index:
-		w_utf8 = w.encode('utf-8')
-		assert w_utf8.find(0b11111000) == -1, w
-
-		words_bytes.extend(w_utf8)
-		assert offsets_index < 2**21
-
-		'''
-		# funny enough LZ4 compress 4 bytes offsets with 4 bytes markers better then
-		# 3 bytes offsets with 2 bytes markers
-		# Since we only really care for compressed index size AND extracting 4 bytes offset
-		# is easier, let's leave it thus
-		compressed_offsets_bytes = []
-		for ofs in offsets:
-			ofs = ofs // 2
-			assert ofs < 2**24
-			compressed_offsets_bytes.extend((ofs >> 16, (ofs >> 8) & 0xff, ofs & 0xff))
-		compressed_offsets_bytes = struct.pack('B'*len(compressed_offsets_bytes), *compressed_offsets_bytes)
-		'''
-		compressed_offsets_bytes = struct.pack('<' + 'I' * len(offsets), *offsets)
-		for i in range(0, len(compressed_offsets_bytes) - 1):
-			common_unused_byte_pairs.discard(compressed_offsets_bytes[i:i+2])
-		w_utf16 = w.encode('utf-16')
-		for i in range(0, len(w_utf16) - 1):
-			common_unused_byte_pairs.discard(w_utf16[i:i+2])
-		utf16_index.append((w_utf16, compressed_offsets_bytes))
-
-		# 0b11111000 is forbidden in current UTF-8
-		words_bytes.extend(struct.pack('BBBB', 0b11111000,
-			0b01111111 & offsets_index,
-			0b01111111 & (offsets_index >> 7),
-			0b01111111 & (offsets_index >> 14)
-		))
-		offsets_index += len(offsets)
-		offsets_bytes.extend(struct.pack('<' + 'I' * len(offsets), *offsets))
-
-	label2utf16_index[label] = utf16_index
-
-	with open(f'data/{label}.idx', 'wb') as of:
-		of.write(struct.pack('<I', 4 + len(offsets_bytes)))
-		of.write(offsets_bytes)
-		of.write(words_bytes)
-
-def write_utf16_index():
-	print('common unused byte pairs:', common_unused_byte_pairs)
-	if len(common_unused_byte_pairs) < 2:
-		print('Using 4 bytes markers')
-		start_marker = b'\x01\x03\x03\x07'
-		end_marker = b'\x48\x15\x16\x23'
-	else:
-		[start_marker, end_marker] = list(common_unused_byte_pairs)[:2]
-
-	line_lengths = []
-	for label, utf16_index in label2utf16_index.items():
-		with open(f'data/{label}.u16.idx', 'wb') as of:
-			for w, offsets in utf16_index:
-				assert start_marker not in w
-				assert end_marker not in w
-				of.write(w)
-				of.write(start_marker)
-				assert start_marker not in offsets
-				assert end_marker not in offsets
-				of.write(offsets)
-				of.write(end_marker)
-				line_lengths.append(len(w) + len(start_marker) + len(offsets) + len(end_marker))
-
-	line_lengths.sort()
-	print(f'''utf16 index line stats:
-		min={line_lengths[0]} max={line_lengths[-1]}
-		mean={sum(line_lengths)/len(line_lengths)} med={line_lengths[len(line_lengths) // 2]}
-	''')
-
-	return start_marker, end_marker
 
 def prepare_names():
 	index = defaultdict(set)
@@ -276,20 +198,23 @@ def prepare_names():
 			of.write(b'\n')
 			offset += len(l) + 1
 
-	line_lengths.sort()
-	print('names line length:', max(line_lengths), sum(line_lengths)/len(line_lengths), line_lengths[len(line_lengths)//2])
-
-	write_index(index, 'names')
+	print_lengths_stats('names', line_lengths)
+	return index
 
 def prepare_dict():
+	pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+
 	index = defaultdict(set)
 	offset = 0
 	line_lengths = []
 	with open(f'data/dict.dat', 'wb') as of:
 		for entry in dictionary.dictionary_reader('JMdict_e.gz'):
-			entry_index_keys = index_keys(entry, variate=True)
-			for key in entry_index_keys:
-				index[key].add(offset)
+			all_pos = set(itertools.chain.from_iterable(sg.pos for sg in entry.sense_groups))
+			pos_flags = sum(pos_flags_map.get(pos, 0) for pos in all_pos)
+			index_entry = offset if pos_flags == 0 else wasm_generator.TypedOffset(type=pos_flags, offset=offset)
+
+			for key in index_keys(entry, variate=True):
+				index[key].add(index_entry)
 
 			l = format_entry(entry).encode('utf-8')
 			line_lengths.append(len(l))
@@ -297,10 +222,8 @@ def prepare_dict():
 			of.write(b'\n')
 			offset += len(l) + 1
 
-	line_lengths.sort()
-	print('dict line length:', max(line_lengths), sum(line_lengths)/len(line_lengths), line_lengths[len(line_lengths)//2])
-
-	write_index(index, 'dict')
+	print_lengths_stats('dict', line_lengths)
+	return index
 
 def index_kanji():
 	index = []
@@ -321,16 +244,12 @@ def index_kanji():
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
 freqs.initialize()
-prepare_dict()
-prepare_names()
+dict_index = prepare_dict()
+names_index = prepare_names()
 
-start_marker, end_marker = write_utf16_index()
-with open('cpp/client/config.h', 'w') as of:
-	print(f'#define UNKNOWN_WORD_FREQ_ORDER', freqs.get_unknown_word_freq_order(), file=of)
-	start = ''.join(f'{b:02X}' for b in start_marker)
-	print(f'#define INDEX_OFFSETS_START 0x{start}', file=of)
-	end = ''.join(f'{b:02X}' for b in end_marker)
-	print(f'#define INDEX_OFFSETS_END 0x{end}', file=of)
+wasm_generator.write_utf16_indexies(dict_index, names_index)
+wasm_generator.generate_config_header(max_readings_index)
+wasm_generator.get_lz4_source()
 
 # TODO generate kanji.dat
 index_kanji()

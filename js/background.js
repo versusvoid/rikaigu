@@ -51,6 +51,7 @@ var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' 
 
 
 var rikaiguEnabled = false;
+var rikaiguError = false;
 function onLoaded(initiatorTab) {
 	rikaiguEnabled = true;
 
@@ -87,14 +88,15 @@ function onLoaded(initiatorTab) {
 	});
 }
 
-function onLoadError(err) {
-	console.error('onLoadError(', err, ')');
+function onError(err) {
+	console.error('onError(', err, ')');
 	chrome.browserAction.setBadgeBackgroundColor({
 		"color": [0, 0, 0, 255]
 	});
 	chrome.browserAction.setBadgeText({
 		"text": "Err"
 	});
+	rikaiguError = true;
 }
 
 function clearState() {
@@ -110,65 +112,50 @@ function clearState() {
 	});
 }
 
-function loadFile(filename) {
-	return new Promise(function(resolve, reject) {
-		/*
-		 * Modified version of emscripten_async_wget_data() which
-		 * does not free allocated buffer after callback return.
-		 * We don't have to copy file's content anymore (and we have
-		 * large files like names.idx > 20MB). This leads to reduced
-		 * TOTAL_MEMORY.
-		 */
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', chrome.extension.getURL(filename), true);
-		xhr.responseType = 'arraybuffer';
-		xhr.onload = function xhr_onload() {
-			if (xhr.status == 200) {
-				var byteArray = new Uint8Array(xhr.response);
-				var buffer = Module._malloc(byteArray.length);
-				HEAPU8.set(byteArray, buffer);
-				if (Module.ccall('rikaigu_set_file', 'number',
-						['string', 'number', 'number'],
-						[filename, buffer, byteArray.length])) {
-					resolve();
-				} else {
-					reject('asm.js is a shit');
-				}
-			} else {
-				reject(xhr.status);
-			}
-		};
-		xhr.onerror = reject;
-		xhr.send(null);
-	});
+function readCString(ptr) {
+	let length = 0;
+	const buf = new Uint8Array(Module.instance.exports.memory.buffer, ptr);
+	while (buf[length] !== 0) {
+		length += 1;
+	}
+	return decoder.decode(buf.slice(0, length));
 }
 
-function rikaiguEnable(tab) {
+function takeATrip(errorPtr) {
+	const err = readCString(errorPtr);
+	onError(err);
+	throw new Error(err);
+}
+
+function print(ptr) {
+	console.log(readCString(ptr));
+}
+
+async function rikaiguEnable(tab) {
 	if (!!window.Module) {
 		console.error("Double enable");
 		return;
 	}
-	window.Module = {
-		print: function(text) { console.log('stdout:', text); },
-		locateFile: function(path, prefix) { return '/cpp/' + path; },
-		onRuntimeInitialized: function() {
-			updateCppConfig();
-			Promise.all([
-					/* names.dat, dict.dat, and kanji.dat are stored
-					 * compressed in emscripten's virtual file system.
-					 */
-					loadFile('data/radicals.dat'),
-					loadFile('data/dict.idx'),
-					loadFile('data/names.idx'),
-					loadFile('data/kanji.idx'),
-					loadFile('data/deinflect.dat'),
-				]).then(onLoaded.bind(null, tab), onLoadError);
-		}
-	};
-	var js = document.createElement("script");
-	js.type = "text/javascript";
-	js.src = "/cpp/rikai.asm.js";
-	document.head.appendChild(js);
+	try {
+		window.Module = await WebAssembly.instantiateStreaming(
+			fetch('/wasm/rikai.wasm'),
+			{ env: {
+				take_a_trip: takeATrip,
+				request_read_dictionary: requestReadDictionary,
+				log: Math.log,
+				print: print,
+			}}
+		);
+	} catch(err) {
+		onError(err);
+	}
+
+	Module.inputDataOffset = Module.instance.exports.rikaigu_set_config(
+		Module.instance.exports.__heap_base,
+		Module.instance.exports.memory.buffer.byteLength,
+	);
+
+	onLoaded(tab);
 }
 
 function rikaiguDisable() {
@@ -188,19 +175,6 @@ function rikaiguDisable() {
 		});
 	chrome.storage.local.set({'reload': true});
 	location.reload();
-}
-
-var inTextBuffer = [0, 0];
-function stringToUTF16buffer(str) {
-	let [buf, length] = inTextBuffer;
-	if (length < str.length*2 + 2) {
-		Module._free(buf);
-		length = Math.max(64, str.length*2 + 2);
-		buf = Module._malloc(str.length*2 + 2);
-		inTextBuffer = [buf, length];
-	}
-	Module.stringToUTF16(str, buf, length);
-	return buf;
 }
 
 async function getRoot() {
@@ -257,47 +231,74 @@ async function getLine(file, offset) {
 	});
 }
 
-async function printOffsets() {
-	let readTimes = [];
-	for (const k of ['names_offsets', 'dict_offsets']) {
-		let v = Module.ccall(k, 'number', []);
-		console.log('printOffsets', k, v);
-		if (!v) continue;
-
-		let offsets = [];
-		let offset = Module.getValue(v, 'i32');
-		while(offset !== 0) {
-			offsets.push(offset);
-			v += 4;
-			offset = Module.getValue(v, 'i32');
-		}
-		console.log('printOffsets', k, offsets);
-
-		const start = Date.now();
-		const lines = await getLines(k.startsWith('names') ? namesFile : dictFile, offsets);
-		readTimes.push(Date.now() - start);
-		console.log(k, 'lines:', lines);
+function readLines(offsets, numWordsOffsets) {
+	const promises = [];
+	for (let i = 0; i < offsets.length; ++i) {
+		promises.push(getLine(i < numWordsOffsets ? dictFile : namesFile, offsets[i]));
 	}
-
-	Module.ccall('rikaigu_dump_profile_info', null, []);
-	Module.ccall('rikaigu_clear_profile_info', null, []);
-	console.log('total read time:', readTimes.reduce((a,b) => a + b, 0), 'ms');
+	return Promise.all(promises);
 }
 
-var matchLengthPtr = null;
+var nextRequestId = 0;
+var requestsData = new Map();
 
-function search(request) {
-	if (!matchLengthPtr) {
-		matchLengthPtr = Module._malloc(4);
+const decoder = new TextDecoder('utf-8');
+async function requestReadDictionary(offsetsPtr, numWordsOffsets, numNamesOffsets, bufferHandle, requestId) {
+	const lines = await readLines(
+		new Uint32Array(Module.instance.exports.memory.buffer, offsetsPtr, numWordsOffsets + numNamesOffsets),
+		numWordsOffsets,
+	);
+
+	for (const line of lines) {
+		const lineView = new Uint8Array(line);
+		const bufPtr = Module.instance.exports.buffer_allocate(bufferHandle, lineView.length + 2);
+		const bufView = new Uint8Array(Module.instance.exports.memory.buffer, bufPtr, lineView.length + 2);
+		bufView[0] = lineView.length & 0xff;
+		bufView[1] = (lineView.length >> 8) & 0xff;
+		bufView.set(lineView, 2);
 	}
-	const inText = stringToUTF16buffer(request.text);
-	var html = Module.ccall('rikaigu_search', 'string', ['number', 'number'], [inText, matchLengthPtr]);
-	var matchLength = Module.getValue(matchLengthPtr, 'i32');
-	return [html, {matchLength, prefixLength: 0}];
+
+	const request = requestsData.get(requestId);
+	console.assert(request);
+	requestsData.delete(requestId);
+
+	let res = Module.instance.exports.rikaigu_search_finish(bufferHandle);
+	if (res === -1) {
+		console.error('wut');
+		return;
+	}
+	const htmlPtr = res % Math.pow(2, 32);
+	const htmlLength = (res - htmlPtr) / Math.pow(2, 32);
+
+	const htmlView = new Uint8Array(Module.instance.exports.memory.buffer, htmlPtr, htmlLength);
+	const html = decoder.decode(htmlView);
+
+	chrome.tabs.sendMessage(request.tabId, {
+		"type": "show",
+		"html": html,
+		"match": request.text.substring(0, request.matchLength),
+		"screenX": request.screenX,
+		"screenY": request.screenY
+	});
 }
 
-function getReviewEntriesForSentence(text) {
-	return Module.ccall('rikaigu_review_entries_for_sentence', 'string', ['string'], [text]);
+function writeInputText(text) {
+	const view = new Uint16Array(Module.instance.exports.memory.buffer, Module.inputDataOffset, 32);
+	for (let i = 0; i < text.length; i += 1) {
+		view[i] = text.charCodeAt(i);
+	}
+}
+
+function startSearch(request, tabId) {
+	writeInputText(request.text);
+	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, nextRequestId);
+	if (matchLength) {
+		request.tabId = tabId;
+		request.matchLength = matchLength;
+		requestsData.set(nextRequestId, request);
+		nextRequestId += 1;
+	}
+	return matchLength;
 }
 
 function onMessage(request, sender, response) {
@@ -307,34 +308,13 @@ function onMessage(request, sender, response) {
 			break;
 
 		case 'xsearch':
-			var [html, result]  = search(request);
-			result.type = request.type;
-			response(result);
-			if (html) {
-				chrome.tabs.sendMessage(sender.tab.id, {
-					"type": "show",
-					"html": html,
-					"match": request.prefix.substring(request.prefix.length - result.prefixLength)
-						+ request.text.substring(0, result.matchLength),
-					"screenX": request.screenX,
-					"screenY": request.screenY
-				});
-			}
+			if (rikaiguError) return;
+			const matchLength = startSearch(request, sender.tab.id);
+			response({matchLength, type: request.type});
 
-			break;
-
-		case 'review':
-			var result = getReviewEntriesForSentence(request.text);
-			if (result) {
-				chrome.tabs.sendMessage(sender.tab.id, {
-					"type": "show-reviewed",
-					"result": result.split('\n').map(s => s.split('\t'))
-				})
-			}
 			break;
 
 		case 'relay':
-			console.assert(request.targetType);
 			request.type = request.targetType;
 			if ('frameId' in request) {
 				chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});

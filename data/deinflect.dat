@@ -2,7 +2,6 @@
 # vi: set noexpandtab tabstop=23:
 # pos are taken from jmdict except for `raw` - piece of original text
 # reason - particular deinflection marker
-# suffix | new suffix | source pos | new pos | reason
 # Test set:
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%D9%FA%A4%E1%A4%EB_v1
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%B8%E2%A4%EC%A4%EB_v1-s
@@ -23,6 +22,7 @@
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%C9%BD%A4%B9%A4%EB_vs-s
 # http://www.edrdg.org/cgi-bin/wwwjdic/wwwjdic?1W%CA%AA%A4%C8%A4%B9%A4%EB_vs-i
 # Consider 間違いありません. It's somewhat irregular adj-i
+# suffix | new suffix | source pos | new pos | reason
 ありません	ない	raw	adj-i	polite
 かったら	い	raw	adj-i	-tara
 かったり	い	raw	adj-i	-tari

@@ -11,7 +11,7 @@ Enhanced version of rikaikun - translate Japanese by hovering over words. Now wi
 
 ## Building
 
-You'll need **make**, **curl**, **python3** and [**emcc**](https://github.com/kripken/emscripten). From repo root execute:
+You'll need **make**, **curl**, **python**, **python-lz4** and **clang >= 8.0.0**. From repo root execute:
 ```bash
 rikiagu/$ make
 ```

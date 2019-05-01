@@ -8,9 +8,13 @@ data/*.idx
 data/*.bin
 cpp/rikai.asm.*
 cpp/release
+cpp/build
 cpp/client/config.h
 *.swp
 __pycache__
 tmp
 rikaigu.code-workspace
 .vscode
+wasm/generated
+wasm/build
+*.wasm

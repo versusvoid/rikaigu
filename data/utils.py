@@ -32,10 +32,13 @@ def is_kana(c):
 	return (code >= 0x3040 and code <= 0x309f) or (code >= 0x30a1 and code <= 0x30fe)
 
 def _is_simple_japanese_character(code):
-	return ((code >= 0x4e00 and code <= 0x9fa5)
-				or (code >= 0x3041 and code <= 0x3096)
-				or (code >= 0x30a1 and code <= 0x30fa)
-				or code == 0x30fc)
+	return (
+		(code >= 0x4e00 and code <= 0x9fa5)  # kanji
+		or (code >= 0x3041 and code <= 0x3096)  # hiragana
+		or (code >= 0x30a1 and code <= 0x30fa)  # katakana
+		or (code >= 0xff66 and code <= 0xff9f)  # half-width katakana
+		or code == 0x30fc  # long vowel mark
+	)
 
 def is_simple_japanese_character(c):
 	return _is_simple_japanese_character(ord(c))
@@ -44,19 +47,13 @@ def _is_supplementary_japanese_character(code):
 	# Only a small portion of this ranges has something to do with Japanese.
 	# Care to determine exact boundaries?
 	return (
-		(code >= 0x3400 and code <= 0x4D85) # CJK extension A
-		or
-		(code >= 0x20000 and code <= 0x2A6D6) # CJK extension B
-		or
-		(code >= 0x2A700 and code <= 0x2B734) # CJK extension C
-		or
-		(code >= 0x2B740 and code <= 0x2B81D) # CJK extension D
-		or
-		(code >= 0x2B820 and code <= 0x2CEA1) # CJK extension E
-		or
-		(code >= 0x2CEB0 and code <= 0x2EBE0) # CJK extension F
-		or
-		(code >= 0x2F800 and code <= 0x2FA1F) # CJK Compatibility Supplement
+		(code >= 0x3400 and code <= 0x4D85)  # CJK extension A
+		or (code >= 0x20000 and code <= 0x2A6D6)  # CJK extension B
+		or (code >= 0x2A700 and code <= 0x2B734)  # CJK extension C
+		or (code >= 0x2B740 and code <= 0x2B81D)  # CJK extension D
+		or (code >= 0x2B820 and code <= 0x2CEA1)  # CJK extension E
+		or (code >= 0x2CEB0 and code <= 0x2EBE0)  # CJK extension F
+		or (code >= 0x2F800 and code <= 0x2FA1F)  # CJK Compatibility Supplement
 	)
 
 def is_supplementary_japanese_character(c):
@@ -97,7 +94,7 @@ def kata_to_hira(w, agressive=True):
 	res = []
 	for c in w:
 		code = ord(c)
-		if code >= 0x30a1 and code <= 0x30f6:
+		if code >= ord('ァ') and code <= ord('ヶ'):
 			res.append(chr(ord(c) - ord('ァ') + ord('ぁ')))
 		elif c == 'ー' and len(res) > 0 and res[-1] in _long_vowel_mark_mapping:
 			res.append(_long_vowel_mark_mapping[res[-1]])
@@ -122,15 +119,26 @@ def kata_to_hira(w, agressive=True):
 
 assert kata_to_hira('ぶっとおし') == 'ぶっとうし', kata_to_hira('ぶっとおし')
 
-def download(url, filename):
-	path = os.path.join('tmp', filename)
+def download(url, filename, temp=True):
+	if temp:
+		path = os.path.join('tmp', filename)
+	else:
+		path = filename
+
 	if not os.path.exists(path):
 		print(f"Downloading {filename}")
 		tmp_path = path + '-part'
 		subprocess.check_call(
-			['curl', '-C', '-', url, '-o', tmp_path, '--create-dirs'],
+			['curl', '-L', '-C', '-', url, '-o', tmp_path, '--create-dirs'],
 			universal_newlines=True
 		)
 		os.rename(tmp_path, path)
 		print(f"\nDownloaded {filename}")
 	return path
+
+def print_lengths_stats(label, line_lengths):
+	line_lengths.sort()
+	print(f'''{label} lines stats:
+		min={line_lengths[0]} max={line_lengths[-1]}
+		mean={sum(line_lengths)/len(line_lengths)} med={line_lengths[len(line_lengths) // 2]}
+	''')

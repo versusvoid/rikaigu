@@ -70,10 +70,13 @@ function nodeFilter(node) {
  * Corresponds to is_japanese_character() in data/utils.py
  */
 function isJapaneseCharacter(code) {
-	return ((code >= 0x4e00 && code <= 0x9fa5)
-				|| (code >= 0x3041 && code <= 0x3096)
-				|| (code >= 0x30a1 && code <= 0x30fa)
-				|| code == 0x30fc);
+	return (
+		(code >= 0x4e00 && code <= 0x9fa5) // kanji
+		|| (code >= 0x3041 && code <= 0x3096) // hiragana
+		|| (code >= 0x30a1 && code <= 0x30fa) // katakana
+		|| (code >= 0xff66 && code <= 0xff9f) // half-width katakana
+		|| code == 0x30fc // long vowel mark
+	);
 }
 const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc])/;
 const japaneseCharacterBoundaryCondition = {
