@@ -8,6 +8,7 @@
 #include "../src/state.c"
 #include "../src/libc.c"
 #include "../src/dentry.c"
+#include "../src/utf.c"
 
 
 void test_init()

@@ -3,10 +3,13 @@
 #include <stdint.h>
 #include <assert.h>
 
-wchar_t decode_utf16_wchar(const char16_t* text)
+wchar_t decode_utf16_wchar(const char16_t** pText)
 {
+	const char16_t* text = *pText;
 	if ((*text & 0xFC00) == 0xD800)
 	{
+		*pText += 2;
+
 		wchar_t res = *text - 0xD800;
 		res <<= 10;
 		res += *(text + 1) - 0xDC00;
@@ -14,6 +17,8 @@ wchar_t decode_utf16_wchar(const char16_t* text)
 	}
 	else
 	{
+		*pText += 1;
+
 		return *text;
 	}
 }
@@ -26,8 +31,8 @@ int utf16_compare(const char16_t* a, const size_t alen, const char16_t* b, const
 	const char16_t* const bend = b + blen;
 	while (ait != aend && bit != bend)
 	{
-		const wchar_t achar = decode_utf16_wchar(ait);
-		const wchar_t bchar = decode_utf16_wchar(bit);
+		const wchar_t achar = decode_utf16_wchar(&ait);
+		const wchar_t bchar = decode_utf16_wchar(&bit);
 
 		if (achar < bchar)
 		{
@@ -36,11 +41,6 @@ int utf16_compare(const char16_t* a, const size_t alen, const char16_t* b, const
 		else if (achar > bchar)
 		{
 			return 1;
-		}
-		else
-		{
-			ait += (achar > 0xFFFF) ? 2 : 1;
-			bit += (bchar > 0xFFFF) ? 2 : 1;
 		}
 	}
 
@@ -176,6 +176,13 @@ uint32_t kata_to_hira_character(const char16_t c, const char16_t previous)
 	{
 		return c - u'ァ' + u'ぁ';
 	}
+	else if (c == u'ー' || c == u'ｰ' /* it's actually half-width long vowel mark U+ff70 */)
+	{
+		if (previous >= long_vowel_mark_mapping_min && previous <= long_vowel_mark_mapping_max)
+		{
+			return long_vowel_mark_mapping[previous - long_vowel_mark_mapping_min];
+		}
+	}
 	// Half-width katakana to hiragana
 	else if (c >= u'ｦ' && c <= u'ﾝ')
 	{
@@ -195,13 +202,6 @@ uint32_t kata_to_hira_character(const char16_t c, const char16_t previous)
 		if (previous >= half_voiced_mapping_min && previous <= half_voiced_mapping_max)
 		{
 			return half_voiced_mapping[previous - half_voiced_mapping_min] | replace_flag;
-		}
-	}
-	else if (c == u'ー' || c == u'ｰ' /* it's actually half-width long vowel mark U+ff70 */)
-	{
-		if (previous >= long_vowel_mark_mapping_min && previous <= long_vowel_mark_mapping_max)
-		{
-			return long_vowel_mark_mapping[previous - long_vowel_mark_mapping_min];
 		}
 	}
 	return c;
@@ -230,4 +230,101 @@ void input_kata_to_hira(input_t* input)
 		previous = converted;
 	}
 	input->length = out_length;
+}
+
+wchar_t decode_utf8_wchar(const char** pUtf8)
+{
+	const char* utf8 = *pUtf8;
+	const char c = *utf8;
+	if ((0x80 & c) == 0)
+	{
+		*pUtf8 += 1;
+
+		return c;
+	}
+	else if ((0xE0 & c) == 0xC0)
+	{
+		*pUtf8 += 2;
+
+		wchar_t res = (0x1F & c);
+		res <<= 6;
+		res |= (0x3f & utf8[1]);
+		return res;
+	}
+	else if ((0xF0 & c) == 0xE0)
+	{
+		*pUtf8 += 3;
+
+		wchar_t res = (0x0F & c);
+		res <<= 6;
+		res |= (0x3f & utf8[1]);
+		res <<= 6;
+		res |= (0x3f & utf8[2]);
+		return res;
+	}
+	else
+	{
+		assert((0xF8 & c) == 0xF0);
+		*pUtf8 += 4;
+
+		wchar_t res = (0x07 & c);
+		res <<= 6;
+		res |= (0x3f & utf8[1]);
+		res <<= 6;
+		res |= (0x3f & utf8[2]);
+		res <<= 6;
+		res |= (0x3f & utf8[3]);
+		return res;
+	}
+}
+
+bool utf16_utf8_kata_to_hira_eq(
+	const char16_t* key, const size_t key_length,
+	const char* utf8, const size_t utf8_length
+	)
+{
+	const char16_t* const key_end = key + key_length;
+	const char* const utf8_end = utf8 + utf8_length;
+	char16_t previous = 0;
+	while (key != key_end && utf8 != utf8_end)
+	{
+		const wchar_t a = decode_utf16_wchar(&key);
+		wchar_t b = decode_utf8_wchar(&utf8);
+
+		if (a == b)
+		{
+			// b may be > 0xFFFF
+			previous = (char16_t)b;
+			continue;
+		}
+
+		if (b > 0xFFFF)
+		{
+			return false;
+		}
+
+		b = (char16_t)kata_to_hira_character((char16_t)b, previous);
+		if (a != b)
+		{
+			return false;
+		}
+
+		previous = b;
+	}
+
+	return key == key_end && utf8 == utf8_end;
+}
+
+bool is_hiragana(const char16_t* word, const size_t length)
+{
+	const char16_t* const end = word + length;
+	for (; word != end; ++word)
+	{
+		char16_t c = *word;
+		if (c < 0x3041 || c > 0x3096)
+		{
+			return false;
+		}
+	}
+	return true;
 }

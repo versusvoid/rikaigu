@@ -7,6 +7,7 @@
 
 #include "../src/state.c"
 #include "../src/libc.c"
+#include "../src/utf.c"
 #include "../src/dentry.c"
 
 void test_to_number_unchecked()

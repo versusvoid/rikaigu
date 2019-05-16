@@ -5,6 +5,7 @@
 
 #include "state.h"
 #include "libc.h"
+#include "utf.h"
 #include "../generated/config.h"
 
 dentry_t* dentry_new()
@@ -272,4 +273,43 @@ void dentry_parse(dentry_t* dentry)
 	}
 	dentry_parse_readings(dentry, dentry_buffer);
 	dentry_parse_definition(dentry, dentry_buffer);
+}
+
+bool filter_surfaces(surface_t* current, const surface_t* const end, const char16_t* key, const size_t key_length)
+{
+	bool matched = false;
+	for (; current != end; ++current)
+	{
+		if (utf16_utf8_kata_to_hira_eq(key, key_length, current->text, current->length))
+		{
+			matched = true;
+		}
+		else
+		{
+			current->length = 0;
+		}
+	}
+	return matched;
+}
+
+void dentry_filter_readings(dentry_t* dentry, const char16_t* key, const size_t key_length)
+{
+	reading_t* current = dentry->readings;
+	const reading_t* const end = current + dentry->num_readings;
+	filter_surfaces(current, end, key, key_length);
+}
+
+void dentry_filter_kanji_groups(dentry_t* dentry, const char16_t* key, const size_t key_length)
+{
+	kanji_group_t* current = dentry->kanji_groups;
+	const kanji_group_t* const end = current + dentry->num_kanji_groups;
+	for (; current != end; ++current)
+	{
+		kanji_t* kanjis_start = current->kanjis;
+		const kanji_t* const kanjis_end = kanjis_start + current->num_kanjis;
+		if (!filter_surfaces(kanjis_start, kanjis_end, key, key_length))
+		{
+			current->num_kanjis = 0;
+		}
+	}
 }

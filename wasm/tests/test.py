@@ -328,7 +328,7 @@ class T(unittest.TestCase):
 
 		return res
 
-	def _test_kata_to_hira_character(self):
+	def test_kata_to_hira_character(self):
 		lib.kata_to_hira_character.argtypes = [c_ushort, c_ushort]
 		lib.kata_to_hira_character.restype = c_uint
 
@@ -366,7 +366,7 @@ class T(unittest.TestCase):
 		struct.length = len(w)
 		lib.input_kata_to_hira(byref(struct))
 		self.assertEqual(struct.length, 4)
-		self.assertEqual(''.join(map(chr, struct.data[:4])), 'すぴーか')
+		self.assertEqual(''.join(map(chr, struct.data[:4])), 'すぴいか')
 		self.assertEqual(struct.length_mapping[:5], [0, 1, 3, 4, 5])
 
 		w = '開発センター'

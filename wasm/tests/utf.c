@@ -4,13 +4,19 @@
 void test_decode_utf16_wchar()
 {
 	const char16_t single[] = { 0x20AC };
-	assert(decode_utf16_wchar(single) == 0x20AC);
+	const char16_t* p = single;
+	assert(decode_utf16_wchar(&p) == 0x20AC);
+	assert(p == single + 1);
 
 	const char16_t surrogate[] = { 0xD852, 0xDF62 };
-	assert(decode_utf16_wchar(surrogate) == 0x24B62);
+	p = surrogate;
+	assert(decode_utf16_wchar(&p) == 0x24B62);
+	assert(p == surrogate + 2);
 
 	const char16_t le_check[] = u"你";
-	assert(decode_utf16_wchar(le_check) == 0x2F804);
+	p = le_check;
+	assert(decode_utf16_wchar(&p) == 0x2F804);
+	assert(p == le_check + 2);
 }
 
 void test_utf16_compare()
@@ -41,11 +47,51 @@ void test_utf16_drop_code_point()
 	assert(utf16_drop_code_point(s2, 4) == 2);
 }
 
+void test_decode_utf8_wchar()
+{
+	const char single[] = u8"a";
+	const char* p = single;
+	assert(decode_utf8_wchar(&p) == 'a');
+	assert(p == single + 1);
+
+	const char pair[] = u8"¢";
+	p = pair;
+	assert(decode_utf8_wchar(&p) == L'¢');
+	assert(p == pair + 2);
+
+	const char triple[] = u8"€";
+	p = triple;
+	assert(decode_utf8_wchar(&p) == L'€');
+	assert(p == triple + 3);
+
+	const char quadriple[] = u8"𐍈";
+	p = quadriple;
+	assert(decode_utf8_wchar(&p) == L'𐍈');
+	assert(p == quadriple + 4);
+}
+
+void test_utf16_utf8_kata_to_hira_eq()
+{
+	const char16_t key[] = u"すぴいか";
+	const char utf8[] = u8"スピーカ";
+	assert(utf16_utf8_kata_to_hira_eq(key, 4, utf8, sizeof(utf8) - 1));
+
+	const char16_t key2[] = u"すぴいか𐍈";
+	assert(!utf16_utf8_kata_to_hira_eq(key, sizeof(key2) - 1, utf8, sizeof(utf8) - 1));
+
+	const char utf8_2[] = u8"ｽﾋﾟｰｶ";
+	// This function does not handle replaces in utf8
+	// but there is none in dictionary
+	assert(!utf16_utf8_kata_to_hira_eq(key, 4, utf8_2, sizeof(utf8_2) - 1));
+}
+
 int main()
 {
 	test_decode_utf16_wchar();
 	test_utf16_compare();
 	test_utf16_drop_code_point();
+	test_decode_utf8_wchar();
+	test_utf16_utf8_kata_to_hira_eq();
 
 	return 0;
 }

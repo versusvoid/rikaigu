@@ -5,7 +5,7 @@ HTML = html/background.html html/options.html html/scratchpad.html html/popup.ht
 JS = js/background.js js/config.js js/options.js js/rikaicontent.js js/selection.js js/highlight.js js/scratchpad.js js/popup.js
 WASM = wasm/rikai.wasm
 
-.PHONY: all release clean
+.PHONY: all release clean wasm/rikai.wasm
 
 all: wasm/rikai.wasm
 release: dist/rikaigu.zip

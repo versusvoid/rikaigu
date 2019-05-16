@@ -6,6 +6,7 @@
 #include "libc.h"
 #include "vardata_array.h"
 #include "imports.h"
+#include "utf.h"
 
 typedef struct word_result {
 	uint32_t offset;
@@ -208,10 +209,24 @@ void state_sort_and_limit_word_results()
 		vardata_array_set_size(b, 32);
 	}
 
+	const input_t* input = state_get_input();
+	const bool reading_key = is_hiragana(input->data, input->length);
+
+	const void* const vardata_start = vardata_array_vardata_start(b);
+
 	for (size_t i = 0; i < num_elements; ++i)
 	{
 		dentry_parse(array[i].dentry);
-		// TODO filter unmatched readings/writings
+
+		const char16_t* key = vardata_start + array[i].vardata_start_offset;
+		if (reading_key)
+		{
+			dentry_filter_readings(array[i].dentry, key, array[i].key_length);
+		}
+		else
+		{
+			dentry_filter_kanji_groups(array[i].dentry, key, array[i].key_length);
+		}
 	}
 }
 
