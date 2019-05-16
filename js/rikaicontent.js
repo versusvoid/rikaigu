@@ -140,7 +140,7 @@ function makePopup() {
 	return popup;
 }
 
-async function showPopup(text) {
+async function showPopup(text, renderParams) {
 	var popup = document.getElementById('rikaigu-window');
 	if (!popup) {
 		popup = makePopup();
@@ -172,7 +172,7 @@ async function showPopup(text) {
 
 	popup.style.removeProperty('display');
 
-	await _updatePopupRect(popup);
+	await _updatePopupPosition(popup, renderParams);
 }
 
 function toggleHiddenReviewListEntryInfo(node) {
@@ -249,71 +249,7 @@ function onClick(ev) {
 	chrome.storage.local.set({reviewList: rikaigu.config.reviewList});
 }
 
-const _PADDING_AND_BORDER = 4 + 1;
-function _computeFinalPosition(availableWidth, leftRightOrBoth, availableHeight, upDownOrBoth) {
-	if (rikaigu.altView === 'up' && (upDownOrBoth & _DIRECTIONS.UP) !== 0) {
-		return [window.scrollX, window.scrollY];
-	} else if (rikaigu.altView !== null) {
-		return [
-			(window.innerWidth - availableWidth) + window.scrollX,
-			(window.innerHeight - availableHeight) + window.scrollY
-		];
-	} else {
-
-		let x,y;
-		if (leftRightOrBoth === 0) {
-			x = (window.innerWidth -  availableWidth) / 2;
-		}
-		// TODO change defaults for writing-mode: vertical-rl;
-		// these defaults are preferable only for horizontal
-		else if ((leftRightOrBoth & _DIRECTIONS.RIGHT) !== 0) {
-			x = _firstCharacterStart();
-		} else {
-			x = _lastCharacterEnd() - availableWidth;
-		}
-
-		if ((upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
-			y = _characterBottomLine();
-		} else {
-			y = _characterUpperLine() - availableHeight - _PADDING_AND_BORDER;
-		}
-
-		x += window.scrollX;
-		y += window.scrollY;
-		return [x, y];
-	}
-}
-
-const _DIRECTIONS = {
-	UP   : 0b0001,
-	DOWN : 0b0010,
-	LEFT : 0b0100,
-	RIGHT: 0b1000,
-}
-
-function _computeWidthAvailable(requiredWidth) {
-	const availableLeft = _lastCharacterEnd();
-	const availableRight = window.innerWidth - _firstCharacterStart();
-	const availableMax = Math.max(availableLeft, availableRight);
-	if (availableMax < requiredWidth) {
-		return [Math.min(requiredWidth, window.innerWidth), 0];
-	}
-	const dir = (availableRight >= requiredWidth ? _DIRECTIONS.RIGHT : 0)
-			  | (availableLeft >= requiredWidth ? _DIRECTIONS.LEFT : 0);
-	return [Math.min(requiredWidth, availableMax), dir];
-}
-
-function _computeHeightAvailable(requiredHeight) {
-	const availableUp = _characterUpperLine();
-	const availableDown = window.innerHeight - _characterBottomLine();
-	const dir = (availableUp >= requiredHeight ? _DIRECTIONS.UP : 0)
-			  | (availableDown >= requiredHeight ? _DIRECTIONS.DOWN : 0);
-	return [Math.min(requiredHeight, Math.max(availableUp, availableDown)), dir];
-}
-
 function _firstCharacterStart() {
-	// FIXME would not work in multiframe setting
-	// need comunications between frames
 	const r = new Range();
 	console.assert(rikaigu.lastRangeNode);
 	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
@@ -357,62 +293,212 @@ function _conditionSatisfied(condition) {
 	});
 }
 
+const _DIRECTIONS = {
+	UP   : 0b0001,
+	DOWN : 0b0010,
+	LEFT : 0b0100,
+	RIGHT: 0b1000,
+}
+
+function getRenderParams() {
+	const dx = (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX);
+	const dy = (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY);
+	const firstCharacterStart = _firstCharacterStart() + dx;
+	return {
+		firstCharacterStart: firstCharacterStart,
+		lastCharacterEnd: firstCharacterStart, // FIXME we don't have selection yet, so make array for all possible selections length
+		characterUpperLine: _characterUpperLine() + dy,
+		characterBottomLine: _characterBottomLine() + dy,
+	};
+}
+
+const _PADDING_AND_BORDER = 4 + 1;
 const _defaultWidth = 347;
 const _defaultHeight = 413;
-async function _computeRequiredDimensions(popup) {
-	if (popup.offsetWidth === 0) {
-		await _conditionSatisfied(() => popup.offsetWidth !== 0);
-	}
-	return [
-		Math.min(popup.offsetWidth, _defaultWidth),
-		Math.min(popup.offsetHeight, _defaultHeight + _PADDING_AND_BORDER)
-	];
-}
+class PopupDimPosComputer {
+	constructor(popup, renderParams) {
+		this.popup = popup;
+		if (renderParams) {
+			for (const k in renderParams) {
+				// firstCharacterStart/lastCharacterEnd
+				// characterBottomLine/characterUpperLine
+				this[`_${k}Value`] = renderParams[k];
+			}
+		}
 
-function _makePopupScrollable(popup) {
-	console.error('implement me');
-	for (var el of popup.getElementsByClassName('rikaigu-lurk-moar')) {
+		// In top frame this represents integral position of webpage's viewport.
+		// In a sense we transform coordinates to screen space when passing them
+		// to background page, and here we transform them back to webpage space of
+		// top frame
+		this.integralDx = (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX);
+		this.integralDy = (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY);
+	}
+
+	_getCached(key, computeFunction, thisarg) {
+		if (key in this) {
+			return this[key];
+		}
+		computeFunction.apply(thisarg || this);
+		return this[key];
+	}
+
+	get _characterUpperLine() {
+		return this._getCached('_characterUpperLineValue', window._characterUpperLine, null) - this.integralDy;
+	}
+
+	get _characterBottomLine() {
+		return this._getCached('_characterBottomLineValue', window._characterBottomLine, null) - this.integralDy;
+	}
+
+	get _firstCharacterStart() {
+		return this._getCached('_firstCharacterStartValue', window._firstCharacterStart, null) - this.integralDx;
+	}
+
+	get _lastCharacterEnd() {
+		return this._getCached('_lastCharacterEndValue', window._lastCharacterEnd, null) - this.integralDx;
+	}
+
+	_computeRequiredDimensions() {
+		this._requiredWidthValue = Math.min(this.popup.offsetWidth, _defaultWidth);
+		this._requiredHeightValue = Math.min(this.popup.offsetHeight, _defaultHeight + _PADDING_AND_BORDER);
+	}
+
+	get _requiredHeight() {
+		return this._getCached('_requiredHeightValue', this._computeRequiredDimensions);
+	}
+
+	get _requiredWidth() {
+		return this._getCached('_requiredWidthValue', this._computeRequiredDimensions);
+	}
+
+	_computeHeightAvailable() {
+		const availableUp = this._characterUpperLine;
+		const availableDown = window.innerHeight - this._characterBottomLine;
+		this._upDownOrBothValue = (
+			(availableUp >= this._requiredHeight ? _DIRECTIONS.UP : 0)
+			|
+			(availableDown >= this._requiredHeight ? _DIRECTIONS.DOWN : 0)
+		)
+		this._availableHeightValue = Math.min(this._requiredHeight, Math.max(availableUp, availableDown));
+	}
+
+	get _upDownOrBoth() {
+		return this._getCached('_upDownOrBothValue', this._computeHeightAvailable);
+	}
+
+	get _availableHeight() {
+		return this._getCached('_availableHeightValue', this._computeHeightAvailable);
+	}
+
+	_computeWidthAvailable() {
+		const availableLeft = this._lastCharacterEnd;
+		const availableRight = window.innerWidth - this._firstCharacterStart;
+		const availableMax = Math.max(availableLeft, availableRight);
+		if (availableMax < this._requiredWidth) {
+			return [Math.min(this._requiredWidth, window.innerWidth), 0];
+		}
+		this._leftRightOrBothValue = (
+			(availableRight >= this._requiredWidth ? _DIRECTIONS.RIGHT : 0)
+			|
+			(availableLeft >= this._requiredWidth ? _DIRECTIONS.LEFT : 0)
+		);
+		this._availableWidthValue = Math.min(this._requiredWidth, availableMax);
+	}
+
+	get _leftRightOrBoth() {
+		return this._getCached('_leftRightOrBothValue', this._computeWidthAvailable);
+	}
+
+	get _availableWidth() {
+		return this._getCached('_availableWidthValue', this._computeWidthAvailable);
+	}
+
+	_makePopupScrollable() {
+		console.error('implement me');
+		for (var el of this.popup.getElementsByClassName('rikaigu-lurk-moar')) {
+			el.parentNode.removeChild(el);
+		}
+		for (var el of this.popup.getElementsByClassName('rikaigu-second-and-further')) {
+			el.classList.remove('rikaigu-hidden')
+		}
+	}
+
+	async _popupReady() {
+		if (this.popup.offsetWidth === 0) {
+			await _conditionSatisfied(() => this.popup.offsetWidth !== 0);
+		}
+
+		if (this._availableHeight < this._requiredHeight) {
+			this._makePopupScrollable();
+		}
+	}
+
+	_computeFinalPosition() {
+		if (rikaigu.altView === 'up' && (this._upDownOrBoth & _DIRECTIONS.UP) !== 0) {
+			return [window.scrollX, window.scrollY];
+		} else if (rikaigu.altView !== null) {
+			return [
+				(window.innerWidth - this._availableWidth) + window.scrollX,
+				(window.innerHeight - this._availableHeight) + window.scrollY
+			];
+		} else {
+			let x,y;
+			if (this._leftRightOrBoth === 0) {
+				x = (window.innerWidth - this._availableWidth) / 2;
+			}
+			// TODO change defaults for writing-mode: vertical-rl;
+			// these defaults are preferable only for horizontal
+			else if ((this._leftRightOrBoth & _DIRECTIONS.RIGHT) !== 0) {
+				x = this._firstCharacterStart;
+			} else {
+				x = this._lastCharacterEnd - this._availableWidth;
+			}
+
+			if ((this._upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
+				y = this._characterBottomLine;
+			} else {
+				y = this._characterUpperLine - this._availableHeight - _PADDING_AND_BORDER;
+			}
+
+			x += window.scrollX;
+			y += window.scrollY;
+			return [x, y];
+		}
+	}
+
+	_isPopupBelowText(y) {
+		return y > this._characterUpperLine + window.scrollY;
+	}
+
+	_placeExpandButton(y) {
+		const el = this.popup.getElementsByClassName('rikaigu-lurk-moar')[0] || null;
+		if (el === null) return;
 		el.parentNode.removeChild(el);
+		if (this._isPopupBelowText(y)) {
+			this.popup.insertBefore(el, this.popup.firstChild);
+		} else {
+			this.popup.appendChild(el);
+		}
 	}
-	for (var el of popup.getElementsByClassName('rikaigu-second-and-further')) {
-		el.classList.remove('rikaigu-hidden')
-	}
-}
 
-function _isPopupBelowText(y) {
-	return y > _characterUpperLine() + window.scrollY;
-}
+	async updatePopupPosition() {
+		await this._popupReady();
 
-function _placeExpandButton(popup, y) {
-	const el = popup.getElementsByClassName('rikaigu-lurk-moar')[0] || null;
-	if (el === null) return;
-	el.parentNode.removeChild(el);
-	if (_isPopupBelowText(y)) {
-		popup.insertBefore(el, popup.firstChild);
-	} else {
-		popup.appendChild(el);
+		const [x, y] = this._computeFinalPosition();
+		this._placeExpandButton(y);
+
+		this.popup.style.setProperty('left', `${x}px`, 'important');
+		this.popup.style.setProperty('top', `${y}px`, 'important');
 	}
 }
 
-async function _updatePopupRect(popup) {
-	const [requiredWidth, requiredHeight] = await _computeRequiredDimensions(popup);
-	// TODO optimize recomputations of start/end/upper line/bottom line
-	// FIXME multiframe setting
-	const [availableWidth, leftRightOrBoth] = _computeWidthAvailable(requiredWidth);
-	const [availableHeight, upDownOrBoth] = _computeHeightAvailable(requiredHeight);
-	if (availableHeight < requiredHeight) {
-		_makePopupScrollable(popup);
-	}
-
-	const [x, y] = _computeFinalPosition(availableWidth, leftRightOrBoth, availableHeight, upDownOrBoth);
-	_placeExpandButton(popup, y);
-
-	popup.style.setProperty('left', `${x}px`, 'important');
-	popup.style.setProperty('top', `${y}px`, 'important');
+async function _updatePopupPosition(popup, renderParams) {
+	const computer = new PopupDimPosComputer(popup, renderParams);
+	await computer.updatePopupPosition();
 }
 
 function _getPopupAndUpdateItsPosition() {
-	_updatePopupRect(document.getElementById('rikaigu-window'));
+	_updatePopupPosition(document.getElementById('rikaigu-window'));
 }
 
 function requestHidePopup() {
@@ -800,7 +886,7 @@ chrome.runtime.onMessage.addListener(
 						// );
 						console.error('why this branch even exists');
 					} else {
-						showPopup(request.html);
+						showPopup(request.html, request.renderParams);
 						rikaigu.shownMatch = request.match;
 					}
 				}

@@ -277,8 +277,7 @@ async function requestReadDictionary(offsetsPtr, numWordsOffsets, numNamesOffset
 		"type": "show",
 		"html": html,
 		"match": request.text.substring(0, request.matchLength),
-		"screenX": request.screenX,
-		"screenY": request.screenY
+		"renderParams": request.renderParams,
 	});
 }
 

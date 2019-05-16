@@ -331,11 +331,10 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 	var prefixSelectionRange = [{rangeNode, offset: rangeOffset, endIndex: rangeOffset, isEdge: true}];
 
 	chrome.runtime.sendMessage({
-			"type": "xsearch",
-			"text": text,
-			"prefix": prefix,
-			"screenX": rikaigu.lastPos.screenX,
-			"screenY": rikaigu.lastPos.screenY
+			type: "xsearch",
+			text: text,
+			prefix: prefix,
+			renderParams: getRenderParams(),
 		},
 		processSearchResult.bind(window, fullSelectionRange, prefixSelectionRange));
 }

@@ -57,7 +57,7 @@ void render_reading(buffer_t* b, reading_t* reading, bool second_and_further, bo
 {
 	conditionally_append(second_and_further, u8"、");
 	append_static("<span class=\"w-kana rikaigu-review-listed");
-	conditionally_append(!reading->common, "uncommon");
+	conditionally_append(!reading->common, " uncommon");
 	conditionally_append(add_hidden, "rikaigu-hidden");
 	append_static("\">");
 	append(b, reading->text, reading->length);
@@ -80,7 +80,7 @@ void render_kanji_group(buffer_t* b, word_result_t* wr, dentry_t* dentry, kanji_
 		kanji_t* k = group->kanjis + i;
 		conditionally_append(i > 0, u8"、");
 		append_static("<span class=\"w-kanji");
-		conditionally_append(!k->common, "uncommon");
+		conditionally_append(!k->common, " uncommon");
 		append_static("\">");
 		append(b, k->text, k->length);
 		append_static("</span>");
