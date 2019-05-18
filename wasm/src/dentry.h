@@ -54,6 +54,8 @@ typedef struct {
 
 dentry_t* dentry_make(const char* raw, size_t length);
 
+void dentry_drop_kanji_groups(dentry_t* dentry);
+
 void dentry_parse(dentry_t* dentry);
 
 void dentry_filter_readings(dentry_t* dentry, const char16_t* key, const size_t key_length);

@@ -245,7 +245,15 @@ void sense_group_parse(sense_group_t* sense_group, const char* start, const char
 	const char* sep = find(start, end, ';');
 
 	parse_i_promise_i_wont_overwrite_it_strings(&sense_group->num_types, &sense_group->types, start, sep, ',', dentry_buffer);
-	parse_i_promise_i_wont_overwrite_it_strings(&sense_group->num_senses, &sense_group->senses, sep + 1, end, '`', dentry_buffer);
+
+	if (sep + 1 < end)
+	{
+		parse_i_promise_i_wont_overwrite_it_strings(&sense_group->num_senses, &sense_group->senses, sep + 1, end, '`', dentry_buffer);
+	}
+	else
+	{
+		sense_group->num_senses = 0;
+	}
 }
 
 void dentry_parse_definition(dentry_t* dentry, buffer_t* dentry_buffer)
@@ -273,6 +281,11 @@ void dentry_parse(dentry_t* dentry)
 	}
 	dentry_parse_readings(dentry, dentry_buffer);
 	dentry_parse_definition(dentry, dentry_buffer);
+}
+
+void dentry_drop_kanji_groups(dentry_t* dentry)
+{
+	dentry->kanjis_start = NULL;
 }
 
 bool filter_surfaces(surface_t* current, const surface_t* const end, const char16_t* key, const size_t key_length)

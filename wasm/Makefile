@@ -17,7 +17,8 @@ SOURCES := \
 	src/deinflect.c \
 	src/word_results.c \
 	src/vardata_array.c \
-	src/utf.c
+	src/utf.c \
+	src/names_types_mapping.c
 BITCODE_OBJECTS := $(SOURCES:src/%.c=build/%.bc) generated/index.bc
 EXPORTS := rikaigu_search_start rikaigu_search_finish rikaigu_set_config buffer_allocate
 EXPORTS := $(EXPORTS:%=--export=%)

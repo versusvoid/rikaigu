@@ -299,6 +299,7 @@ void test_sense_group_parse()
 
 	const char s[] = "n;pitch (i.e. pace, speed, angle, space, field, sound, etc.)`pitch (from distilling petroleum, tar, etc.)`pitch (football, rugby); playing field`PHS portable phone";
 	sense_group_t sg;
+	memset(&sg, 0xff, sizeof(sg));
 	sense_group_parse(&sg, s, s + strlen(s), state->buffers + DENTRY_BUFFER);
 	assert(state->buffers[DENTRY_BUFFER].size == (1 + 4) * sizeof(i_promise_i_wont_overwrite_it_string_t));
 
@@ -316,6 +317,18 @@ void test_sense_group_parse()
 	assert(sg.senses[3].text == s + 1 + 1 + 58 + 1 + 44 + 1 + 38 + 1);
 	assert(sg.senses[3].length == 18);
 
+	const char s2[] = "the-only-pos";
+	memset(&sg, 0xff, sizeof(sg));
+	state->buffers[DENTRY_BUFFER].size = 0;
+	sense_group_parse(&sg, s2, s2 + strlen(s2), state->buffers + DENTRY_BUFFER);
+	assert(state->buffers[DENTRY_BUFFER].size == sizeof(i_promise_i_wont_overwrite_it_string_t));
+
+	assert(sg.num_types == 1);
+	assert(sg.types[0].text == s2);
+	assert(sg.types[0].length == strlen(s2));
+
+	assert(sg.num_senses == 0);
+
 	clear_memory();
 }
 
@@ -324,23 +337,26 @@ void test_dentry_parse_definition()
 	setup_memory();
 	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
 
-	const char s[] = "n-suf;depending on`as soon as; immediately`in accordance with\\n;order; program`circumstances; reason";
+	const char s[] = "n-suf;depending on`as soon as; immediately`in accordance with\\n;order; program`circumstances; reason\\p";
 	dentry_t d;
 	d.definition_start = s;
 	d.definition_end = s + strlen(s);
 	dentry_parse_definition(&d, state->buffers + DENTRY_BUFFER);
 	assert(state->buffers[DENTRY_BUFFER].size == (
-		2*sizeof(sense_group_t)
+		3*sizeof(sense_group_t)
 		+ (1 + 3)*sizeof(i_promise_i_wont_overwrite_it_string_t)
 		+ (1 + 2)*sizeof(i_promise_i_wont_overwrite_it_string_t)
+		+ (1 + 0)*sizeof(i_promise_i_wont_overwrite_it_string_t)
 	));
-	assert(d.num_sense_groups == 2);
+	assert(d.num_sense_groups == 3);
 	assert(d.sense_groups[0].num_types == 1);
 	assert(d.sense_groups[0].num_senses == 3);
 	assert(d.sense_groups[1].num_types == 1);
 	assert(d.sense_groups[1].types[0].text == s + 62);
 	assert(d.sense_groups[1].num_senses == 2);
 	assert(d.sense_groups[1].senses[0].text == s + 62 + 2);
+	assert(d.sense_groups[2].num_types == 1);
+	assert(d.sense_groups[2].num_senses == 0);
 
 	clear_memory();
 }

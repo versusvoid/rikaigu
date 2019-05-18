@@ -203,7 +203,7 @@ class WordResult(Structure):
 	]
 pWordResult = POINTER(WordResult)
 
-dictionary_line = 'お浸し,御浸し;御ひたし#0;御したし#1\tおひたし;おしたし\tn;boiled greens in bonito-flavoured soy sauce\t33066'
+dictionary_line = 'お浸し,御浸し;御ひたし#0;御したし#1\tおひたし;おしたし\tn;boiled greens in bonito-flavoured soy sauce\\p\t33066'
 def make_dentry() -> Dentry:
 	s = dictionary_line.encode()
 	ends = [len(p) for p in s.split(b'\t')][:3]
@@ -227,11 +227,11 @@ def make_dentry() -> Dentry:
 
 	rs = (Reading * 2)(Reading(b'abc', 3, True), Reading(b'de', 2, False))
 
-	t1 = BorrowedString(b't', 1)
+	t1 = BorrowedString(b'p', 1)
 	s1 = BorrowedString(b'se', 2)
 	sg1 = SenseGroup(1, pointer(t1), 1, pointer(s1))
 
-	t2 = BorrowedString(b'wtf', 3)
+	t2 = BorrowedString(b'm', 1)
 	s2 = BorrowedString(b'ftw', 3)
 	sg2 = SenseGroup(1, pointer(t2), 1, pointer(s2))
 	sgs = (SenseGroup * 2)(sg1, sg2)
@@ -328,7 +328,7 @@ class T(unittest.TestCase):
 
 		return res
 
-	def test_kata_to_hira_character(self):
+	def _test_kata_to_hira_character(self):
 		lib.kata_to_hira_character.argtypes = [c_ushort, c_ushort]
 		lib.kata_to_hira_character.restype = c_uint
 

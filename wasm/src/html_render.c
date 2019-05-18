@@ -6,6 +6,7 @@
 #include "state.h"
 #include "libc.h"
 #include "word_results.h"
+#include "names_types_mapping.h"
 
 void append(buffer_t* b, const char* str, size_t length)
 {
@@ -155,16 +156,34 @@ void render_readings_only_dentry_readings(buffer_t* b, word_result_t* wr, dentry
 	append_static("<br />");
 }
 
-void render_sense_group(buffer_t* b, sense_group_t* sense_group, bool from_review_list)
+void render_type(buffer_t* b, const char* text, const size_t length, bool is_name)
+{
+	if (is_name)
+	{
+		name_type_mapping_t* mapping = get_mapped_type(*text);
+		append(b, mapping->type, mapping->length);
+	}
+	else
+	{
+		append(b, text, length);
+	}
+}
+
+void render_sense_group(buffer_t* b, sense_group_t* sense_group, bool is_name, bool from_review_list)
 {
 	append_static("<span class=\"w-pos\">");
 
 	for (size_t i = 0; i < sense_group->num_types; ++i)
 	{
 		conditionally_append(i > 0, ", ");
-		append(b, sense_group->types[i].text, sense_group->types[i].length);
+		render_type(b, sense_group->types[i].text, sense_group->types[i].length, is_name);
 	}
-	append_static("</span><span class=\"rikaigu-review-listed");
+	append_static("</span>");
+	if (sense_group->num_senses == 0)
+	{
+		return;
+	}
+	append_static("<span class=\"rikaigu-review-listed");
 	conditionally_append(!from_review_list, "rikaigu-hidden");
 	append_static("\">; </span>");
 
@@ -182,8 +201,6 @@ void render_sense_group(buffer_t* b, sense_group_t* sense_group, bool from_revie
 	}
 	else
 	{
-		// TODO? generate readings for names
-		assert(sense_group->num_senses == 1);
 		append_static(" <span class=\"w-def rikaigu-review-listed");
 		conditionally_append(from_review_list, "rikaigu-hidden");
 		append_static("\">");
@@ -224,7 +241,7 @@ void render_dentry(buffer_t* b, word_result_t* wr)
 
 	for (size_t i = 0; i < dentry->num_sense_groups; ++i)
 	{
-		render_sense_group(b, dentry->sense_groups + i, from_review_list);
+		render_sense_group(b, dentry->sense_groups + i, word_result_is_name(wr), from_review_list);
 	}
 
 	append_static("</div>");

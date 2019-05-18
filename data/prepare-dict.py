@@ -35,28 +35,27 @@ def format_sense(sense, entry):
 	return res
 
 trans_type_abbreviations = {
+	"place": "a",
 	"company": "c",
+	"product": "d",
 	"fem": "f",
 	"given": "g",
 	"masc": "m",
+	"surname": "n",
 	"organization": "o",
 	"person": "p",
-	"place": "pl",
-	"product": "pr",
 	"station": "s",
-	"surname": "su",
 	"unclass": "u",
 	"work": "w",
 }
 def format_trans(trans, name):
 	parts = []
 	parts.append(','.join(map(trans_type_abbreviations.__getitem__, trans.types)))
-	parts.append(';')  # FIXME не всегда нужен
 	if (len(trans.glosses) == 1 and len(name.readings) == 1
 				and is_romajination(kata_to_hira(name.readings[0].text, agressive=False), trans.glosses[0])):
-		#parts.append('*')
 		pass
 	else:
+		parts.append(';')
 		parts.append('; '.join(trans.glosses))
 	return ''.join(parts)
 

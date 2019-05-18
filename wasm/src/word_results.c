@@ -216,6 +216,11 @@ void state_sort_and_limit_word_results()
 
 	for (size_t i = 0; i < num_elements; ++i)
 	{
+		if (array[i].is_name && reading_key)
+		{
+			dentry_drop_kanji_groups(array[i].dentry);
+		}
+
 		dentry_parse(array[i].dentry);
 
 		const char16_t* key = vardata_start + array[i].vardata_start_offset;

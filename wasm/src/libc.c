@@ -200,6 +200,26 @@ bool binary_locate_bounds(
 	return true;
 }
 
+size_t print_uint(char* out, size_t max_length, uint32_t v)
+{
+	size_t digits = 1;
+	for (uint32_t v2 = v / 10; v2 != 0; v2 /= 10)
+	{
+		digits += 1;
+	}
+	if (digits >= max_length)
+	{
+		take_a_trip("small buffer");
+	}
+
+	for (size_t i = digits; i > 0; --i)
+	{
+		*(out + i - 1) = '0' + (v % 10);
+		v /= 10;
+	}
+	return digits;
+}
+
 int consolef(const char* format, ...)
 {
 	char buf[128];
@@ -220,30 +240,23 @@ int consolef(const char* format, ...)
 		}
 
 		char spec = *(in + 1);
-		if (spec != 'u')
+		if (spec == 'u')
+		{
+			out += print_uint(out, buf + sizeof(buf) - 1 - out, va_arg(args, uint32_t));
+		}
+		else if (spec == 'S')
+		{
+			uint32_t length = va_arg(args, uint32_t);
+			const char* s = va_arg(args, const char*);
+			memcpy(out, s, length);
+			out += length;
+		}
+		else
 		{
 			take_a_trip("unknown consolef specifier");
 		}
 
 		in += 2;
-
-		uint32_t v = va_arg(args, uint32_t);
-		int digits = 1;
-		for (uint32_t v2 = v / 10; v2 != 0; v2 /= 10)
-		{
-			digits += 1;
-		}
-		if (out + digits >= buf + sizeof(buf))
-		{
-			take_a_trip("small buffer");
-		}
-
-		for (int i = digits; i > 0; --i)
-		{
-			*(out + i - 1) = '0' + (v % 10);
-			v /= 10;
-		}
-		out += digits;
 	}
 	va_end(args);
 
