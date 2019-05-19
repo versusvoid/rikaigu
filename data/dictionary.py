@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
 from collections import namedtuple
-from itertools import groupby
 from typing import Dict, List, Tuple
 import xml.etree.ElementTree as ET
 import gzip
 import pickle
 import os
-import gc
 
-from utils import download, kata_to_hira
+from utils import download
 from index import index_keys
 
 class Kanji(namedtuple('Kanji', 'text, inf, common')):

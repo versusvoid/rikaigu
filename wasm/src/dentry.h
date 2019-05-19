@@ -40,7 +40,7 @@ typedef struct {
 	const char* readings_start;
 	const char* definition_start;
 	const char* definition_end;
-	int32_t freq;
+	uint32_t entry_id;
 
 	size_t num_kanji_groups;
 	kanji_group_t* kanji_groups;
@@ -52,7 +52,7 @@ typedef struct {
 	sense_group_t* sense_groups;
 } dentry_t;
 
-dentry_t* dentry_make(const char* raw, size_t length);
+dentry_t* dentry_make(const char* raw, size_t length, bool is_name);
 
 void dentry_drop_kanji_groups(dentry_t* dentry);
 

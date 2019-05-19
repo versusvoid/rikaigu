@@ -5,14 +5,13 @@ from collections import namedtuple
 
 import lz4.block
 
-import freqs
 from utils import print_lengths_stats, download
 
 
-def generate_config_header(max_reading_index):
+def generate_config_header(max_reading_index, min_entry_id):
 	with open('wasm/generated/config.h', 'w') as of:
-		print('#define UNKNOWN_WORD_FREQ_ORDER', freqs.get_unknown_word_freq_order(), file=of)
 		print('#define MAX_READING_INDEX', max_reading_index, file=of)
+		print('#define MIN_ENTRY_ID', min_entry_id, file=of)
 
 def get_lz4_source():
 	download('https://github.com/lz4/lz4/raw/master/lib/lz4.c', 'wasm/generated/lz4.c', temp=False)

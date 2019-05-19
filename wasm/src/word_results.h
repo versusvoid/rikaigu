@@ -13,9 +13,7 @@ bool state_try_add_word_result(
 
 void state_make_offsets_array_and_request_read(uint32_t request_id);
 
-void state_add_dentry_to_word_result(size_t result_index, dentry_t* dentry);
-
-void state_sort_and_limit_word_results(void);
+void state_polish_word_results(void);
 
 
 typedef struct word_result_iterator {
@@ -35,6 +33,7 @@ bool word_result_is_name(word_result_t* wr);
 size_t word_result_get_inflection_name_length(word_result_t* wr);
 char* word_result_get_inflection_name(word_result_t* wr);
 
+void word_result_set_dentry(word_result_t* wr, dentry_t* dentry);
 dentry_t* word_result_get_dentry(word_result_t* wr);
 
 

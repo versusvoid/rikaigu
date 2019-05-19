@@ -35,23 +35,16 @@ size_t word_result_copy_new_data(
 	return new_element_vardata_start - vardata_array_vardata_start(b);
 }
 
-typedef struct {
-	bool is_name;
-	const size_t offset;
-	const void* data_start;
-} word_results_search_context_t;
-
-int results_array_cmp(const void* key, const void* object)
+int uniq_dentry_cmp(const void* key, const void* object)
 {
-	const word_results_search_context_t* c = key;
-	const word_result_t* wr = object;
+	const word_result_t* a = key;
+	const word_result_t* b = object;
 
-	if (c->is_name != wr->is_name)
+	if (a->is_name != b->is_name)
 	{
-		return (int)c->is_name - (int)wr->is_name;
+		return (int)a->is_name - (int)b->is_name;
 	}
-
-	return (int)c->offset - (int)wr->offset;
+	return (int)a->offset - (int)b->offset;
 }
 
 bool state_try_add_word_result(
@@ -66,140 +59,82 @@ bool state_try_add_word_result(
 		vardata_array_make(b, sizeof(word_result_t));
 	}
 
-	word_results_search_context_t c = {
-		.is_name = d == NAMES,
-		.offset = offset,
-		.data_start = vardata_array_vardata_start(b),
-	};
-
 	word_result_t* array = vardata_array_elements_start(b);
 	const size_t num_elements = vardata_array_num_elements(b);
+	word_result_t new_wr = {
+		.offset = offset,
+		.match_utf16_length = input_length,
+		.is_name = d == NAMES,
+		.key_length = word_length,
+		.inflection_name_length = inflection_name_length,
+		.vardata_start_offset = 0,
+		.dentry = NULL,
+	};
 	bool found;
 	word_result_t* it = binary_locate(
-		&c, array,
+		&new_wr, array,
 		num_elements, sizeof(word_result_t),
-		results_array_cmp, &found
+		uniq_dentry_cmp, &found
 	);
 	if (found)
 	{
 		return false;
 	}
 
-	const size_t new_wr_vardata_start_offset = word_result_copy_new_data(b, word, word_length, inflection_name, inflection_name_length);
+	new_wr.vardata_start_offset = word_result_copy_new_data(b, word, word_length, inflection_name, inflection_name_length);
 	const size_t index = it - array;
 	vardata_array_increment_size(b);
 	memmove(it + 1, it, (num_elements - index) * sizeof(word_result_t));
-	it->offset = offset;
-	it->match_utf16_length = input_length;
-	it->is_name = d == NAMES;
-	it->key_length = word_length;
-	it->inflection_name_length = inflection_name_length;
-	it->vardata_start_offset = new_wr_vardata_start_offset;
-	it->dentry = NULL;
+	memcpy(it, &new_wr, sizeof(word_result_t));
 
 	return true;
 }
 
-void state_make_offsets_array_and_request_read(uint32_t request_id)
-{
-	buffer_t* b = state_get_word_result_buffer();
-	const size_t num_elements = vardata_array_num_elements(b);
-	const size_t padding = 4 - b->size % 4;
-	uint32_t* offsets = buffer_allocate(b, num_elements * sizeof(uint32_t)) + padding;
-	word_result_t* array = vardata_array_elements_start(b);
-
-	size_t num_words = 0;
-	size_t num_names = 0;
-	for (size_t i = 0; i < num_elements; ++i)
-	{
-		if (array[i].is_name)
-		{
-			num_names += 1;
-		}
-		else
-		{
-			assert(num_names == 0);
-			num_words += 1;
-		}
-
-		offsets[i] = array[i].offset;
-	}
-
-	buffer_t* raw_dentry_buffer = state_get_raw_dentry_buffer();
-	request_read_dictionary(offsets, num_words, num_names, raw_dentry_buffer, request_id);
-}
-
-void state_add_dentry_to_word_result(size_t result_index, dentry_t* dentry)
-{
-	buffer_t* b = state_get_word_result_buffer();
-	assert(result_index < vardata_array_num_elements(b));
-	((word_result_t*)vardata_array_elements_start(b))[result_index].dentry = dentry;
-}
-
-double __attribute__((always_inline)) word_result_score(const word_result_t* wr)
-{
-	const double scale = 0.3;
-	const double bias = 1.0;
-	return scale*log(wr->dentry->freq + 1) - wr->match_utf16_length + bias;
-}
-
-inline int sign(double v)
-{
-	return v < 0 ? -1 : (v > 0 ? 1 : 0);
-}
-
 int sort_cmp(const void* key, const void* object)
 {
-	const word_result_t* a = key;
-	const word_result_t* b = object;
+       const word_result_t* a = key;
+       const word_result_t* b = object;
 
-	if (a->dentry->freq != b->dentry->freq)
-	{
-		return sign(word_result_score(a) - word_result_score(b));
-	}
-	if (a->match_utf16_length != b->match_utf16_length)
-	{
-		return (int)a->match_utf16_length - (int)b->match_utf16_length;
-	}
-	if (a->is_name != b->is_name)
-	{
-		return (int)a->is_name - (int)b->is_name;
-	}
-	return (int)a->inflection_name_length - (int)b->inflection_name_length;
+       if (a->match_utf16_length != b->match_utf16_length)
+       {
+               return -((int)a->match_utf16_length - (int)b->match_utf16_length);
+       }
+       if (a->is_name != b->is_name)
+       {
+               return (int)a->is_name - (int)b->is_name;
+       }
+       return -((int)a->inflection_name_length - (int)b->inflection_name_length);
 }
 
 size_t locate_sorted(word_result_t* array, const size_t i)
 {
-	bool found;
-	word_result_t* it = binary_locate(
-		array + i, array,
-		i, sizeof(word_result_t),
-		sort_cmp, &found
-	);
-	return it - array;
+       bool found;
+       word_result_t* it = binary_locate(
+               array + i, array,
+               i, sizeof(word_result_t),
+               sort_cmp, &found
+       );
+       return it - array;
 }
 
 void sort_results(word_result_t* array, const size_t num_elements)
 {
-	for (size_t i = 0; i < num_elements; ++i)
-	{
-		size_t to_index = locate_sorted(array, i);
-		if (to_index == i)
-		{
-			continue;
-		}
+       for (size_t i = 0; i < num_elements; ++i)
+       {
+               size_t to_index = locate_sorted(array, i);
+               if (to_index == i)
+               {
+                       continue;
+               }
 
-		word_result_t tmp = array[i];
-		memmove(array + to_index + 1, array + to_index, (i - to_index) * sizeof(word_result_t));
-		array[to_index] = tmp;
-	}
+               word_result_t tmp = array[i];
+               memmove(array + to_index + 1, array + to_index, (i - to_index) * sizeof(word_result_t));
+               array[to_index] = tmp;
+       }
 }
 
-void state_sort_and_limit_word_results()
+size_t sort_and_limit_word_results(buffer_t* b, word_result_t* array)
 {
-	buffer_t* b = state_get_word_result_buffer();
-
-	word_result_t* array = vardata_array_elements_start(b);
 	size_t num_elements = vardata_array_num_elements(b);
 	sort_results(array, num_elements);
 
@@ -208,29 +143,66 @@ void state_sort_and_limit_word_results()
 		num_elements = 32;
 		vardata_array_set_size(b, 32);
 	}
+	return num_elements;
+}
+
+void state_make_offsets_array_and_request_read(uint32_t request_id)
+{
+	buffer_t* b = state_get_word_result_buffer();
+	word_result_t* array = vardata_array_elements_start(b);
+	size_t num_elements = sort_and_limit_word_results(b, array);
+
+	const size_t padding = 4 - b->size % 4;
+	uint32_t* offsets = buffer_allocate(b, num_elements * sizeof(uint32_t) + padding) + padding;
+
+	for (size_t i = 0; i < num_elements; ++i)
+	{
+		if (array[i].is_name)
+		{
+			offsets[i] = (1u << 31) | array[i].offset;
+		}
+		else
+		{
+			offsets[i] = array[i].offset;
+		}
+	}
+
+	buffer_t* raw_dentry_buffer = state_get_raw_dentry_buffer();
+	request_read_dictionary(offsets, num_elements, raw_dentry_buffer, request_id);
+}
+
+void word_result_set_dentry(word_result_t* wr, dentry_t* dentry)
+{
+	wr->dentry = dentry;
+}
+
+void state_polish_word_results()
+{
+	buffer_t* b = state_get_word_result_buffer();
+	const void* const vardata_start = vardata_array_vardata_start(b);
 
 	const input_t* input = state_get_input();
 	const bool reading_key = is_hiragana(input->data, input->length);
 
-	const void* const vardata_start = vardata_array_vardata_start(b);
-
-	for (size_t i = 0; i < num_elements; ++i)
+	word_result_t* it = vardata_array_elements_start(b);
+	const word_result_t* const end = it + vardata_array_num_elements(b);
+	for (; it < end; ++it)
 	{
-		if (array[i].is_name && reading_key)
+		if (it->is_name && reading_key)
 		{
-			dentry_drop_kanji_groups(array[i].dentry);
+			dentry_drop_kanji_groups(it->dentry);
 		}
 
-		dentry_parse(array[i].dentry);
+		dentry_parse(it->dentry);
 
-		const char16_t* key = vardata_start + array[i].vardata_start_offset;
+		const char16_t* key = vardata_start + it->vardata_start_offset;
 		if (reading_key)
 		{
-			dentry_filter_readings(array[i].dentry, key, array[i].key_length);
+			dentry_filter_readings(it->dentry, key, it->key_length);
 		}
 		else
 		{
-			dentry_filter_kanji_groups(array[i].dentry, key, array[i].key_length);
+			dentry_filter_kanji_groups(it->dentry, key, it->key_length);
 		}
 	}
 }

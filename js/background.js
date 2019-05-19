@@ -142,7 +142,6 @@ async function rikaiguEnable(tab) {
 			{ env: {
 				take_a_trip: takeATrip,
 				request_read_dictionary: requestReadDictionary,
-				log: Math.log,
 				print: print,
 			}}
 		);
@@ -209,7 +208,7 @@ async function getLines(file, offsets) {
 
 async function getLine(file, offset) {
 	return new Promise(function(resolve, reject) {
-		var len = 75;
+		var len = 75; // median line length
 		var blob = file.slice(offset, offset + len);
 
 		var reader = new FileReader();
@@ -231,10 +230,14 @@ async function getLine(file, offset) {
 	});
 }
 
-function readLines(offsets, numWordsOffsets) {
+function readLines(offsetsPtr, numOffsets) {
+	const offsetsView = new Uint32Array(Module.instance.exports.memory.buffer, offsetsPtr, numOffsets);
 	const promises = [];
-	for (let i = 0; i < offsets.length; ++i) {
-		promises.push(getLine(i < numWordsOffsets ? dictFile : namesFile, offsets[i]));
+	for (let i = 0; i < offsetsView.length; ++i) {
+		// see word_results.c : state_make_offsets_array_and_request_read()
+		const isName = !!(offsetsView[i] & (1 << 31));
+		const offset = offsetsView[i] & 0x7FFFFFFF;
+		promises.push(getLine(isName ? namesFile : dictFile, offset));
 	}
 	return Promise.all(promises);
 }
@@ -243,11 +246,8 @@ var nextRequestId = 0;
 var requestsData = new Map();
 
 const decoder = new TextDecoder('utf-8');
-async function requestReadDictionary(offsetsPtr, numWordsOffsets, numNamesOffsets, bufferHandle, requestId) {
-	const lines = await readLines(
-		new Uint32Array(Module.instance.exports.memory.buffer, offsetsPtr, numWordsOffsets + numNamesOffsets),
-		numWordsOffsets,
-	);
+async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, requestId) {
+	const lines = await readLines(offsetsPtr, numOffsets);
 
 	for (const line of lines) {
 		const lineView = new Uint8Array(line);

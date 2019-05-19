@@ -16,31 +16,27 @@ dentry_t* dentry_new()
 	return ptr;
 }
 
-int32_t to_number_unchecked(const char* str, size_t length)
+uint32_t parse_base62_uint(const char* s, const char* const end)
 {
-	int32_t res = 0;
-	const char* const end = str + length;
-	while (str < end)
+	uint32_t res = 0;
+	for (; s < end; ++s)
 	{
-		res = res*10 + (*str - '0');
-		str += 1;
+		char c = *s;
+		res *= 62;
+		if (c >= '0' && c <= '9')
+		{
+			res += c - '0';
+		}
+		else if (c >= 'a' && c <= 'z')
+		{
+			res += c - 'a';
+		}
+		else
+		{
+			res += c - 'A';
+		}
 	}
 	return res;
-}
-
-bool is_number(const char* str, size_t length)
-{
-	const char* const end = str + length;
-	while (str < end)
-	{
-		if (*str < '0' || *str > '9')
-		{
-			return false;
-		}
-		str += 1;
-	}
-
-	return true;
 }
 
 const char* find(const char* start, const char* end, const char c)
@@ -56,7 +52,7 @@ const char* find(const char* start, const char* end, const char c)
 	return start;
 }
 
-dentry_t* dentry_make(const char* raw, size_t length)
+dentry_t* dentry_make(const char* raw, size_t length, bool is_name)
 {
 	const char* parts_start[] = {raw, NULL, NULL, NULL};
 	size_t num_parts = 1;
@@ -72,35 +68,29 @@ dentry_t* dentry_make(const char* raw, size_t length)
 	}
 
 	dentry_t* res = dentry_new();
-	if (num_parts == 4)
+	if (!is_name)
+	{
+		assert(num_parts >= 3);
+		res->entry_id = MIN_ENTRY_ID + parse_base62_uint(parts_start[num_parts - 1], raw + length);
+		res->definition_end = parts_start[num_parts - 1] - 1;
+		num_parts -= 1;
+	}
+	else
+	{
+		res->definition_end = raw + length;
+	}
+
+	assert(num_parts == 2 || num_parts == 3);
+	if (num_parts == 3)
 	{
 		res->kanjis_start = parts_start[0];
 		res->readings_start = parts_start[1];
 		res->definition_start = parts_start[2];
-		res->definition_end = parts_start[3] - 1;
-		res->freq = to_number_unchecked(parts_start[3], raw + length - parts_start[3]);
 	}
 	else if (num_parts == 2)
 	{
 		res->readings_start = parts_start[0];
 		res->definition_start = parts_start[1];
-		res->definition_end = raw + length;
-		res->freq = UNKNOWN_WORD_FREQ_ORDER;
-	}
-	else if (is_number(parts_start[2], raw + length - parts_start[2]))
-	{
-		res->readings_start = parts_start[0];
-		res->definition_start = parts_start[1];
-		res->definition_end = parts_start[2] - 1;
-		res->freq = to_number_unchecked(parts_start[2], raw + length - parts_start[2]);
-	}
-	else
-	{
-		res->kanjis_start = parts_start[0];
-		res->readings_start = parts_start[1];
-		res->definition_start = parts_start[2];
-		res->definition_end = raw + length;
-		res->freq = UNKNOWN_WORD_FREQ_ORDER;
 	}
 
 	return res;

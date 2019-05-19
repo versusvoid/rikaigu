@@ -6,7 +6,6 @@ import itertools
 from collections import defaultdict
 
 import dictionary
-import freqs
 import wasm_generator
 from utils import kata_to_hira, print_lengths_stats
 from index import index_keys
@@ -59,11 +58,24 @@ def format_trans(trans, name):
 		parts.append('; '.join(trans.glosses))
 	return ''.join(parts)
 
+_base62_alphabeth = [
+	*map(str, range(ord('0'), ord('9') + 1)),
+	*map(str, range(ord('a'), ord('z') + 1)),
+	*map(str, range(ord('A'), ord('Z') + 1)),
+]
+assert len(_base62_alphabeth) == 62
+def format_uint_base62(v):
+	v, i = divmod(v, 62)
+	s = [_base62_alphabeth[i]]
+	while v != 0:
+		v, i = divmod(v, 62)
+		s.append(_base62_alphabeth[i])
+	return ''.join(s)
 
 control_kanji_symbols = re.compile('[#|U,;\t]')
 control_reading_symbols = re.compile('[|U;\t]')
 max_readings_index = 0
-def format_entry(entry):
+def format_entry(entry, min_entry_id=None):
 	global max_readings_index
 
 	any_common_kanji = any(map(lambda k: k.common, entry.kanjis))
@@ -143,20 +155,13 @@ def format_entry(entry):
 		parts.append('\\'.join(sense_groups))
 		del sense_groups
 
-		# TODO per kanji/reading freq
-		freq = freqs.get_frequency(entry)
-		if freq is not None:
-			parts.append(str(freq))
+		parts.append(format_uint_base62(entry.id - min_entry_id))
 	else:
 		transes = []
 		for t in entry.transes:
 			transes.append(format_trans(t, entry))
 		parts.append('\\'.join(transes))
 		del transes
-
-		freq = freqs.get_frequency(entry)
-		if freq is not None:
-			parts.append(str(freq))
 
 	return '\t'.join(parts)
 
@@ -202,6 +207,9 @@ def prepare_names():
 
 def prepare_dict():
 	pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+	min_entry_id = 2**63
+	for entry in dictionary.dictionary_reader('JMdict_e.gz'):
+		min_entry_id = min(entry.id, min_entry_id)
 
 	index = defaultdict(set)
 	offset = 0
@@ -215,14 +223,14 @@ def prepare_dict():
 			for key in index_keys(entry, variate=True):
 				index[key].add(index_entry)
 
-			l = format_entry(entry).encode('utf-8')
+			l = format_entry(entry, min_entry_id).encode('utf-8')
 			line_lengths.append(len(l))
 			of.write(l)
 			of.write(b'\n')
 			offset += len(l) + 1
 
 	print_lengths_stats('dict', line_lengths)
-	return index
+	return index, min_entry_id
 
 def index_kanji():
 	index = []
@@ -242,12 +250,11 @@ def index_kanji():
 		for kanji_code_point, offset in index:
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
-freqs.initialize()
-dict_index = prepare_dict()
+dict_index, min_entry_id = prepare_dict()
 names_index = prepare_names()
 
 wasm_generator.write_utf16_indexies(dict_index, names_index)
-wasm_generator.generate_config_header(max_readings_index)
+wasm_generator.generate_config_header(max_readings_index, min_entry_id)
 wasm_generator.get_lz4_source()
 
 # TODO generate kanji.dat

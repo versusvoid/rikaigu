@@ -75,17 +75,19 @@ bool word_search_finish(buffer_t* raw_dentry_buffer)
 	void* data = raw_dentry_buffer->data;
 	const void* const end = data + raw_dentry_buffer->size;
 	size_t dentry_index = 0;
+	word_result_iterator_t it = state_get_word_result_iterator();
 	while (data < end)
 	{
 		const uint16_t line_length = *(uint16_t*)data;
-		dentry_t* dentry = dentry_make(data + sizeof(uint16_t), line_length);
-		state_add_dentry_to_word_result(dentry_index, dentry);
+		dentry_t* dentry = dentry_make(data + sizeof(uint16_t), line_length, word_result_is_name(it.current));
+		word_result_set_dentry(it.current, dentry);
 
 		data += sizeof(uint16_t) + line_length;
 		dentry_index += 1;
+		word_result_iterator_next(&it);
 	}
 
-	state_sort_and_limit_word_results();
+	state_polish_word_results();
 
 	return true;
 }

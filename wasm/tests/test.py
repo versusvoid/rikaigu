@@ -175,7 +175,7 @@ class Dentry(Structure):
 		('readings_start', c_char_p),
 		('definition_start', c_char_p),
 		('definition_end', c_char_p),
-		('freq', c_int),
+		('entry_id', c_uint),
 
 		('num_kanji_groups', c_size_t),
 		('kanji_groups', pKanjiGroup),
@@ -203,7 +203,8 @@ class WordResult(Structure):
 	]
 pWordResult = POINTER(WordResult)
 
-dictionary_line = 'お浸し,御浸し;御ひたし#0;御したし#1\tおひたし;おしたし\tn;boiled greens in bonito-flavoured soy sauce\\p\t33066'
+names_line = 'お浸し,御浸し;御ひたし#0;御したし#1\tおひたし;おしたし\tn;boiled greens in bonito-flavoured soy sauce\\p'
+dictionary_line = names_line + '\t33066'
 def make_dentry() -> Dentry:
 	s = dictionary_line.encode()
 	ends = [len(p) for p in s.split(b'\t')][:3]
@@ -844,19 +845,22 @@ class T(unittest.TestCase):
 			self.assertEqual(res, i == 0)
 
 		self.assertEqual(lib.vardata_array_num_elements(lib.state_get_word_result_buffer()), 2)
-		return cast(lib.vardata_array_elements_start(lib.state_get_word_result_buffer()), pWordResult)
+		wr = cast(lib.vardata_array_elements_start(lib.state_get_word_result_buffer()), pWordResult)
+		self.assertFalse(wr[0].is_name)
+
+		return wr
 
 	def test_state_make_offsets_array_and_request_read(self):
 		lib.state_make_offsets_array_and_request_read.argtypes = [c_uint]
 		lib.state_make_offsets_array_and_request_read.restype = None
 
-		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, c_size_t, c_void_p, c_uint)
-		def request_read_dictionary(ofs, num_words, num_names, handle, request_id):
-			if num_words != 1 or num_names != 1:
-				print(f'test_state_make_offsets_array_and_request_read: expected (1, 1) got ({num_words}, {num_names})')
+		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, c_void_p, c_uint)
+		def request_read_dictionary(ofs, num_offsets, handle, request_id):
+			if num_offsets != 2:
+				print(f'test_state_make_offsets_array_and_request_read: expected 2 got {num_offsets}')
 				exit(1)
-			if ofs[:2] != [123, 123]:
-				print(f'test_state_make_offsets_array_and_request_read: expected (123, 123) got {ofs[:2]}')
+			if ofs[:2] != [123, (1 << 31) | 123]:
+				print(f'test_state_make_offsets_array_and_request_read: expected (123, (1 << 31) | 123) got {ofs[:2]}')
 				exit(1)
 
 			if request_id != 4382:
@@ -878,15 +882,16 @@ class T(unittest.TestCase):
 		it[0].dentry = pointer(d1)
 
 		d2 = make_dentry()
-		d2.freq = 1
+		it[1].match_utf16_length += 1
 		it[1].dentry = pointer(d2)
 
 		lib.sort_results(it, 2)
 
 		self.assertTrue(it[0].is_name)
 
-	def test_state_sort_and_limit_word_results(self):
-		lib.state_sort_and_limit_word_results.restype = None
+	def test_sort_and_limit_word_results(self):
+		lib.sort_and_limit_word_results.argtypes = [pBuffer, pWordResult]
+		lib.sort_and_limit_word_results.restype = None
 
 		self.init_state()
 
@@ -901,11 +906,12 @@ class T(unittest.TestCase):
 			if success:
 				added += 1
 
-		it = cast(lib.vardata_array_elements_start(lib.state_get_word_result_buffer()), pWordResult)
+		buf = lib.state_get_word_result_buffer()
+		it = cast(lib.vardata_array_elements_start(buf), pWordResult)
 		for i in range(40):
 			it[i].dentry = pointer(make_dentry())
 
-		lib.state_sort_and_limit_word_results()
+		lib.sort_and_limit_word_results(buf, it)
 		self.assertEqual(lib.vardata_array_num_elements(lib.state_get_word_result_buffer()), 32)
 
 	def test_word_result_get_inflection_name(self):
@@ -996,14 +1002,15 @@ class T(unittest.TestCase):
 
 		memory, buf = make_buffer(1024)
 
-		s = dictionary_line.encode()
-		memory[0] = len(s)
-		memory[2:2 + len(s)] = s
+		s1 = dictionary_line.encode()
+		memory[0] = len(s1)
+		memory[2:2 + len(s1)] = s1
 
-		memory[2 + len(s)] = len(s)
-		memory[2 + len(s) + 2:2 + len(s) + 2 + len(s)] = s
+		s2 = names_line.encode()
+		memory[2 + len(s1)] = len(s2)
+		memory[2 + len(s1) + 2:2 + len(s1) + 2 + len(s2)] = s2
 
-		buf.size = 2 + len(s) + 2 + len(s)
+		buf.size = 2 + len(s2) + 2 + len(s2)
 
 		self.assertTrue(lib.word_search_finish(byref(buf)))
 

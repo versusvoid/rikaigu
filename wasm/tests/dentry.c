@@ -10,22 +10,11 @@
 #include "../src/utf.c"
 #include "../src/dentry.c"
 
-void test_to_number_unchecked()
+
+void test_parse_base62_uint()
 {
-	const char number[] = "12398174";
-	assert(to_number_unchecked(number, strlen(number)) == 12398174);
-}
-
-void test_is_number()
-{
-	const char number[] = "12398174";
-	assert(is_number(number, strlen(number)));
-
-	const char not_a_number[] = u8"1１2２3３4４5５6６7７8８9９";
-	assert(!is_number(not_a_number, strlen(not_a_number)));
-
-	const char not_a_number2[] = u8"1oo5oo";
-	assert(!is_number(not_a_number2, strlen(not_a_number2)));
+	const char number[] = "123";
+	assert(parse_base62_uint(number, number + 3) == 62*62 + 2 * 62 + 3);
 }
 
 void test_find()
@@ -43,47 +32,47 @@ void test_dentry_make()
 	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char case1[] = "kanji\tkana\tdefinition\t123";
-	const dentry_t* d = dentry_make(case1, strlen(case1));
+	const dentry_t* d = dentry_make(case1, strlen(case1), false);
 	assert(state->buffers[DENTRY_BUFFER].size == sizeof(dentry_t));
 	assert(state->buffers[DENTRY_BUFFER].data == d);
 	assert(d->kanjis_start == case1);
 	assert(d->readings_start == case1 + 6);
 	assert(d->definition_start == case1 + 6 + 5);
 	assert(d->definition_end == case1 + 6 + 5 + 10);
-	assert(d->freq == 123);
+	assert(d->entry_id == MIN_ENTRY_ID + 1 * 62*62 + 2 * 62 + 3);
 
 	state->buffers[DENTRY_BUFFER].size = 0;
 	const char case2[] = "kana\tdefinition";
-	d = dentry_make(case2, strlen(case2));
+	d = dentry_make(case2, strlen(case2), true);
 	assert(state->buffers[DENTRY_BUFFER].size == sizeof(dentry_t));
 	assert(state->buffers[DENTRY_BUFFER].data == d);
 	assert(d->kanjis_start == NULL);
 	assert(d->readings_start == case2);
 	assert(d->definition_start == case2 + 5);
 	assert(d->definition_end == case2 + strlen(case2));
-	assert(d->freq == UNKNOWN_WORD_FREQ_ORDER);
+	assert(d->entry_id == 0);
 
 	state->buffers[DENTRY_BUFFER].size = 0;
 	const char case3[] = "kana\tdefinition\t456";
-	d = dentry_make(case3, strlen(case3));
+	d = dentry_make(case3, strlen(case3), false);
 	assert(state->buffers[DENTRY_BUFFER].size == sizeof(dentry_t));
 	assert(state->buffers[DENTRY_BUFFER].data == d);
 	assert(d->kanjis_start == NULL);
 	assert(d->readings_start == case3);
 	assert(d->definition_start == case3 + 5);
 	assert(d->definition_end == case3 + 5 + 10);
-	assert(d->freq == 456);
+	assert(d->entry_id == MIN_ENTRY_ID + 4 * 62*62 + 5 * 62 + 6);
 
 	state->buffers[DENTRY_BUFFER].size = 0;
 	const char case4[] = "kanji\tkana\tdefinition";
-	d = dentry_make(case4, strlen(case4));
+	d = dentry_make(case4, strlen(case4), true);
 	assert(state->buffers[DENTRY_BUFFER].size == sizeof(dentry_t));
 	assert(state->buffers[DENTRY_BUFFER].data == d);
 	assert(d->kanjis_start == case4);
 	assert(d->readings_start == case4 + 6);
 	assert(d->definition_start == case4 + 6 + 5);
 	assert(d->definition_end == case4 + 6 + 5 + 10);
-	assert(d->freq == UNKNOWN_WORD_FREQ_ORDER);
+	assert(d->entry_id == 0);
 
 	clear_memory();
 }
@@ -366,11 +355,11 @@ void test_dentry_parse_whole()
 	setup_memory();
 	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
 
-	const char s[] = u8"我;吾U#0,1,2,3,4;吾れU,我れU#0,2	われ;わU;あれU;あU;わぬU;わろU	pn;I; me`(only われ,わ) oneself`(only われ,わ) you\\pref;(only わ) (also 和) prefix indicating familiarity or contempt	2677";
-	dentry_t* d = dentry_make(s, strlen(s));
+	const char s[] = u8"我;吾U#0,1,2,3,4;吾れU,我れU#0,2	われ;わU;あれU;あU;わぬU;わろU	pn;I; me`(only われ,わ) oneself`(only われ,わ) you\\pref;(only わ) (also 和) prefix indicating familiarity or contempt	77";
+	dentry_t* d = dentry_make(s, strlen(s), false);
 	dentry_parse(d);
 
-	assert(d->freq == 2677);
+	assert(d->entry_id == MIN_ENTRY_ID + 7 * 62 + 7);
 	assert(d->num_readings == 6);
 	assert(!d->readings[5].common);
 	assert(d->num_kanji_groups == 3);
@@ -386,8 +375,7 @@ void test_dentry_parse_whole()
 
 int main()
 {
-	test_to_number_unchecked();
-	test_is_number();
+	test_parse_base62_uint();
 	test_find();
 	test_dentry_make();
 	test_count_parts();
