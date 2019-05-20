@@ -7,7 +7,7 @@ if (localStorage.length > 0) {
 	var newConfig = {
 		popupColor: localStorage["popupcolor"],
 		enableKeys: localStorage["disablekeys"] !== 'true',
-		popupDelay: parseInt(localStorage['popupDelay']) || 150,
+		popupDelay: parseInt(localStorage['popupDelay']) || 100,
 		defaultDict: ['words', 'names', 'kanji'].indexOf(localStorage["defaultDict"])
 	};
 	for (var oldNew of [

@@ -87,8 +87,6 @@ bool word_search_finish(buffer_t* raw_dentry_buffer)
 		word_result_iterator_next(&it);
 	}
 
-	state_polish_word_results();
-
 	return true;
 }
 

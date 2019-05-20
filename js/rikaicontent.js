@@ -629,12 +629,11 @@ function onKeyUp(ev) {
 	if (!!rikaigu.keysDown[ev.code]) delete rikaigu.keysDown[ev.code];
 }
 
-function processSearchResult(selectionRange, prefixSelectionRange, result) {
+function processSearchResult(selectionRange, result) {
 	clearHighlight();
 	rikaigu.lastShownRangeNode = null;
 	rikaigu.lastShownRangeOffset = 0;
-	if (!result.matchLength || !highlightMatch(result.matchLength, result.prefixLength,
-			selectionRange, prefixSelectionRange)) {
+	if (!result.matchLength || !highlightMatch(result.matchLength, selectionRange)) {
 		return requestHidePopup();
 	}
 	if (selectionRange.constructor === Array) {
@@ -759,9 +758,13 @@ function _setSearchTimeout(ev) {
 	rikaigu.timer = setTimeout(
 		function(rangeNode, rangeOffset) {
 			rikaigu.timer = null;
-			if (!rikaigu || rangeNode != rikaigu.lastRangeNode
-					|| rangeOffset != rikaigu.lastRangeOffset
-					|| rikaigu.mouseOnPopup) {
+			if (!rikaigu || rikaigu.mouseOnPopup) {
+				return;
+			}
+			if (rangeNode != rikaigu.lastRangeNode || rangeOffset != rikaigu.lastRangeOffset) {
+				return;
+			}
+			if (rangeNode == rikaigu.lastShownRangeNode && rangeOffset == rikaigu.lastShownRangeOffset) {
 				return;
 			}
 			extractTextAndSearch(rangeNode, rangeOffset);
@@ -878,17 +881,9 @@ chrome.runtime.onMessage.addListener(
 				break;
 			case 'show':
 				if (window.self === window.top) {
-					if (request.match === rikaigu.shownMatch) {
-						// _getPopupAndUpdateItsPosition();
-						// updatePopupPosition(
-							// request.screenX - (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX),
-							// request.screenY - (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY)
-						// );
-						console.error('why this branch even exists');
-					} else {
-						showPopup(request.html, request.renderParams);
-						rikaigu.shownMatch = request.match;
-					}
+					console.assert(request.match !== rikaigu.shownMatch);
+					showPopup(request.html, request.renderParams);
+					rikaigu.shownMatch = request.match;
 				}
 				rikaigu.isVisible = true;
 				break;

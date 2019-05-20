@@ -39,22 +39,22 @@ function isHighlightableInput(input) {
 	return input.nodeName === 'TEXTAREA' || (input.nodeName === 'INPUT' && input.type === 'text');
 }
 
-function highlightMatch(matchLength, prefixLength, selectionRange, prefixSelectionRange) {
+function highlightMatch(matchLength, selectionRange) {
 	if (!rikaigu.config.matchHighlight || rikaigu.mousePressed) return true;
 
 	if (selectionRange.constructor === Array) {
-		return highlightRange(matchLength, prefixLength, selectionRange, prefixSelectionRange);
+		return highlightRange(matchLength, selectionRange);
 	} else {
-		return highlightInput(matchLength, prefixLength, selectionRange.rangeNode, selectionRange.offset);
+		return highlightInput(matchLength, selectionRange.rangeNode, selectionRange.offset);
 	}
 }
 
-function highlightInput(matchLength, prefixLength, input, offset) {
+function highlightInput(matchLength, input, offset) {
 	if (!document.body.contains(input)) return false;
 	if (!isHighlightableInput(input)) return true;
 
-	if (offset + matchLength > input.value.length || offset - prefixLength < 0) {
-		console.error('Invalid input', input, 'selectionRange:', offset, matchLength, prefixLength);
+	if (offset + matchLength > input.value.length) {
+		console.error('Invalid input', input, 'selectionRange:', offset, matchLength);
 		return false;
 	}
 	if (document.activeElement !== input) {
@@ -62,32 +62,23 @@ function highlightInput(matchLength, prefixLength, input, offset) {
 	}
 	rikaigu.oldSelectionStart = input.selectionStart;
 	rikaigu.oldSelectionEnd = input.selectionEnd;
-	input.selectionStart = offset - prefixLength;
+	input.selectionStart = offset;
 	input.selectionEnd = offset + matchLength;
 	input.focus();
 	return true;
 }
 
-function highlightRange(matchLength, prefixLength, selectionRange, prefixSelectionRange) {
+function highlightRange(matchLength, selectionRange) {
 	if (!document.body.contains(selectionRange[0].rangeNode)) return false;
 
-	var requiredLength = prefixLength;
-	var i = 0;
-	while (i < prefixSelectionRange.length && prefixSelectionRange[i].offset - prefixSelectionRange[i].endIndex < requiredLength) {
-		requiredLength -= prefixSelectionRange[i].offset - prefixSelectionRange[i].endIndex;
-		++i;
-	}
-	var startNode = prefixSelectionRange[i].rangeNode,
-		startOffset = Math.max(prefixSelectionRange[i].offset - requiredLength, 0);
-
-	requiredLength = matchLength;
-	i = 0;
+	let requiredLength = matchLength;
+	let i = 0;
 	while (i < selectionRange.length - 1 && selectionRange[i].endIndex - selectionRange[i].offset < requiredLength) {
 		requiredLength -= selectionRange[i].endIndex - selectionRange[i].offset;
 		++i;
 	}
-	var endNode = selectionRange[i].rangeNode,
-		endOffset = Math.min(selectionRange[i].offset + requiredLength, selectionRange[i].endIndex);
+	const endNode = selectionRange[i].rangeNode;
+	const endOffset = Math.min(selectionRange[i].offset + requiredLength, selectionRange[i].endIndex);
 
 	if (isHighlightableInput(document.activeElement)) {
 		rikaigu.oldActiveElement = document.activeElement;
@@ -95,14 +86,14 @@ function highlightRange(matchLength, prefixLength, selectionRange, prefixSelecti
 		rikaigu.oldActiveElementSelectionEnd = rikaigu.oldActiveElement.selectionEnd;
 	}
 
-	var selection = window.getSelection();
+	const selection = window.getSelection();
 	if (selection.rangeCount > 0) {
 		rikaigu.oldRange = selection.getRangeAt(0);
 		selection.removeAllRanges();
 	}
 
 	var range = document.createRange();
-	range.setStart(startNode, startOffset);
+	range.setStart(selectionRange[0].rangeNode, selectionRange[0].offset);
 	range.setEnd(endNode, endOffset);
 	selection.addRange(range);
 	rikaigu.selected = true;

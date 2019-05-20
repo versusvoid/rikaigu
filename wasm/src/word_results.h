@@ -13,8 +13,6 @@ bool state_try_add_word_result(
 
 void state_make_offsets_array_and_request_read(uint32_t request_id);
 
-void state_polish_word_results(void);
-
 
 typedef struct word_result_iterator {
 	word_result_t* current;

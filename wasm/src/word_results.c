@@ -174,36 +174,26 @@ void state_make_offsets_array_and_request_read(uint32_t request_id)
 void word_result_set_dentry(word_result_t* wr, dentry_t* dentry)
 {
 	wr->dentry = dentry;
-}
-
-void state_polish_word_results()
-{
-	buffer_t* b = state_get_word_result_buffer();
-	const void* const vardata_start = vardata_array_vardata_start(b);
 
 	const input_t* input = state_get_input();
-	const bool reading_key = is_hiragana(input->data, input->length);
-
-	word_result_t* it = vardata_array_elements_start(b);
-	const word_result_t* const end = it + vardata_array_num_elements(b);
-	for (; it < end; ++it)
+	const bool reading_key = is_hiragana(input->data, wr->match_utf16_length);
+	if (wr->is_name && reading_key)
 	{
-		if (it->is_name && reading_key)
-		{
-			dentry_drop_kanji_groups(it->dentry);
-		}
+		dentry_drop_kanji_groups(dentry);
+	}
 
-		dentry_parse(it->dentry);
+	dentry_parse(dentry);
 
-		const char16_t* key = vardata_start + it->vardata_start_offset;
-		if (reading_key)
-		{
-			dentry_filter_readings(it->dentry, key, it->key_length);
-		}
-		else
-		{
-			dentry_filter_kanji_groups(it->dentry, key, it->key_length);
-		}
+	buffer_t* b = state_get_word_result_buffer();
+	const void* const vardata_start = vardata_array_vardata_start(b);
+	const char16_t* key = vardata_start + wr->vardata_start_offset;
+	if (reading_key)
+	{
+		dentry_filter_readings(dentry, key, wr->key_length);
+	}
+	else
+	{
+		dentry_filter_kanji_groups(dentry, key, wr->key_length);
 	}
 }
 

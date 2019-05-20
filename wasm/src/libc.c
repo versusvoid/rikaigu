@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#include "utf.h"
 #include "imports.h"
 
 void* memcpy(void *dest, const void *src, size_t n)
@@ -209,7 +210,7 @@ size_t print_uint(char* out, size_t max_length, uint32_t v)
 	}
 	if (digits >= max_length)
 	{
-		take_a_trip("small buffer");
+		take_a_trip("print_uint: small consolef buffer");
 	}
 
 	for (size_t i = digits; i > 0; --i)
@@ -218,6 +219,54 @@ size_t print_uint(char* out, size_t max_length, uint32_t v)
 		v /= 10;
 	}
 	return digits;
+}
+
+char* print_utf16(const char16_t* s, const size_t length, char* out, size_t available)
+{
+	const char16_t* const end = s + length;
+	while (s < end)
+	{
+		wchar_t wc = decode_utf16_wchar(&s);
+		char res[4];
+		size_t bytes_required = 0;
+		if (wc >= 0x10000)
+		{
+			bytes_required = 4;
+			res[0] = 0xf0 | (wc >> 18);
+			res[1] = 0x80 | ((wc >> 12) & 0x3f);
+			res[2] = 0x80 | ((wc >> 6) & 0x3f);
+			res[3] = 0x80 | ((wc >> 0) & 0x3f);
+		}
+		else if (wc >= 0x800)
+		{
+			bytes_required = 3;
+			res[0] = 0xe0 | (wc >> 12);
+			res[1] = 0x80 | ((wc >> 6) & 0x3f);
+			res[2] = 0x80 | ((wc >> 0) & 0x3f);
+		}
+		else if (wc >= 0x80)
+		{
+			bytes_required = 2;
+			res[0] = 0xc0 | (wc >> 6);
+			res[1] = 0x80 | ((wc >> 0) & 0x3f);
+		}
+		else
+		{
+			bytes_required = 1;
+			res[0] = wc & 0x00;
+		}
+
+		if (available < bytes_required)
+		{
+			take_a_trip("print_utf16: small consolef buffer");
+		}
+
+		memcpy(out, res, bytes_required);
+		out += bytes_required;
+		available -= bytes_required;
+	}
+
+	return out;
 }
 
 int consolef(const char* format, ...)
@@ -244,12 +293,18 @@ int consolef(const char* format, ...)
 		{
 			out += print_uint(out, buf + sizeof(buf) - 1 - out, va_arg(args, uint32_t));
 		}
-		else if (spec == 'S')
+		else if (spec == 's')
 		{
-			uint32_t length = va_arg(args, uint32_t);
 			const char* s = va_arg(args, const char*);
+			uint32_t length = va_arg(args, uint32_t);
 			memcpy(out, s, length);
 			out += length;
+		}
+		else if (spec == 'S')
+		{
+			const char16_t* s = va_arg(args, const char16_t*);
+			uint32_t length = va_arg(args, uint32_t);
+			out = print_utf16(s, length, out, buf + sizeof(buf) - 1 - out);
 		}
 		else
 		{
