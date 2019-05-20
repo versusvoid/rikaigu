@@ -18,9 +18,16 @@ SOURCES := \
 	src/word_results.c \
 	src/vardata_array.c \
 	src/utf.c \
-	src/names_types_mapping.c
+	src/names_types_mapping.c \
+	src/review_list.c
 BITCODE_OBJECTS := $(SOURCES:src/%.c=build/%.bc) generated/index.bc
-EXPORTS := rikaigu_search_start rikaigu_search_finish rikaigu_set_config buffer_allocate
+EXPORTS := \
+	rikaigu_search_start \
+	rikaigu_search_finish \
+	rikaigu_set_config \
+	buffer_allocate \
+	review_list_add_entry \
+	review_list_remove_entry
 EXPORTS := $(EXPORTS:%=--export=%)
 
 rikai.wasm: build/wasm.o src/imports.txt

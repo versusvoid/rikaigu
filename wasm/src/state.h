@@ -35,6 +35,7 @@ void* buffer_allocate(buffer_t* buffer, size_t num_bytes);
 
 void state_clear(void);
 
+buffer_t* state_get_review_list_buffer(void);
 buffer_t* state_get_candidate_buffer(void);
 buffer_t* state_get_index_entry_buffer(void);
 buffer_t* state_get_word_result_buffer(void);

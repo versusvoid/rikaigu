@@ -7,6 +7,7 @@
 #include "libc.h"
 #include "word_results.h"
 #include "names_types_mapping.h"
+#include "review_list.h"
 
 void append(buffer_t* b, const char* str, size_t length)
 {
@@ -64,7 +65,7 @@ bool render_reading(buffer_t* b, const reading_t* reading, bool second_and_furth
 	conditionally_append(second_and_further, u8"、");
 	append_static("<span class=\"w-kana rikaigu-review-listed");
 	conditionally_append(!reading->common, " uncommon");
-	conditionally_append(add_hidden, "rikaigu-hidden");
+	conditionally_append(add_hidden, " rikaigu-hidden");
 	append_static("\">");
 	append(b, reading->text, reading->length);
 	append_static("</span>");
@@ -184,13 +185,13 @@ void render_sense_group(buffer_t* b, sense_group_t* sense_group, bool is_name, b
 		return;
 	}
 	append_static("<span class=\"rikaigu-review-listed");
-	conditionally_append(!from_review_list, "rikaigu-hidden");
+	conditionally_append(!from_review_list, " rikaigu-hidden");
 	append_static("\">; </span>");
 
 	if (sense_group->num_senses > 1)
 	{
 		append_static("<ul class=\"w-def rikaigu-review-listed");
-		conditionally_append(from_review_list, "rikaigu-hidden");
+		conditionally_append(from_review_list, " rikaigu-hidden");
 		append_static("\"><li>");
 		for (size_t i = 0; i < sense_group->num_senses; ++i)
 		{
@@ -202,17 +203,15 @@ void render_sense_group(buffer_t* b, sense_group_t* sense_group, bool is_name, b
 	else
 	{
 		append_static(" <span class=\"w-def rikaigu-review-listed");
-		conditionally_append(from_review_list, "rikaigu-hidden");
+		conditionally_append(from_review_list, " rikaigu-hidden");
 		append_static("\">");
 		append(b, sense_group->senses[0].text, sense_group->senses[0].length);
 		append_static("</span><br />");
 	}
 }
 
-void render_dentry(buffer_t* b, word_result_t* wr)
+void render_dentry(buffer_t* b, word_result_t* wr, dentry_t* dentry, const bool from_review_list)
 {
-	const bool from_review_list = false; //review_list_entry != NULL;
-	dentry_t* dentry = word_result_get_dentry(wr);
 	if (dentry->num_kanji_groups > 0)
 	{
 		for (size_t i = 0; i < dentry->num_kanji_groups; ++i)
@@ -228,7 +227,7 @@ void render_dentry(buffer_t* b, word_result_t* wr)
 	if (!word_result_is_name(wr))
 	{
 		append_static("<p class=\"w-review-context rikaigu-review-listed");
-		conditionally_append(!from_review_list, "rikaigu-hidden");
+		conditionally_append(!from_review_list, " rikaigu-hidden");
 		append_static("\">");
 		if (from_review_list)
 		{
@@ -250,9 +249,10 @@ void render_dentry(buffer_t* b, word_result_t* wr)
 void render_entry(buffer_t* b, word_result_t* wr, bool moar_cut)
 {
 	append_static("<tr class=\"");
-	conditionally_append(moar_cut, " rikaigu-second-and-further rikaigu-hidden");
+	conditionally_append(moar_cut, "rikaigu-second-and-further rikaigu-hidden");
 	append_static("\">");
 
+	dentry_t* dentry = word_result_get_dentry(wr);
 	/*
 	const auto& review_list_entry = config.review_list.find(result.data[i].dentry.id());
 	std::string* review_list_context = (
@@ -260,25 +260,24 @@ void render_entry(buffer_t* b, word_result_t* wr, bool moar_cut)
 	);
 	review_list_entry_t* review_list_entry = NULL;
 	*/
+	bool from_review_list = false;
 
 	append_static("<td class=\"word");
-	conditionally_append(word_result_is_name(wr), " rikaigu-name");
-	/*
-	conditionally_append(review_list_entry != NULL, "reviewed");
-	conditionally_append(!word_result_is_name(wr), "reviewable");
-	append_static("\" jmdict-id=");
-	append_uint(b, word_result_get_dentry(wr)->id);
-	*/
+	if (word_result_is_name(wr))
+	{
+		append_static(" rikaigu-name");
+	}
+	else
+	{
+		from_review_list = in_review_list(dentry->entry_id);
+		conditionally_append(from_review_list, " reviewed");
+		append_static(" reviewable\" jmdict-id=\"");
+		append_uint(b, dentry->entry_id);
+	}
 	append_static("\">");
 
-	/*
-	buffer += std::to_string(word.dentry.freq());
-	buffer += ' ';
-	buffer += std::to_string(word.score());
-	buffer += "<br />";
-	*/
+	render_dentry(b, wr, dentry, from_review_list);
 
-	render_dentry(b, wr);
 	append_static("</td></tr>");
 }
 

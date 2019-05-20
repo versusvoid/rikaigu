@@ -3,6 +3,7 @@
 
 #include "fake-memory.h"
 #include "../src/libc.c"
+#include "../src/utf.c"
 
 void test_memcpy(void* (*f)(void*, const void*, size_t))
 {

@@ -329,7 +329,7 @@ class T(unittest.TestCase):
 
 		return res
 
-	def _test_kata_to_hira_character(self):
+	def test_kata_to_hira_character(self):
 		lib.kata_to_hira_character.argtypes = [c_ushort, c_ushort]
 		lib.kata_to_hira_character.restype = c_uint
 
@@ -1137,15 +1137,17 @@ class T(unittest.TestCase):
 			buf.size = 0
 
 	def test_render_dentry(self):
-		lib.render_dentry.argtypes = [pBuffer, pWordResult]
+		lib.render_dentry.argtypes = [pBuffer, pWordResult, pDentry, c_bool]
 		lib.render_dentry.restype = None
 
 		self.init_state()
 
 		memory, buf = make_buffer(1024)
 		wr = self.make_word_result()
-		lib.render_dentry(byref(buf), wr)
-		self.assertTrue(memory[:buf.size].strip())
+		for flag in [False, True]:
+			lib.render_dentry(byref(buf), wr, wr.contents.dentry, flag)
+			self.assertTrue(memory[:buf.size].strip())
+			buf.size = 0
 
 	def test_render_entry(self):
 		lib.render_entry.argtypes = [pBuffer, pWordResult, c_bool]

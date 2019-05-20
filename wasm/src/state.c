@@ -9,6 +9,7 @@
 #include "word_results.h"
 
 typedef enum {
+	REVIEW_LIST_BUFFER,
 	CANDIDATE_BUFFER,
 	INDEX_ENTRY_BUFFER,
 	WORD_RESULT_BUFFER,
@@ -19,7 +20,7 @@ typedef enum {
 	NUM_BUFFER_TOKENS,
 } BUFFER_TOKENS;
 
-const size_t initial_sizes[NUM_BUFFER_TOKENS] = {1<<10, 1<<12, 1<<12, 1<<14, 1<<14, 1<<16};
+const size_t initial_sizes[NUM_BUFFER_TOKENS] = {1<<10, 1<<10, 1<<12, 1<<12, 1<<14, 1<<14, 1<<16};
 
 typedef struct {
 	input_t input;
@@ -38,7 +39,7 @@ void split_memory_into_buffers(void* start, size_t capacity_left)
 	capacity_left -= 8 - ((size_t)start % 8);
 	start += 8 - ((size_t)start % 8);
 
-	static_assert(NUM_BUFFER_TOKENS == 6, "Update split_memory_into_buffers()");
+	static_assert(NUM_BUFFER_TOKENS == 7, "Update split_memory_into_buffers()");
 	for (size_t i = 0; i < NUM_BUFFER_TOKENS - 1; ++i)
 	{
 		state->buffers[i].capacity = initial_sizes[i];
@@ -130,12 +131,18 @@ input_t* state_get_input()
 
 void state_clear()
 {
+	// REVIEW_LIST_BUFFER does not reset
 	state->buffers[CANDIDATE_BUFFER].size = 0;
 	state->buffers[INDEX_ENTRY_BUFFER].size = 0;
 	state->buffers[WORD_RESULT_BUFFER].size = 0;
 	state->buffers[RAW_DENTRY_BUFFER].size = 0;
 	state->buffers[DENTRY_BUFFER].size = 0;
 	state->buffers[HTML_BUFFER].size = 0;
+}
+
+buffer_t* state_get_review_list_buffer()
+{
+	return &state->buffers[REVIEW_LIST_BUFFER];
 }
 
 buffer_t* state_get_candidate_buffer()

@@ -40,23 +40,24 @@ if (localStorage.length > 0) {
 }
 
 var config = null;
-var cppConfig = ['onlyReadings', 'showKanjiComponents', 'defaultDict', 'kanjiInfo', 'reviewList'];
-function updateCppConfig() {
-	if (!window.Module) return;
-	var cppConfigValues = cppConfig.map(key => config[key]);
-	cppConfigValues[cppConfigValues.length - 1] = Object.entries(config['reviewList']).map(kv => kv.join(',')).join('|');
-	Module.ccall('rikaigu_set_config', null,
-		['number', 'number', 'number', 'string', 'string'], cppConfigValues);
-}
-
 function onConfigChange(configChange) {
 	for (var key in configChange) {
 		window.config[key] = configChange[key].newValue;
 	}
-	for (var key of cppConfig) {
-		if (key in configChange) {
-			updateCppConfig();
-			return;
+	if ('reviewList' in configChange) {
+		const oldReviewList = configChange['reviewList'].oldValue;
+		const newReviewList = configChange['reviewList'].newValue;
+		for (var key of Object.keys(oldReviewList)) {
+			if (!(key in newReviewList)) {
+				Module.instance.exports.review_list_remove_entry(Number(key));
+			}
+		}
+
+		for (var key of Object.keys(newReviewList)) {
+			console.assert(typeof key === "number");
+			if (!(key in oldReviewList)) {
+				Module.instance.exports.review_list_add_entry(Number(key));
+			}
 		}
 	}
 }
