@@ -1099,7 +1099,7 @@ class T(unittest.TestCase):
 
 		self.init_state()
 
-		memory, buf = make_buffer(256)
+		memory, buf = make_buffer(512)
 		wr = self.make_word_result()
 		for a, b, i in itertools.product([False, True], [False, True], [0, 1]):
 			kg = cast(

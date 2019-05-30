@@ -83,6 +83,11 @@ void init(size_t heap_base, size_t free_size)
 void enlarge_your_buffer(buffer_t* buffer, size_t required_place_bytes)
 {
 	assert(state != NULL);
+	if (required_place_bytes > 1<<20)
+	{
+		take_a_trip("huge allocation asked");
+	}
+
 	const size_t buffer_index = buffer - state->buffers;
 	// NOTE not effective when allocationg ~PAGE_SIZE_BYTES - 1, but we won't have such huge allocations
 	size_t diff_pages = (buffer->capacity > required_place_bytes ? buffer->capacity : required_place_bytes) / PAGE_SIZE_BYTES + 1;

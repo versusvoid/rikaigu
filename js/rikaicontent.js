@@ -225,6 +225,7 @@ function onClick(ev) {
 
 	console.log('wordNode =', wordNode);
 	if (!wordNode.classList.contains('reviewed')) {
+		/*
 		let context = getCurrentWordContext();
 		console.log('context:', context);
 		for (const el of wordNode.querySelectorAll('.w-kanji, .w-kana')) {
@@ -234,6 +235,8 @@ function onClick(ev) {
 				break;
 			}
 		}
+		*/
+		const context = '';
 
 		rikaigu.config.reviewList[wordNode.getAttribute('jmdict-id')] = context;
 		wordNode.getElementsByClassName('w-review-context')[0].innerHTML = context;
@@ -764,7 +767,7 @@ function _setSearchTimeout(ev) {
 			if (rangeNode != rikaigu.lastRangeNode || rangeOffset != rikaigu.lastRangeOffset) {
 				return;
 			}
-			if (rangeNode == rikaigu.lastShownRangeNode && rangeOffset == rikaigu.lastShownRangeOffset) {
+			if (rangeNode == rikaigu.lastShownRangeNode && rangeOffset == rikaigu.lastShownRangeOffset && rikaigu.isVisible) {
 				return;
 			}
 			extractTextAndSearch(rangeNode, rangeOffset);

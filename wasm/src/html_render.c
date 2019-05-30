@@ -55,7 +55,7 @@ void try_render_inflection_info(buffer_t* b, word_result_t* wr)
 	}
 }
 
-bool render_reading(buffer_t* b, const reading_t* reading, bool second_and_further, bool add_hidden)
+bool render_reading(buffer_t* b, const reading_t* reading, bool second_and_further)
 {
 	if (reading->length == 0) // filtered out by search key
 	{
@@ -63,9 +63,8 @@ bool render_reading(buffer_t* b, const reading_t* reading, bool second_and_furth
 	}
 
 	conditionally_append(second_and_further, u8"、");
-	append_static("<span class=\"w-kana rikaigu-review-listed");
+	append_static("<span class=\"w-kana");
 	conditionally_append(!reading->common, " uncommon");
-	conditionally_append(add_hidden, " rikaigu-hidden");
 	append_static("\">");
 	append(b, reading->text, reading->length);
 	append_static("</span>");
@@ -73,27 +72,40 @@ bool render_reading(buffer_t* b, const reading_t* reading, bool second_and_furth
 	return true;
 }
 
-void render_all_readings(buffer_t* b, dentry_t* dentry, bool add_hidden)
+void render_all_readings(buffer_t* b, dentry_t* dentry, bool add_review_listed, bool add_hidden)
 {
+	append_static("<span class=\"w-kana-container");
+	conditionally_append(add_review_listed, " rikaigu-review-listed");
+	conditionally_append(add_hidden, " rikaigu-hidden");
+	append_static("\">");
+
 	bool rendered_some = false;
 	const reading_t* current = dentry->readings;
 	const reading_t* const end = current + dentry->num_readings;
 	for (; current < end; ++current)
 	{
-		rendered_some |= render_reading(b, current, rendered_some, add_hidden);
+		rendered_some |= render_reading(b, current, rendered_some);
 	}
+
+	append_static("</span>");
 }
 
 void render_some_readings(buffer_t* b, dentry_t* dentry, uint8_t* indices, size_t num_indices, bool add_hidden)
 {
+	append_static("<span class=\"w-kana-container rikaigu-review-listed");
+	conditionally_append(add_hidden, " rikaigu-hidden");
+	append_static("\">");
+
 	bool rendered_some = false;
 	const uint8_t* current = indices;
 	const uint8_t* const end = current + num_indices;
 	for (; current < end; ++current)
 	{
 		reading_t* r = dentry->readings + (*current);
-		rendered_some |= render_reading(b, r, rendered_some, add_hidden);
+		rendered_some |= render_reading(b, r, rendered_some);
 	}
+
+	append_static("</span>");
 }
 
 bool render_kanji(buffer_t* b, const kanji_t* kanji, bool second_and_further)
@@ -140,7 +152,7 @@ void render_kanji_group(buffer_t* b, word_result_t* wr, dentry_t* dentry, kanji_
 	}
 	else
 	{
-		render_all_readings(b, dentry, from_review_list);
+		render_all_readings(b, dentry, true, from_review_list);
 	}
 
 	if (first)
@@ -152,7 +164,7 @@ void render_kanji_group(buffer_t* b, word_result_t* wr, dentry_t* dentry, kanji_
 
 void render_readings_only_dentry_readings(buffer_t* b, word_result_t* wr, dentry_t* dentry)
 {
-	render_all_readings(b, dentry, false);
+	render_all_readings(b, dentry, false, false);
 	try_render_inflection_info(b, wr);
 	append_static("<br />");
 }
