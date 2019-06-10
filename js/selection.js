@@ -76,9 +76,10 @@ function isJapaneseCharacter(code) {
 		|| (code >= 0x30a1 && code <= 0x30fa) // katakana
 		|| (code >= 0xff66 && code <= 0xff9f) // half-width katakana
 		|| code == 0x30fc // long vowel mark
+		|| code == 0x3005 // 々 - kanji repetition mark
 	);
 }
-const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc])/;
+const endOfContinuousJapaneseTextRegex = /(\s|[^\u4e00-\u9fa5\u3041-\u3096\u30a1-\u30fa\u30fc\u3005])/;
 const japaneseCharacterBoundaryCondition = {
 	endRegex: endOfContinuousJapaneseTextRegex,
 	predicate: isJapaneseCharacter,
