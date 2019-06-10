@@ -93,6 +93,7 @@ bool word_search_finish(buffer_t* raw_dentry_buffer)
 size_t search_start(size_t utf16_input_length, uint32_t request_id)
 {
 	input_t* input = state_get_input();
+	assert(utf16_input_length < 32);
 	input->length = utf16_input_length;
 	input_kata_to_hira(input);
 

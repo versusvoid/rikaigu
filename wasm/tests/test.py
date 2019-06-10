@@ -22,6 +22,7 @@ from ctypes import (
 	sizeof,
 	byref,
 	c_ubyte,
+	c_double,
 	create_string_buffer,
 	string_at
 )
@@ -291,16 +292,39 @@ class T(unittest.TestCase):
 	def get_offsets(cls, key):
 		return set(map(lambda o: o[1] if type(o) == tuple else o, cls.samples[key]))
 
-	def init_state(self):
-		size = (1 << 16) * 2
+	def init_state(self, size=(1 << 16) * 2, initial_size=(1 << 16) * 2):
+		size = max(size, initial_size)
 		self.memory = create_string_buffer(size)
+		self.memory_used_size = initial_size
 		lib.init.argtypes = [c_void_p, c_size_t]
 		lib.init.restype = None
-		lib.init(cast(pointer(self.memory), c_void_p), size)
+		lib.init(cast(pointer(self.memory), c_void_p), initial_size)
 		self.state = pState.in_dll(lib, 'state')
+
+		if size > initial_size:
+			@CFUNCTYPE(c_size_t, c_int)
+			def memory_size(_):
+				return self.memory_used_size // (1 << 16)
+			c_void_p.in_dll(lib, '__builtin_wasm_memory_size_impl').value = cast(memory_size, c_void_p).value
+
+			@CFUNCTYPE(c_size_t, c_int, c_size_t)
+			def memory_grow(_, num_pages):
+				num_bytes = num_pages * (1 << 16)
+				if len(self.memory) < self.memory_used_size + num_bytes:
+					print(
+						f'max memory: {len(self.memory)},',
+						f'current: {self.memory_used_size},',
+						f'requested: {num_pages} * 16KiB = {num_bytes}',
+					)
+					return -1
+				self.memory_used_size += num_bytes
+				return self.memory_used_size - num_bytes
+			c_void_p.in_dll(lib, '__builtin_wasm_memory_grow_impl').value = cast(memory_size, c_void_p).value
 
 	def clear_state(self):
 		c_void_p.in_dll(lib, 'state').value = 0
+		c_void_p.in_dll(lib, '__builtin_wasm_memory_size_impl').value = 0
+		c_void_p.in_dll(lib, '__builtin_wasm_memory_grow_impl').value = 0
 
 		if hasattr(self, 'state'):
 			del self.state
@@ -1174,3 +1198,77 @@ class T(unittest.TestCase):
 		memory, buf = make_buffer(2048)
 		lib.render_entries(byref(buf))
 		self.assertTrue(memory[:buf.size].strip())
+
+	@unittest.skip('long')
+	def test_endure(self):
+		self.init_state(size=(1 << 20), initial_size=(1 << 16) * 2)
+
+		keys = set()
+		for filename in ['dict', 'names']:
+			with open(f'../data/{filename}.dat') as f:
+				for l in f:
+					l = l.split('\t')
+					surfaces = l[0]
+					if len(l) == 4:
+						surfaces = f'{surfaces};{l[1]}'
+
+					for group in surfaces.split(';'):
+						if '#' in group:
+							group = group[0:group.index('#')]
+						for key in group.split(','):
+							keys.add(key.strip('U'))
+
+		keys = list(keys)
+		random.shuffle(keys)
+
+		requested_offsets = []
+		out_buffer_handle = [None]
+
+		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, c_void_p, c_uint)
+		def request_read_dictionary(offsets, num_offsets, buffer_handle, request_id):
+			for i in range(num_offsets):
+				requested_offsets.append((bool(offsets[i] & (1 << 31)), offsets[i] & 0x7FFFFFFF))
+			out_buffer_handle[0] = buffer_handle
+		c_void_p.in_dll(lib, 'request_read_dictionary_impl').value = cast(request_read_dictionary, c_void_p).value
+
+		lib.buffer_allocate.argtypes = [c_void_p, c_size_t]
+		lib.buffer_allocate.restype = POINTER(c_ubyte)
+
+		lib.rikaigu_search_start.argtypes = [c_size_t, c_uint]
+		lib.rikaigu_search_start.restype = c_size_t
+
+		lib.rikaigu_search_finish.argtypes = [c_void_p]
+		lib.rikaigu_search_finish.restype = c_double
+
+		words = open('../data/dict.dat')
+		names = open('../data/names.dat')
+
+		for key_index, key in enumerate(keys):
+			if (key_index + 1) % 10000 == 0:
+				print(f'\n{key_index + 1} / {len(keys)}', end='')
+
+			utf16 = key.encode('utf-16le')
+			if len(utf16) > 32:
+				continue
+
+			for i in range(len(utf16) // 2):
+				self.state.contents.input.data[i] = (utf16[i*2 + 1] << 8) | utf16[i*2 + 0]
+
+			requested_offsets.clear()
+			lib.rikaigu_search_start(len(utf16) // 2, 1)
+			self.assertTrue(requested_offsets)
+
+			for name, offset in requested_offsets:
+				f = names if name else words
+				f.seek(offset)
+				utf8 = f.readline().strip().encode('utf8')
+				ptr = lib.buffer_allocate(out_buffer_handle[0], len(utf8) + 2)
+				ptr[0] = len(utf8) & 0xff
+				ptr[1] = len(utf8) >> 8
+				for i, b in enumerate(utf8):
+					ptr[i + 2] = b
+
+			lib.rikaigu_search_finish(out_buffer_handle[0])
+
+		words.close()
+		names.close()

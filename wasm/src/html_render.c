@@ -174,7 +174,10 @@ void render_type(buffer_t* b, const char* text, const size_t length, bool is_nam
 	if (is_name)
 	{
 		name_type_mapping_t* mapping = get_mapped_type(*text);
-		append(b, mapping->type, mapping->length);
+		if (mapping)
+		{
+			append(b, mapping->type, mapping->length);
+		}
 	}
 	else
 	{

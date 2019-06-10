@@ -36,6 +36,6 @@ name_type_mapping_t* get_mapped_type(char key)
 		sizeof(map) / sizeof(name_type_mapping_t), sizeof(name_type_mapping_t),
 		name_type_comparator, &found
 	);
-	assert(found);
-	return it;
+	assert(found || key == ';');
+	return found ? it : NULL;
 }
