@@ -302,10 +302,36 @@ void dentry_filter_readings(dentry_t* dentry, const char16_t* key, const size_t 
 	filter_surfaces(current, end, key, key_length);
 }
 
+bool has_surface(surface_t* current, const surface_t* const end, const char16_t* key, const size_t key_length)
+{
+	for (; current != end; ++current)
+	{
+		if (utf16_utf8_kata_to_hira_eq(key, key_length, current->text, current->length))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void dentry_filter_kanji_groups(dentry_t* dentry, const char16_t* key, const size_t key_length)
 {
 	kanji_group_t* current = dentry->kanji_groups;
 	const kanji_group_t* const end = current + dentry->num_kanji_groups;
+	bool has_matching_kanji = false;
+	for (; !has_matching_kanji && current != end; ++current)
+	{
+		kanji_t* kanjis_start = current->kanjis;
+		const kanji_t* const kanjis_end = kanjis_start + current->num_kanjis;
+		has_matching_kanji = has_surface(kanjis_start, kanjis_end, key, key_length);
+
+	}
+	if (!has_matching_kanji)
+	{
+		return;
+	}
+
+	current = dentry->kanji_groups;
 	for (; current != end; ++current)
 	{
 		kanji_t* kanjis_start = current->kanjis;
