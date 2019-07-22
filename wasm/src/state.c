@@ -110,6 +110,11 @@ void enlarge_your_buffer(buffer_t* buffer, size_t required_place_bytes)
 
 export void* buffer_allocate(buffer_t* buffer, size_t num_bytes)
 {
+	char local = 'a';
+	if ((size_t)&local < 256) {
+		take_a_trip("going down");
+	}
+
 	if (buffer->capacity - buffer->size < num_bytes)
 	{
 		enlarge_your_buffer(buffer, num_bytes - (buffer->capacity - buffer->size));

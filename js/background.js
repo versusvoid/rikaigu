@@ -288,7 +288,15 @@ function writeInputText(text) {
 	}
 }
 
+const searchHistory = [];
+chrome.storage.local.get(['searchHistory'], function(data) {
+	console.log('old search history:', JSON.parse(data.searchHistory || null));
+});
+
 function startSearch(request, tabId) {
+	searchHistory.push(request.text);
+	chrome.storage.local.set({ searchHistory: JSON.stringify(searchHistory)}, function() {});
+
 	writeInputText(request.text);
 	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, nextRequestId);
 	if (matchLength) {
