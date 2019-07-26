@@ -131,6 +131,21 @@ function print(ptr) {
 	console.log(readCString(ptr));
 }
 
+const traceLog = [];
+chrome.storage.local.get(['traceLog'], function(data) {
+	console.log('last trace log:', JSON.parse(data.traceLog || null));
+});
+
+function trace(ptr, stack) {
+	traceLog.push(`${readCString(ptr)} stack at ${stack}`);
+	chrome.storage.local.set({ traceLog: JSON.stringify(traceLog)}, function() {});
+}
+
+function resetTraceLog() {
+	traceLog.splice(0);
+	chrome.storage.local.set({ traceLog: JSON.stringify(traceLog)}, function() {});
+}
+
 async function rikaiguEnable(tab) {
 	if (!!window.Module) {
 		console.error("Double enable");
@@ -143,6 +158,7 @@ async function rikaiguEnable(tab) {
 				take_a_trip: takeATrip,
 				request_read_dictionary: requestReadDictionary,
 				print: print,
+				trace: trace,
 			}}
 		);
 	} catch(err) {
@@ -263,6 +279,7 @@ async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, reque
 	requestsData.delete(requestId);
 
 	let res = Module.instance.exports.rikaigu_search_finish(bufferHandle);
+	resetTraceLog();
 	if (res === -1) {
 		console.error('wut');
 		return;
@@ -297,8 +314,14 @@ function startSearch(request, tabId) {
 	searchHistory.push(request.text);
 	chrome.storage.local.set({ searchHistory: JSON.stringify(searchHistory)}, function() {});
 
+	if (requestsData.size > 0) {
+		console.error('Still processing previous request:', requestsData.values().next().value);
+		return;
+	}
+
 	writeInputText(request.text);
 	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, nextRequestId);
+	resetTraceLog();
 	if (matchLength) {
 		request.tabId = tabId;
 		request.matchLength = matchLength;

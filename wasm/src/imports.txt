@@ -2,6 +2,7 @@ take_a_trip
 request_read_dictionary
 log
 print
+trace
 
 malloc
 memset
