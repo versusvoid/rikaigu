@@ -131,21 +131,6 @@ function print(ptr) {
 	console.log(readCString(ptr));
 }
 
-const traceLog = [];
-chrome.storage.local.get(['traceLog'], function(data) {
-	console.log('last trace log:', JSON.parse(data.traceLog || null));
-});
-
-function trace(ptr, stack) {
-	traceLog.push(`${readCString(ptr)} stack at ${stack}`);
-	chrome.storage.local.set({ traceLog: JSON.stringify(traceLog)}, function() {});
-}
-
-function resetTraceLog() {
-	traceLog.splice(0);
-	chrome.storage.local.set({ traceLog: JSON.stringify(traceLog)}, function() {});
-}
-
 async function rikaiguEnable(tab) {
 	if (!!window.Module) {
 		console.error("Double enable");
@@ -158,7 +143,6 @@ async function rikaiguEnable(tab) {
 				take_a_trip: takeATrip,
 				request_read_dictionary: requestReadDictionary,
 				print: print,
-				trace: trace,
 			}}
 		);
 	} catch(err) {
@@ -259,11 +243,15 @@ function readLines(offsetsPtr, numOffsets) {
 }
 
 var nextRequestId = 0;
-var requestsData = new Map();
+var lastRequest = null;
 
 const decoder = new TextDecoder('utf-8');
 async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, requestId) {
 	const lines = await readLines(offsetsPtr, numOffsets);
+
+	if (lastRequest.id !== requestId) {
+		return;
+	}
 
 	for (const line of lines) {
 		const lineView = new Uint8Array(line);
@@ -274,12 +262,7 @@ async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, reque
 		bufView.set(lineView, 2);
 	}
 
-	const request = requestsData.get(requestId);
-	console.assert(request);
-	requestsData.delete(requestId);
-
 	let res = Module.instance.exports.rikaigu_search_finish(bufferHandle);
-	resetTraceLog();
 	if (res === -1) {
 		console.error('wut');
 		return;
@@ -290,11 +273,11 @@ async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, reque
 	const htmlView = new Uint8Array(Module.instance.exports.memory.buffer, htmlPtr, htmlLength);
 	const html = decoder.decode(htmlView);
 
-	chrome.tabs.sendMessage(request.tabId, {
+	chrome.tabs.sendMessage(lastRequest.tabId, {
 		"type": "show",
 		"html": html,
-		"match": request.text.substring(0, request.matchLength),
-		"renderParams": request.renderParams,
+		"match": lastRequest.text.substring(0, lastRequest.matchLength),
+		"renderParams": lastRequest.renderParams,
 	});
 }
 
@@ -305,28 +288,18 @@ function writeInputText(text) {
 	}
 }
 
-const searchHistory = [];
-chrome.storage.local.get(['searchHistory'], function(data) {
-	console.log('old search history:', JSON.parse(data.searchHistory || null));
-});
-
 function startSearch(request, tabId) {
-	searchHistory.push(request.text);
-	chrome.storage.local.set({ searchHistory: JSON.stringify(searchHistory)}, function() {});
-
-	if (requestsData.size > 0) {
-		console.error('Still processing previous request:', requestsData.values().next().value);
-		return;
-	}
+	lastRequest = {
+		tabId: tabId,
+		id: nextRequestId,
+		...request,
+	};
+	nextRequestId += 1;
 
 	writeInputText(request.text);
-	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, nextRequestId);
-	resetTraceLog();
+	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, lastRequest.id);
 	if (matchLength) {
-		request.tabId = tabId;
-		request.matchLength = matchLength;
-		requestsData.set(nextRequestId, request);
-		nextRequestId += 1;
+		lastRequest.matchLength = matchLength;
 	}
 	return matchLength;
 }

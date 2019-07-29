@@ -14,11 +14,3 @@ extern void request_read_dictionary(
 );
 
 extern void print(const char* message);
-
-extern void trace(const char* function, size_t stack);
-
-#define TRACE \
-{ \
-	char stack = 'a'; \
-	trace(__PRETTY_FUNCTION__, (size_t)&stack); \
-} \

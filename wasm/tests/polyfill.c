@@ -33,7 +33,3 @@ void print(const char* p)
 {
 	printf("print('%s')\n", p);
 }
-
-void trace(const char* p, size_t stack)
-{
-}
