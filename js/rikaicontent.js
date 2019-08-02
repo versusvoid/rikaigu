@@ -706,9 +706,20 @@ function _shouldDoAnythingOnMouseMove(ev) {
 	);
 }
 
+function _tooFar(rect, clientX, clientY) {
+	return (
+		clientX - rect.right > 25
+		|| rect.left - clientX > 25
+		|| clientY - rect.bottom > 25
+		|| rect.top - clientY > 25
+	);
+}
+
 function _getNewRange(ev) {
 	var rangeEnd = 0;
-	var rangeNode, rangeOffset;
+	var rangeNode = null;
+	var rangeOffset = 0;
+
 	if (isInput(ev.target)) {
 		const fakeInput = makeFake(ev.target);
 		document.body.appendChild(fakeInput);
@@ -722,18 +733,14 @@ function _getNewRange(ev) {
 		document.body.removeChild(fakeInput);
 	} else {
 		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-		const rect = range && range.getBoundingClientRect();
-		if (!range
-				|| ev.clientX - rect.right > 25
-				|| rect.left - ev.clientX > 25
-				|| ev.clientY - rect.bottom > 25
-				|| rect.top - ev.clientY > 25) {
-			rangeNode = null;
-			rangeOffset = 0;
-		} else {
-			rangeNode = range.startContainer;
-			rangeOffset = range.startOffset;
-			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
+		const rects = range && range.getClientRects() || [];
+		for (const rect of rects) {
+			if (!_tooFar(rect, ev.clientX, ev.client)) {
+				rangeNode = range.startContainer;
+				rangeOffset = range.startOffset;
+				rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
+				break;
+			}
 		}
 	}
 	return [rangeEnd, rangeNode, rangeOffset];
