@@ -252,11 +252,28 @@ function onClick(ev) {
 	chrome.storage.local.set({reviewList: rikaigu.config.reviewList});
 }
 
+function rightmostRangeRect(range) {
+	/*
+	 * Range can have multiple client rects
+	 * if caret is at the start of the line.
+	 * We want the lowest (argmax rect.y)
+	 * In the sense of text flow it will be
+	 * the rightmost
+	 */
+	let lowest = null;
+	for (const rect of range.getClientRects()) {
+		if (!lowest || rect.top > lowest.top) {
+			lowest = rect;
+		}
+	}
+	return lowest;
+}
+
 function _firstCharacterStart() {
 	const r = new Range();
 	console.assert(rikaigu.lastRangeNode);
 	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return r.getBoundingClientRect().x;
+	return rightmostRangeRect(r).x;
 }
 
 function _lastCharacterEnd() {
@@ -264,7 +281,7 @@ function _lastCharacterEnd() {
 	console.assert(s.rangeCount > 0);
 	var end = 0;
 	for (var i = 0; i < s.rangeCount; ++i) {
-		end = Math.max(s.getRangeAt(i).getBoundingClientRect().right, end);
+		end = Math.max(rightmostRangeRect(s.getRangeAt(i)).right, end);
 	}
 	return end;
 }
@@ -273,14 +290,14 @@ function _characterUpperLine() {
 	const r = new Range();
 	console.assert(rikaigu.lastRangeNode);
 	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return r.getBoundingClientRect().top;
+	return rightmostRangeRect(r).top;
 }
 
 function _characterBottomLine() {
 	const r = new Range();
 	console.assert(rikaigu.lastRangeNode);
 	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return r.getBoundingClientRect().bottom;
+	return rightmostRangeRect(r).bottom;
 }
 
 function _conditionSatisfied(condition) {
@@ -457,7 +474,7 @@ class PopupDimPosComputer {
 				x = this._lastCharacterEnd - this._availableWidth;
 			}
 
-			if ((this._upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
+			if (this._upDownOrBoth === 0 || (this._upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
 				y = this._characterBottomLine;
 			} else {
 				y = this._characterUpperLine - this._availableHeight - _PADDING_AND_BORDER;
@@ -733,14 +750,11 @@ function _getNewRange(ev) {
 		document.body.removeChild(fakeInput);
 	} else {
 		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-		const rects = range && range.getClientRects() || [];
-		for (const rect of rects) {
-			if (!_tooFar(rect, ev.clientX, ev.client)) {
-				rangeNode = range.startContainer;
-				rangeOffset = range.startOffset;
-				rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
-				break;
-			}
+		const rect = range && rightmostRangeRect(range);
+		if (!_tooFar(rect, ev.clientX, ev.client)) {
+			rangeNode = range.startContainer;
+			rangeOffset = range.startOffset;
+			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
 		}
 	}
 	return [rangeEnd, rangeNode, rangeOffset];
