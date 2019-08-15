@@ -725,10 +725,10 @@ function _shouldDoAnythingOnMouseMove(ev) {
 
 function _tooFar(rect, clientX, clientY) {
 	return (
-		clientX - rect.right > 25
-		|| rect.left - clientX > 25
-		|| clientY - rect.bottom > 25
-		|| rect.top - clientY > 25
+		clientX - rect.right > 15
+		|| rect.left - clientX > 15
+		|| clientY - rect.bottom > 15
+		|| rect.top - clientY > 15
 	);
 }
 
@@ -751,7 +751,7 @@ function _getNewRange(ev) {
 	} else {
 		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
 		const rect = range && rightmostRangeRect(range);
-		if (!_tooFar(rect, ev.clientX, ev.client)) {
+		if (rect && !_tooFar(rect, ev.clientX, ev.clientY)) {
 			rangeNode = range.startContainer;
 			rangeOffset = range.startOffset;
 			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
