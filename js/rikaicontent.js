@@ -732,18 +732,31 @@ function _tooFar(rect, clientX, clientY) {
 	);
 }
 
-function _getNewRange(ev) {
+function nextTick() {
+	return new Promise(function(resolve, reject) {
+		setTimeout(function() { resolve(); }, 0);
+	});
+}
+
+async function _getNewRange(ev) {
 	var rangeEnd = 0;
 	var rangeNode = null;
 	var rangeOffset = 0;
 
 	if (isInput(ev.target)) {
+		const checkElement = document.elementFromPoint(ev.clientX, ev.clientY);
+		if (checkElement !== ev.target) {
+			// Non-repeatable mouseover
+			return [rangeEnd, rangeNode, rangeOffset];
+		}
+
 		const fakeInput = makeFake(ev.target);
 		document.body.appendChild(fakeInput);
+		await nextTick();
 		rangeNode = ev.target;
 		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
 		if (range.startContainer.parentNode !== fakeInput) {
-			console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset);
+			console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset, fakeInput);
 		}
 		rangeOffset = range.startOffset;
 		rangeEnd = ev.target.value.length;
@@ -757,6 +770,7 @@ function _getNewRange(ev) {
 			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
 		}
 	}
+
 	return [rangeEnd, rangeNode, rangeOffset];
 }
 
@@ -828,14 +842,14 @@ function _setResetTimeout(ev) {
 	);
 }
 
-function onMouseMove(ev) {
+async function onMouseMove(ev) {
 	if (window.debugMode) return;
 
 	_updateMousePositionState(ev);
 
 	if (!_shouldDoAnythingOnMouseMove(ev)) return;
 
-	const [rangeEnd, rangeNode, rangeOffset] = _getNewRange(ev);
+	const [rangeEnd, rangeNode, rangeOffset] = await _getNewRange(ev);
 	if (_checkRangeHaveNotChanged(rangeNode, rangeOffset)) return;
 
 	_saveNewRange(rangeNode, rangeOffset);
