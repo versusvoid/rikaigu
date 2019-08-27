@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /*
 	rikaigu
@@ -53,10 +53,9 @@ function updateConfig() {
 	});
 }
 
-function enableTab(config, text) {
+function enableTab(config) {
 	if (rikaigu === null) {
 		rikaigu = {
-			altView: null,
 			keysDown: {},
 			lastPos: {
 				clientX: 0,
@@ -72,8 +71,11 @@ function enableTab(config, text) {
 			screenX: 0,
 			screenY: 0,
 			activeFrame: 0,
-			lastRangeNode: "some object that won't be equal neither any node nor null",
-			lastRangeOffset: -1,
+			lastShownRange: {
+				node: null,
+				offset: 0,
+			},
+			lastRange: null,
 			config: config
 		};
 		window.addEventListener('mousemove', onMouseMove, false);
@@ -81,15 +83,6 @@ function enableTab(config, text) {
 		window.addEventListener('keyup', onKeyUp, true);
 		window.addEventListener('mousedown', onMouseDown, false);
 		window.addEventListener('mouseup', onMouseUp, false);
-
-		if (text) {
-			if (!document.hidden && window.self === window.top) {
-				rikaigu.altView = 'up';
-				showPopup(text);
-				rikaigu.altView = null;
-			}
-			rikaigu.isVisible = true;
-		}
 	}
 }
 
@@ -269,37 +262,6 @@ function rightmostRangeRect(range) {
 	return lowest;
 }
 
-function _firstCharacterStart() {
-	const r = new Range();
-	console.assert(rikaigu.lastRangeNode);
-	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return rightmostRangeRect(r).x;
-}
-
-function _lastCharacterEnd() {
-	const s = window.getSelection();
-	console.assert(s.rangeCount > 0);
-	var end = 0;
-	for (var i = 0; i < s.rangeCount; ++i) {
-		end = Math.max(rightmostRangeRect(s.getRangeAt(i)).right, end);
-	}
-	return end;
-}
-
-function _characterUpperLine() {
-	const r = new Range();
-	console.assert(rikaigu.lastRangeNode);
-	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return rightmostRangeRect(r).top;
-}
-
-function _characterBottomLine() {
-	const r = new Range();
-	console.assert(rikaigu.lastRangeNode);
-	r.setStart(rikaigu.lastRangeNode, rikaigu.lastRangeOffset);
-	return rightmostRangeRect(r).bottom;
-}
-
 function _conditionSatisfied(condition) {
 	return new Promise(function (resolve) {
 		var count = 0;
@@ -320,15 +282,14 @@ const _DIRECTIONS = {
 	RIGHT: 0b1000,
 }
 
-function getRenderParams() {
+function _getRenderParams(rect) {
 	const dx = (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX);
 	const dy = (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY);
-	const firstCharacterStart = _firstCharacterStart() + dx;
 	return {
-		firstCharacterStart: firstCharacterStart,
-		lastCharacterEnd: firstCharacterStart, // FIXME we don't have selection yet, so make array for all possible selections length
-		characterUpperLine: _characterUpperLine() + dy,
-		characterBottomLine: _characterBottomLine() + dy,
+		firstCharacterStart: rect.x + dx,
+		lastCharacterEnd: rect.x + dx, // FIXME we don't have selection yet, so make array for all possible selections length
+		characterUpperLine: rect.top + dy,
+		characterBottomLine: rect.bottom + dy,
 	};
 }
 
@@ -338,44 +299,25 @@ const _defaultHeight = 413;
 class PopupDimPosComputer {
 	constructor(popup, renderParams) {
 		this.popup = popup;
-		if (renderParams) {
-			for (const k in renderParams) {
-				// firstCharacterStart/lastCharacterEnd
-				// characterBottomLine/characterUpperLine
-				this[`_${k}Value`] = renderParams[k];
-			}
-		}
 
 		// In top frame this represents integral position of webpage's viewport.
 		// In a sense we transform coordinates to screen space when passing them
 		// to background page, and here we transform them back to webpage space of
 		// top frame
-		this.integralDx = (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX);
-		this.integralDy = (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY);
+		const integralDx = (rikaigu.lastPos.screenX - rikaigu.lastPos.clientX);
+		const integralDy = (rikaigu.lastPos.screenY - rikaigu.lastPos.clientY);
+		this._firstCharacterStart = renderParams.firstCharacterStart - integralDx;
+		this._lastCharacterEnd = renderParams.lastCharacterEnd - integralDx;
+		this._characterBottomLine = renderParams.characterBottomLine - integralDy;
+		this._characterUpperLine = renderParams.characterUpperLine - integralDy;
 	}
 
-	_getCached(key, computeFunction, thisarg) {
+	_getCached(key, computeFunction) {
 		if (key in this) {
 			return this[key];
 		}
-		computeFunction.apply(thisarg || this);
+		computeFunction.apply(this);
 		return this[key];
-	}
-
-	get _characterUpperLine() {
-		return this._getCached('_characterUpperLineValue', window._characterUpperLine, null) - this.integralDy;
-	}
-
-	get _characterBottomLine() {
-		return this._getCached('_characterBottomLineValue', window._characterBottomLine, null) - this.integralDy;
-	}
-
-	get _firstCharacterStart() {
-		return this._getCached('_firstCharacterStartValue', window._firstCharacterStart, null) - this.integralDx;
-	}
-
-	get _lastCharacterEnd() {
-		return this._getCached('_lastCharacterEndValue', window._lastCharacterEnd, null) - this.integralDx;
 	}
 
 	_computeRequiredDimensions() {
@@ -454,36 +396,27 @@ class PopupDimPosComputer {
 	}
 
 	_computeFinalPosition() {
-		if (rikaigu.altView === 'up' && (this._upDownOrBoth & _DIRECTIONS.UP) !== 0) {
-			return [window.scrollX, window.scrollY];
-		} else if (rikaigu.altView !== null) {
-			return [
-				(window.innerWidth - this._availableWidth) + window.scrollX,
-				(window.innerHeight - this._availableHeight) + window.scrollY
-			];
-		} else {
-			let x,y;
-			if (this._leftRightOrBoth === 0) {
-				x = (window.innerWidth - this._availableWidth) / 2;
-			}
-			// TODO change defaults for writing-mode: vertical-rl;
-			// these defaults are preferable only for horizontal
-			else if ((this._leftRightOrBoth & _DIRECTIONS.RIGHT) !== 0) {
-				x = this._firstCharacterStart;
-			} else {
-				x = this._lastCharacterEnd - this._availableWidth;
-			}
-
-			if (this._upDownOrBoth === 0 || (this._upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
-				y = this._characterBottomLine;
-			} else {
-				y = this._characterUpperLine - this._availableHeight - _PADDING_AND_BORDER;
-			}
-
-			x += window.scrollX;
-			y += window.scrollY;
-			return [x, y];
+		let x,y;
+		if (this._leftRightOrBoth === 0) {
+			x = (window.innerWidth - this._availableWidth) / 2;
 		}
+		// TODO change defaults for writing-mode: vertical-rl;
+		// these defaults are preferable only for horizontal
+		else if ((this._leftRightOrBoth & _DIRECTIONS.RIGHT) !== 0) {
+			x = this._firstCharacterStart;
+		} else {
+			x = this._lastCharacterEnd - this._availableWidth;
+		}
+
+		if (this._upDownOrBoth === 0 || (this._upDownOrBoth & _DIRECTIONS.DOWN) !== 0) {
+			y = this._characterBottomLine;
+		} else {
+			y = this._characterUpperLine - this._availableHeight - _PADDING_AND_BORDER;
+		}
+
+		x += window.scrollX;
+		y += window.scrollY;
+		return [x, y];
 	}
 
 	_isPopupBelowText(y) {
@@ -505,6 +438,7 @@ class PopupDimPosComputer {
 		await this._popupReady();
 
 		const [x, y] = this._computeFinalPosition();
+		console.log('finalPosition:', x, y);
 		this._placeExpandButton(y);
 
 		this.popup.style.setProperty('left', `${x}px`, 'important');
@@ -518,13 +452,13 @@ async function _updatePopupPosition(popup, renderParams) {
 }
 
 function _getPopupAndUpdateItsPosition() {
-	_updatePopupPosition(document.getElementById('rikaigu-window'));
+	_updatePopupPosition(document.getElementById('rikaigu-window'), rikaigu.lastRange.renderParams);
 }
 
 function requestHidePopup() {
 	chrome.runtime.sendMessage({
-		"type": "relay",
-		"targetType": "close"
+		'type': 'relay',
+		'targetType': 'close'
 	});
 }
 
@@ -546,7 +480,7 @@ function reset() {
 }
 
 function onKeyDown(ev) {
-	if (rikaigu.config.showOnKey !== "None" && (ev.altKey || ev.ctrlKey)) {
+	if (rikaigu.config.showOnKey !== 'None' && (ev.altKey || ev.ctrlKey)) {
 		if (rikaigu.lastTarget !== null) {
 			var fakeEvent = {
 				clientX: rikaigu.lastPos.clientX,
@@ -593,20 +527,6 @@ function onKeyDown(ev) {
 		case 'Escape':
 			reset();
 			break;
-		case 'KeyA':
-			switch (rikaigu.altView) {
-				case null:
-					rikaigu.altView = 'up';
-					break;
-				case 'up':
-					rikaigu.altView = 'down';
-					break;
-				case 'down':
-					rikaigu.altView = null;
-					break;
-			}
-			_getPopupAndUpdateItsPosition();
-			break;
 		case 'KeyD':
 			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings});
 			for (var el of document.getElementsByClassName('rikaigu-pos-and-def')) {
@@ -649,42 +569,59 @@ function onKeyUp(ev) {
 	if (!!rikaigu.keysDown[ev.code]) delete rikaigu.keysDown[ev.code];
 }
 
-function processSearchResult(selectionRange, result) {
+function processSearchResult(selectionRange, renderParams, result) {
 	clearHighlight();
-	rikaigu.lastShownRangeNode = null;
-	rikaigu.lastShownRangeOffset = 0;
 	if (!result.matchLength || !highlightMatch(result.matchLength, selectionRange)) {
-		return requestHidePopup();
-	}
-	if (selectionRange.constructor === Array) {
-		rikaigu.lastShownRangeNode = selectionRange[0].rangeNode;
-		rikaigu.lastShownRangeOffset = selectionRange[0].offset;
-	} else {
-		rikaigu.lastShownRangeNode = selectionRange.rangeNode;
-		rikaigu.lastShownRangeOffset = selectionRange.offset;
-	}
 
-	/*
-	chrome.runtime.sendMessage(
-		{
-			"type": "review",
-			"text": getCurrentWordSentence(),
-		}
-	);
-	*/
+		rikaigu.lastShownRange = {
+			node: null,
+			offset: 0,
+			renderParams,
+		};
+
+		requestHidePopup();
+
+	} else if (selectionRange.constructor === Array) {
+
+		rikaigu.lastShownRange = {
+			node: selectionRange[0].rangeNode,
+			offset: selectionRange[0].offset,
+			renderParams,
+		};
+
+	} else {
+
+		rikaigu.lastShownRange = {
+			node: selectionRange.rangeNode,
+			offset: selectionRange.offset,
+			renderParams,
+		};
+
+	}
 }
 
 function makeFake(real) {
-	var fake = document.createElement('div');
-	var realRect = real.getBoundingClientRect();
+	const fake = document.createElement('div');
 	fake.innerText = real.value;
-	fake.style.cssText = window.getComputedStyle(real, "").cssText;
+
+	const computedStyle = window.getComputedStyle(real, '');
+	fake.style.cssText = computedStyle.cssText;
+
+	fake.style.opacity = '0';
+	/* for debugging
+	fake.style.color = 'red';
+    fake.style.webkitTextFillColor = 'red';
+	fake.style.backgroundColor = 'transparent';
+	*/
+
 	fake.scrollTop = real.scrollTop;
 	fake.scrollLeft = real.scrollLeft;
-	fake.style.position = "absolute";
+	fake.style.position = 'absolute';
 	fake.style.zIndex = 7777;
-	fake.style.top = (window.scrollY + realRect.top) + 'px';
-	fake.style.left = (window.scrollX + realRect.left) + 'px';
+
+	const realRect = real.getBoundingClientRect();
+	fake.style.top = (window.scrollY + realRect.top - parseFloat(computedStyle.marginTop)) + 'px';
+	fake.style.left = (window.scrollX + realRect.left - parseFloat(computedStyle.marginLeft)) + 'px';
 
 	for (var i = 0; i < fake.style.length; ++i) {
 		fake.style.setProperty(fake.style[i], fake.style.getPropertyValue(fake.style[i]), 'important');
@@ -708,9 +645,9 @@ function _updateMousePositionState(ev) {
 
 	if (rikaigu.activeFrame !== window.frameId) {
 		chrome.runtime.sendMessage({
-			"type": "relay",
-			"targetType": "changeActiveFrame",
-			"activeFrameId": window.frameId
+			'type': 'relay',
+			'targetType': 'changeActiveFrame',
+			'activeFrameId': window.frameId
 		});
 	}
 }
@@ -718,8 +655,8 @@ function _updateMousePositionState(ev) {
 function _shouldDoAnythingOnMouseMove(ev) {
 	return !rikaigu.mouseOnPopup && (
 		rikaigu.config.showOnKey === 'None' ||
-		rikaigu.config.showOnKey.includes("Alt") && ev.altKey ||
-		rikaigu.config.showOnKey.includes("Ctrl") && ev.ctrlKey
+		rikaigu.config.showOnKey.includes('Alt') && ev.altKey ||
+		rikaigu.config.showOnKey.includes('Ctrl') && ev.ctrlKey
 	);
 }
 
@@ -738,54 +675,86 @@ function nextTick() {
 	});
 }
 
-async function _getNewRange(ev) {
-	var rangeEnd = 0;
-	var rangeNode = null;
-	var rangeOffset = 0;
-
-	if (isInput(ev.target)) {
-		const checkElement = document.elementFromPoint(ev.clientX, ev.clientY);
-		if (checkElement !== ev.target) {
-			// Non-repeatable mouseover
-			return [rangeEnd, rangeNode, rangeOffset];
-		}
-
-		const fakeInput = makeFake(ev.target);
-		document.body.appendChild(fakeInput);
-		await nextTick();
-		rangeNode = ev.target;
-		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-		if (range.startContainer.parentNode !== fakeInput) {
-			console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset, fakeInput);
-		}
-		rangeOffset = range.startOffset;
-		rangeEnd = ev.target.value.length;
-		document.body.removeChild(fakeInput);
-	} else {
-		const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-		const rect = range && rightmostRangeRect(range);
-		if (rect && !_tooFar(rect, ev.clientX, ev.clientY)) {
-			rangeNode = range.startContainer;
-			rangeOffset = range.startOffset;
-			rangeEnd = range.startContainer.data? range.startContainer.data.length : 0;
-		}
+async function _getRangeCandidateFromInput(ev) {
+	const checkElement = document.elementFromPoint(ev.clientX, ev.clientY);
+	if (checkElement !== ev.target) {
+		// Non-repeatable mouseover
+		return null;
+	}
+	if (!ev.target.value) {
+		return null;
 	}
 
-	return [rangeEnd, rangeNode, rangeOffset];
+	const fakeInput = makeFake(ev.target);
+	document.body.parentNode.appendChild(fakeInput);
+	await nextTick();
+	const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+
+	if (range.startContainer.parentNode !== fakeInput) {
+		console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset, fakeInput);
+		fakeInput.remove();
+		return null;
+	}
+
+	const rect = rightmostRangeRect(range);
+	const result = {
+		node: ev.target,
+		offset: range.startOffset,
+		end: ev.target.value.length,
+		renderParams: _getRenderParams(rect),
+	};
+	fakeInput.remove();
+
+	if (_tooFar(rect, ev.clientX, ev.clientY)) {
+		return null;
+	}
+
+	return result;
 }
 
-function _checkRangeHaveNotChanged(rangeNode, rangeOffset) {
-	return rangeNode === rikaigu.lastRangeNode && rangeOffset === rikaigu.lastRangeOffset
-		&& (rikaigu.isVisible || rikaigu.timer !== null);
+function _getRangeCandidateFromPlainElement(ev) {
+	const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+	const rect = range && rightmostRangeRect(range);
+	if (!rect || _tooFar(rect, ev.clientX, ev.clientY)) {
+		return null;
+	}
+
+	return {
+		node: range.startContainer,
+		offset: range.startOffset,
+		end: range.startContainer.data ? range.startContainer.data.length : 0,
+		renderParams: _getRenderParams(rect),
+	};
 }
 
-function _saveNewRange(rangeNode, rangeOffset) {
-	rikaigu.lastRangeNode = rangeNode;
-	rikaigu.lastRangeOffset = rangeOffset;
+async function _getNewRangeCandidate(ev) {
+	let result = null;
+	if (isInput(ev.target)) {
+		result = await _getRangeCandidateFromInput(ev);
+	} else {
+		result = _getRangeCandidateFromPlainElement(ev);
+	}
+
+	if (result && result.offset === result.end) {
+		result = null;
+	}
+
+	return result;
 }
 
-function _shouldSetSearchTimeout(rangeEnd) {
-	return rikaigu.lastRangeNode && rikaigu.lastRangeOffset < rangeEnd;
+function _checkRangeHaveNotChanged(rangeCandidate) {
+	if (!rangeCandidate ^ !rikaigu.lastRange) {
+		return false;
+	}
+	if (!rangeCandidate) {
+		return true;
+	}
+
+	return (
+		rangeCandidate.node === rikaigu.lastRange.node
+		&& rangeCandidate.offset === rikaigu.lastRange.offset
+		&& (rikaigu.isVisible || rikaigu.timer !== null)
+	);
 }
 
 function _setSearchTimeout(ev) {
@@ -794,20 +763,20 @@ function _setSearchTimeout(ev) {
 		clearTimeout(rikaigu.timer);
 	}
 	rikaigu.timer = setTimeout(
-		function(rangeNode, rangeOffset) {
+		function(rangeCandidate) {
 			rikaigu.timer = null;
 			if (!rikaigu || rikaigu.mouseOnPopup) {
 				return;
 			}
-			if (rangeNode != rikaigu.lastRangeNode || rangeOffset != rikaigu.lastRangeOffset) {
+			if (rangeCandidate !== rikaigu.lastRange) {
 				return;
 			}
-			if (rangeNode == rikaigu.lastShownRangeNode && rangeOffset == rikaigu.lastShownRangeOffset && rikaigu.isVisible) {
+			if (rangeCandidate.node === rikaigu.lastShownRange.node && rangeCandidate.offset === rikaigu.lastShownRange.offset && rikaigu.isVisible) {
 				return;
 			}
-			extractTextAndSearch(rangeNode, rangeOffset);
+			extractTextAndSearch(rangeCandidate.node, rangeCandidate.offset, rangeCandidate.renderParams);
 		},
-		delay, rikaigu.lastRangeNode, rikaigu.lastRangeOffset
+		delay, rikaigu.lastRange,
 	);
 }
 
@@ -815,12 +784,12 @@ function _shouldResetPopup(ev) {
 	if (!rikaigu.isVisible || rikaigu.config.showOnKey !== 'None') return false;
 
 	// TODO check if required
-	if (rikaigu.selected && rikaigu.lastRangeNode) {
+	if (rikaigu.selected && rikaigu.lastRange) {
 		const highlightedRange = window.getSelection().getRangeAt(0);
 		// Check if cursor still in highlighted range.
 		// At this point updated request have already been sent. If match will change, we'll update
 		// (or close) popup. Otherwise no reason to close it.
-		if (highlightedRange.comparePoint(rikaigu.lastRangeNode, rikaigu.lastRangeOffset) === 0) {
+		if (highlightedRange.comparePoint(rikaigu.lastRange.node, rikaigu.lastRange.offset) === 0) {
 			return false;
 		}
 	}
@@ -849,12 +818,14 @@ async function onMouseMove(ev) {
 
 	if (!_shouldDoAnythingOnMouseMove(ev)) return;
 
-	const [rangeEnd, rangeNode, rangeOffset] = await _getNewRange(ev);
-	if (_checkRangeHaveNotChanged(rangeNode, rangeOffset)) return;
+	const rangeCandidate = await _getNewRangeCandidate(ev);
+	if (_checkRangeHaveNotChanged(rangeCandidate)) {
+		return;
+	}
 
-	_saveNewRange(rangeNode, rangeOffset);
+	rikaigu.lastRange = rangeCandidate;
 
-	if (_shouldSetSearchTimeout(rangeEnd)) {
+	if (rangeCandidate) {
 		_setSearchTimeout(ev);
 		return;
 	}
@@ -912,7 +883,7 @@ chrome.runtime.onMessage.addListener(
 	function(request, sender, response) {
 		switch (request.type) {
 			case 'enable':
-				chrome.storage.local.get(null, config => enableTab(config, request.text));
+				chrome.storage.local.get(null, config => enableTab(config));
 				break;
 			case 'disable':
 				disableTab();
@@ -966,7 +937,7 @@ chrome.runtime.onMessage.addListener(
  * and own frameId (always).
  */
 chrome.runtime.sendMessage({
-	"type": "enable?"
+	'type': 'enable?'
 }, function(response) {
 	window.frameId = response.frameId;
 	if (response.enabled) {

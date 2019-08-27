@@ -40,27 +40,10 @@
 	Please do not change or remove any of the copyrights or links to web pages
 	when modifying any of the files. - Jon
 */
-
-var miniHelp = '<span style="font-weight:bold">Rikaigu enabled!</span><br><br>' +
-		'<table cellspacing=5>' +
-		'<tr><td>A</td><td>Alternate popup location</td></tr>' +
-		'<tr><td>Y</td><td>Move popup location down</td></tr>' +
-		'<tr><td>D</td><td>Hide/show definitions</td></tr>' +
-		'<tr><td>Shift/Enter&nbsp;&nbsp;</td><td>Switch dictionaries</td></tr>' +
-		'</table>';
-
-
 var rikaiguEnabled = false;
 var rikaiguError = false;
-function onLoaded(initiatorTab) {
+function onLoaded() {
 	rikaiguEnabled = true;
-
-	if (initiatorTab) {
-		chrome.tabs.sendMessage(initiatorTab.id, {
-			"type": "enable",
-			"text": (config.showMiniHelp ? miniHelp : 'Rikaigu enabled!')
-		});
-	}
 
 	chrome.windows.getAll({
 			"populate": true
@@ -68,7 +51,6 @@ function onLoaded(initiatorTab) {
 		function(windows) {
 			for (var browserWindow of windows) {
 				for (var tab of browserWindow.tabs) {
-					if (initiatorTab && tab.id === initiatorTab.id) continue;
 					chrome.tabs.sendMessage(tab.id, {
 						"type": "enable"
 					});

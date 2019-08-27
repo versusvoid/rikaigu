@@ -279,11 +279,12 @@ function getCurrentWordSentence() {
 }
 
 var spacePrefixRegexp = /^\s/;
-function extractTextAndSearch(rangeNode, rangeOffset) {
+function extractTextAndSearch(rangeNode, rangeOffset, renderParams) {
 	if (!rangeNode) {
 		console.log('extractTextAndSearch() restoring range from last shown');
-		rangeNode = rikaigu.lastShownRangeNode;
-		rangeOffset = rikaigu.lastShownRangeOffset;
+		rangeNode = rikaigu.lastShownRange.node;
+		rangeOffset = rikaigu.lastShownRange.offset;
+		renderParams = rikaigu.lastShownRange.renderParams;
 	}
 	if (!rangeNode || !document.body.contains(rangeNode)) {
 		return reset();
@@ -334,8 +335,8 @@ function extractTextAndSearch(rangeNode, rangeOffset) {
 		{
 			type: "xsearch",
 			text: text,
-			renderParams: getRenderParams(),
+			renderParams: renderParams,
 		},
-		processSearchResult.bind(null, fullSelectionRange),
+		processSearchResult.bind(null, fullSelectionRange, renderParams),
 	);
 }
