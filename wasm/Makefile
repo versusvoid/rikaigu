@@ -90,7 +90,7 @@ build/generated.index.o: generated/index.bc
 build/%.test.d : tests/%.c | build
 	$(CC) $(COMMON_CFLAGS) -MM $< -MT "$(@:%.test.d=%.test)" -o $@
 
-COMPILER_RT := /usr/lib/clang/8.0.0/lib/linux
+COMPILER_RT := /usr/lib/clang/$(shell clang --version | grep -oP '\d\.\d\.\d')/lib/linux
 py-test: build/test.so tests/test.py
 	LD_PRELOAD=$(COMPILER_RT)/libclang_rt.asan-x86_64.so ASAN_OPTIONS=detect_leaks=false \
 		python -m unittest -v -f tests/*.py
