@@ -18,5 +18,7 @@ bool binary_locate_bounds(
 	size_t* lower, size_t* upper
 );
 
+const char* find_char(const char* start, const char* end, const char c);
+
 // __attribute__((__format__(__printf__, 1, 2)))
 int consolef(const char* format, ...);

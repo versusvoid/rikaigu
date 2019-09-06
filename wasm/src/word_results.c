@@ -133,42 +133,20 @@ void sort_results(word_result_t* array, const size_t num_elements)
        }
 }
 
-size_t sort_and_limit_word_results(buffer_t* b, word_result_t* array)
+size_t state_sort_and_limit_word_results()
 {
+	buffer_t* b = state_get_word_result_buffer();
+	word_result_t* array = vardata_array_elements_start(b);
 	size_t num_elements = vardata_array_num_elements(b);
 	sort_results(array, num_elements);
 
 	if (num_elements > 32)
 	{
-		num_elements = 32;
 		vardata_array_set_size(b, 32);
+		num_elements = 32;
 	}
+
 	return num_elements;
-}
-
-void state_make_offsets_array_and_request_read(uint32_t request_id)
-{
-	buffer_t* b = state_get_word_result_buffer();
-	word_result_t* array = vardata_array_elements_start(b);
-	size_t num_elements = sort_and_limit_word_results(b, array);
-
-	const size_t padding = 4 - b->size % 4;
-	uint32_t* offsets = buffer_allocate(b, num_elements * sizeof(uint32_t) + padding) + padding;
-
-	for (size_t i = 0; i < num_elements; ++i)
-	{
-		if (array[i].is_name)
-		{
-			offsets[i] = (1u << 31) | array[i].offset;
-		}
-		else
-		{
-			offsets[i] = array[i].offset;
-		}
-	}
-
-	buffer_t* raw_dentry_buffer = state_get_raw_dentry_buffer();
-	request_read_dictionary(offsets, num_elements, raw_dentry_buffer, request_id);
 }
 
 void word_result_set_dentry(word_result_t* wr, dentry_t* dentry)
@@ -214,6 +192,11 @@ void word_result_iterator_next(word_result_iterator_t* it)
 {
 	assert(it->current != it->end);
 	it->current += 1;
+}
+
+uint32_t word_result_get_offset(word_result_t* wr)
+{
+	return wr->offset;
 }
 
 size_t word_result_get_match_length(word_result_t* wr)

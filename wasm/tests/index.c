@@ -10,9 +10,11 @@
 #include "../src/libc.c"
 #include "../src/utf.c"
 #include "../src/vardata_array.c"
+#include "../src/decompress.c"
+#include "../src/index.c"
 #include "../generated/index.test.c"
 
-dictionary_index_t test_index = {
+compressed_file_t test_index = {
 	.last_chunk_index = test_dictionary_index_last_chunk_index,
 	.last_chunk_size = test_dictionary_index_last_chunk_size,
 	.original_size = test_dictionary_index_original_size,
@@ -20,30 +22,6 @@ dictionary_index_t test_index = {
 	.data = test_dictionary_index_data,
 	.currently_decompressed_chunk_index = -1,
 };
-
-void test_do_decompress_chunk()
-{
-	do_decompress_chunk(&test_index, 0);
-	assert(0 == memcmp(decompressed_chunk, test_dictionary_index_original_data, dictionary_index_chunk_size));
-
-	do_decompress_chunk(&test_index, 1);
-	assert(0 == memcmp(
-		decompressed_chunk,
-		test_dictionary_index_original_data + dictionary_index_chunk_size, dictionary_index_chunk_size
-	));
-
-	do_decompress_chunk(&test_index, 2);
-	assert(0 == memcmp(
-		decompressed_chunk,
-		test_dictionary_index_original_data + 2*dictionary_index_chunk_size, dictionary_index_chunk_size
-	));
-
-	do_decompress_chunk(&test_index, 3);
-	assert(0 == memcmp(
-		decompressed_chunk,
-		test_dictionary_index_original_data + 3*dictionary_index_chunk_size, test_dictionary_index_last_chunk_size
-	));
-}
 
 void test_find_entry_start_offset()
 {
@@ -112,7 +90,7 @@ void get_and_compare_index_entry(size_t pos, size_t start_pos, size_t end_pos,  
 
 void test_get_index_entry_at()
 {
-	assert(dictionary_index_chunk_size * dict_dictionary_index_last_chunk_index + dict_dictionary_index_last_chunk_size == dict_index.original_size);
+	assert(CHUNK_SIZE * words_dictionary_index_last_chunk_index + words_dictionary_index_last_chunk_size == words_index.original_size);
 
 	for (size_t entry_index = 0; entry_index < 10; ++entry_index)
 	{
@@ -205,7 +183,6 @@ void test_dictionary_index_search_for_offsets()
 
 int main()
 {
-	test_do_decompress_chunk();
 	test_find_entry_start_offset();
 	test_find_entry_end_offset();
 	test_find_entry_offsets_start();

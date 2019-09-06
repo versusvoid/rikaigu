@@ -331,7 +331,7 @@ function extractTextAndSearch(rangeNode, rangeOffset, renderParams) {
 	}
 	*/
 
-	chrome.runtime.sendMessage(
+	browser.runtime.sendMessage(
 		{
 			type: "xsearch",
 			text: text,

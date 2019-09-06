@@ -24,13 +24,20 @@ from ctypes import (
 	c_ubyte,
 	c_double,
 	create_string_buffer,
-	string_at
+	string_at,
+	addressof,
 )
 
 sys.path.append('../data')
-from utils import kata_to_hira
+from utils import kata_to_hira  # noqa: E402
 
 lib = cdll.LoadLibrary('build/test.so')
+
+def pointer_to_address(p):
+	return cast(p, c_void_p).value
+
+def ptrdiff(a, b):
+	return pointer_to_address(a) - pointer_to_address(b)
 
 InputData = c_ushort * 32
 InputLengthMapping = c_ubyte * 32
@@ -62,12 +69,25 @@ class State(Structure):
 	]
 pState = POINTER(State)
 
+pChar = POINTER(c_char)
+def makePChar(buff):
+	if type(buff) == str:
+		buff = buff.encode()
+	res = create_string_buffer(buff, len(buff))
+	return cast(res, pChar)
+
+def pChar2bytes(p, size):
+	return bytes(cast(p, pChar)[:size])
+
+def pChar2str(p, size):
+	return bytes(cast(p, pChar)[:size]).decode()
+
 class Candidate(Structure):
 	_fields_ = [
 		('word_length', c_size_t),
 		('word', POINTER(c_ushort)),
 		('inflection_name_length', c_size_t),
-		('inflection_name', c_char_p),
+		('inflection_name', pChar),
 		('type', c_uint),
 	]
 
@@ -86,7 +106,7 @@ class Candidate(Structure):
 			f'0x{self.type:08X})'
 		])
 
-class DictionaryIndex(Structure):
+class CompressedFile(Structure):
 	_fields_ = [
 		('last_chunk_index', c_size_t),
 		('last_chunk_size', c_size_t),
@@ -95,8 +115,8 @@ class DictionaryIndex(Structure):
 		('data', POINTER(c_ubyte)),
 		('currently_decompressed_chunk_index', c_size_t),
 	]
-pDictionaryIndex = POINTER(DictionaryIndex)
-test_index = DictionaryIndex(
+pCompressedFile = POINTER(CompressedFile)
+test_index = CompressedFile(
 	c_size_t.in_dll(lib, 'test_dictionary_index_last_chunk_index'),
 	c_size_t.in_dll(lib, 'test_dictionary_index_last_chunk_size'),
 	c_size_t.in_dll(lib, 'test_dictionary_index_original_size'),
@@ -134,7 +154,7 @@ class CurrentIndexEntry(Structure):
 
 class Surface(Structure):
 	_fields_ = [
-		('text', c_char_p),
+		('text', pChar),
 		('length', c_size_t),
 		('common', c_bool),
 	]
@@ -155,7 +175,7 @@ pKanjiGroup = POINTER(KanjiGroup)
 
 class BorrowedString(Structure):
 	_fields_ = [
-		('text', c_char_p),
+		('text', pChar),
 		('length', c_size_t),
 	]
 pBorrowedString = POINTER(BorrowedString)
@@ -172,10 +192,10 @@ pSenseGroup = POINTER(SenseGroup)
 
 class Dentry(Structure):
 	_fields_ = [
-		('kanjis_start', c_char_p),
-		('readings_start', c_char_p),
-		('definition_start', c_char_p),
-		('definition_end', c_char_p),
+		('kanjis_start', pChar),
+		('readings_start', pChar),
+		('definition_start', pChar),
+		('definition_end', pChar),
 		('entry_id', c_uint),
 
 		('num_kanji_groups', c_size_t),
@@ -214,27 +234,27 @@ def make_dentry() -> Dentry:
 		assert s[ends[i]] == ord('\t')
 
 	buf = create_string_buffer(s)
-	kanjis_start = cast(buf, c_char_p)
-	readings_start = cast(pointer(c_char.from_buffer(buf, ends[0])), c_char_p)
-	assert cast(readings_start, c_void_p).value > cast(kanjis_start, c_void_p).value
-	definition_start = cast(pointer(c_char.from_buffer(buf, ends[1])), c_char_p)
-	definition_end = cast(pointer(c_char.from_buffer(buf, ends[2])), c_char_p)
+	kanjis_start = cast(buf, pChar)
+	readings_start = cast(pointer(c_char.from_buffer(buf, ends[0])), pChar)
+	assert pointer_to_address(readings_start) > pointer_to_address(kanjis_start)
+	definition_start = cast(pointer(c_char.from_buffer(buf, ends[1])), pChar)
+	definition_end = cast(pointer(c_char.from_buffer(buf, ends[2])), pChar)
 
-	k1 = Kanji(b'123', 3, True)
+	k1 = Kanji(makePChar('123'), 3, True)
 	kg1 = KanjiGroup(0, None, 1, pointer(k1))
-	ks2 = (Kanji * 2)(Kanji(b'45', 2, False), Kanji(b'6789', 4, True))
+	ks2 = (Kanji * 2)(Kanji(makePChar('45'), 2, False), Kanji(makePChar('6789'), 4, True))
 	ri = c_ubyte(1)
 	kg2 = KanjiGroup(1, pointer(ri), 2, cast(pointer(ks2), pKanji))
 	kgs = (KanjiGroup * 2)(kg1, kg2)
 
-	rs = (Reading * 2)(Reading(b'abc', 3, True), Reading(b'de', 2, False))
+	rs = (Reading * 2)(Reading(makePChar('abc'), 3, True), Reading(makePChar('de'), 2, False))
 
-	t1 = BorrowedString(b'p', 1)
-	s1 = BorrowedString(b'se', 2)
+	t1 = BorrowedString(makePChar('p'), 1)
+	s1 = BorrowedString(makePChar('se'), 2)
 	sg1 = SenseGroup(1, pointer(t1), 1, pointer(s1))
 
-	t2 = BorrowedString(b'm', 1)
-	s2 = BorrowedString(b'ftw', 3)
+	t2 = BorrowedString(makePChar('m'), 1)
+	s2 = BorrowedString(makePChar('ftw'), 3)
 	sg2 = SenseGroup(1, pointer(t2), 1, pointer(s2))
 	sgs = (SenseGroup * 2)(sg1, sg2)
 
@@ -250,7 +270,7 @@ def make_dentry() -> Dentry:
 def take_a_trip(s):
 	print('took a trip:', s.decode())
 	exit(1)
-c_void_p.in_dll(lib, 'take_a_trip_impl').value = cast(take_a_trip, c_void_p).value
+c_void_p.in_dll(lib, 'take_a_trip_impl').value = pointer_to_address(take_a_trip)
 
 lib.vardata_array_elements_start.argtypes = [pBuffer]
 lib.vardata_array_elements_start.restype = c_void_p
@@ -258,11 +278,12 @@ lib.vardata_array_elements_start.restype = c_void_p
 lib.vardata_array_num_elements.argtypes = [pBuffer]
 lib.vardata_array_num_elements.restype = c_size_t
 
-lib.dictionary_index_get_entry.argtypes = [pDictionaryIndex, c_char_p, c_size_t]
+lib.dictionary_index_get_entry.argtypes = [pCompressedFile, pChar, c_size_t]
 lib.dictionary_index_get_entry.restype = pDictionaryIndexEntry
 
 lib.state_get_index_entry_buffer.restype = pBuffer
 lib.state_get_word_result_buffer.restype = pBuffer
+lib.state_get_raw_dentry_buffer.restype = pBuffer
 lib.state_get_html_buffer.restype = pBuffer
 
 lib.state_get_word_result_iterator.restype = Iterator
@@ -272,8 +293,8 @@ lib.word_result_iterator_next.restype = None
 
 lib.state_try_add_word_result.argtypes = [
 	c_uint, c_size_t,
-	c_char_p, c_size_t,
-	c_char_p, c_size_t,
+	pChar, c_size_t,
+	pChar, c_size_t,
 	c_size_t
 ]
 lib.state_try_add_word_result.restype = c_bool
@@ -284,9 +305,12 @@ class T(unittest.TestCase):
 	def setUpClass(cls):
 		cls.samples = {}
 		with open('generated/index-samples.csv') as f:
-			for l in f:
-				l = l.strip().split(',')
-				cls.samples[l[0]] = list(map(lambda o: tuple(map(int, o.split(';'))) if ';' in o else int(o), l[1:]))
+			for line in f:
+				line = line.strip().split(',')
+				cls.samples[line[0]] = [
+					tuple(map(int, offset.split(';'))) if ';' in offset else int(offset)
+					for offset in line[1:]
+				]
 
 	@classmethod
 	def get_offsets(cls, key):
@@ -305,7 +329,7 @@ class T(unittest.TestCase):
 			@CFUNCTYPE(c_size_t, c_int)
 			def memory_size(_):
 				return self.memory_used_size // (1 << 16)
-			c_void_p.in_dll(lib, '__builtin_wasm_memory_size_impl').value = cast(memory_size, c_void_p).value
+			c_void_p.in_dll(lib, '__builtin_wasm_memory_size_impl').value = pointer_to_address(memory_size)
 
 			@CFUNCTYPE(c_size_t, c_int, c_size_t)
 			def memory_grow(_, num_pages):
@@ -319,7 +343,7 @@ class T(unittest.TestCase):
 					return -1
 				self.memory_used_size += num_bytes
 				return self.memory_used_size - num_bytes
-			c_void_p.in_dll(lib, '__builtin_wasm_memory_grow_impl').value = cast(memory_size, c_void_p).value
+			c_void_p.in_dll(lib, '__builtin_wasm_memory_grow_impl').value = pointer_to_address(memory_size)
 
 	def clear_state(self):
 		c_void_p.in_dll(lib, 'state').value = 0
@@ -334,7 +358,7 @@ class T(unittest.TestCase):
 
 	def tearDown(self):
 		self.clear_state()
-		c_void_p.in_dll(lib, 'currently_decompressed_index').value = 0
+		c_void_p.in_dll(lib, 'currently_decompressed_file').value = 0
 
 	def make_word_result(self) -> pWordResult:
 		assert hasattr(self, 'memory')
@@ -353,6 +377,7 @@ class T(unittest.TestCase):
 
 		return res
 
+	@unittest.skip('long')
 	def test_kata_to_hira_character(self):
 		lib.kata_to_hira_character.argtypes = [c_ushort, c_ushort]
 		lib.kata_to_hira_character.restype = c_uint
@@ -415,7 +440,7 @@ class T(unittest.TestCase):
 		array_ptr = cast(POINTER(S)(array), c_void_p)
 		found = c_bool(False)
 		it = lib.binary_locate(
-			c_char_p(needle.encode()), array_ptr,
+			needle.encode(), array_ptr,
 			len(array), sizeof(S),
 			compar, byref(found)
 		)
@@ -470,7 +495,7 @@ class T(unittest.TestCase):
 		]
 		lib.binary_locate.restype = c_bool
 
-		@CFUNCTYPE(c_int, c_char_p, POINTER(c_char_p))
+		@CFUNCTYPE(c_int, c_char_p, POINTER(pChar))
 		def compar(k, v):
 			v = string_at(v.contents)
 			if k < v:
@@ -529,7 +554,7 @@ class T(unittest.TestCase):
 
 		capacity_left = (1 << 16) * 3 // 2
 		memory = create_string_buffer(capacity_left)
-		start = cast(memory, c_void_p).value
+		start = pointer_to_address(memory)
 		c_void_p.in_dll(lib, 'state').value = start
 		state = cast(c_void_p.in_dll(lib, 'state'), POINTER(State))
 
@@ -572,8 +597,8 @@ class T(unittest.TestCase):
 	def test_apply_rule(self):
 		lib.apply_rule.argtypes = [
 			c_void_p, c_void_p, c_size_t,
-			c_char_p, c_size_t,
-			c_char_p, c_size_t
+			pChar, c_size_t,
+			pChar, c_size_t
 		]
 		lib.apply_rule.restypes = None
 
@@ -593,7 +618,7 @@ class T(unittest.TestCase):
 		self.assertEqual(c.inflection_name[:10], b'raw,polite')
 
 	def test_rule_index_bounds_for_suffix(self):
-		lib.rule_index_bounds_for_suffix.argtypes = [c_char_p, c_size_t, c_void_p, c_void_p]
+		lib.rule_index_bounds_for_suffix.argtypes = [pChar, c_size_t, c_void_p, c_void_p]
 		lib.rule_index_bounds_for_suffix.restype = c_bool
 
 		low = c_size_t(-1)
@@ -614,8 +639,8 @@ class T(unittest.TestCase):
 	def test_deinflect_one_word(self):
 		lib.deinflect_one_word.argtypes = [
 			c_void_p, c_uint,
-			c_char_p, c_size_t,
-			c_char_p, c_size_t,
+			pChar, c_size_t,
+			pChar, c_size_t,
 		]
 		lib.deinflect_one_word.restype = None
 
@@ -646,7 +671,7 @@ class T(unittest.TestCase):
 		self.assertEqual(c.type, 0xc)
 
 	def test_deinflect(self):
-		lib.deinflect.argtypes = [c_char_p, c_size_t]
+		lib.deinflect.argtypes = [pChar, c_size_t]
 		lib.deinflect.restype = POINTER(Candidate)
 
 		self.init_state()
@@ -722,7 +747,7 @@ class T(unittest.TestCase):
 
 	def test_index_entries_cache_locate_entry(self):
 		lib.index_entries_cache_locate_entry.argtypes = [
-			pBuffer, c_char_p, c_size_t,
+			pBuffer, pChar, c_size_t,
 			POINTER(c_size_t), POINTER(c_size_t), POINTER(c_bool)
 		]
 		lib.index_entries_cache_locate_entry.restype = pDictionaryIndexEntry
@@ -737,14 +762,14 @@ class T(unittest.TestCase):
 			byref(low), byref(high), byref(found)
 		)
 		self.assertTrue(found)
-		self.assertEqual(cast(it, c_void_p).value, cast(cache_array, c_void_p).value)
+		self.assertEqual(pointer_to_address(it), pointer_to_address(cache_array))
 
 		it = lib.index_entries_cache_locate_entry(
 			byref(buf), '3'.encode('utf-16le'), 1,
 			byref(low), byref(high), byref(found)
 		)
 		self.assertTrue(found)
-		self.assertEqual(cast(it, c_void_p).value, cast(cache_array, c_void_p).value + sizeof(DictionaryIndexEntry))
+		self.assertEqual(pointer_to_address(it), pointer_to_address(cache_array) + sizeof(DictionaryIndexEntry))
 
 		low = c_size_t(0)
 		high = c_size_t(-1)
@@ -755,7 +780,7 @@ class T(unittest.TestCase):
 		self.assertEqual(low.value, 0)
 		self.assertEqual(high.value, 321)
 		self.assertFalse(found)
-		self.assertEqual(cast(it, c_void_p).value, cast(cache_array, c_void_p).value)
+		self.assertEqual(pointer_to_address(it), pointer_to_address(cache_array))
 
 		low = c_size_t(-1)
 		high = c_size_t(-1)
@@ -766,7 +791,7 @@ class T(unittest.TestCase):
 		self.assertEqual(low.value, 654)
 		self.assertEqual(high.value, 123)
 		self.assertFalse(found)
-		self.assertEqual(cast(it, c_void_p).value, cast(cache_array, c_void_p).value + sizeof(DictionaryIndexEntry))
+		self.assertEqual(pointer_to_address(it), pointer_to_address(cache_array) + sizeof(DictionaryIndexEntry))
 
 		low = c_size_t(-1)
 		high = c_size_t(100500)
@@ -777,7 +802,7 @@ class T(unittest.TestCase):
 		self.assertEqual(low.value, 456)
 		self.assertEqual(high.value, 100500)
 		self.assertFalse(found)
-		self.assertEqual(cast(it, c_void_p).value, cast(cache_array, c_void_p).value + 2 * sizeof(DictionaryIndexEntry))
+		self.assertEqual(pointer_to_address(it), pointer_to_address(cache_array) + 2 * sizeof(DictionaryIndexEntry))
 
 	def test_dictionary_index_get_entry(self):
 		self.init_state()
@@ -874,26 +899,6 @@ class T(unittest.TestCase):
 
 		return wr
 
-	def test_state_make_offsets_array_and_request_read(self):
-		lib.state_make_offsets_array_and_request_read.argtypes = [c_uint]
-		lib.state_make_offsets_array_and_request_read.restype = None
-
-		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, c_void_p, c_uint)
-		def request_read_dictionary(ofs, num_offsets, handle, request_id):
-			if num_offsets != 2:
-				print(f'test_state_make_offsets_array_and_request_read: expected 2 got {num_offsets}')
-				exit(1)
-			if ofs[:2] != [123, (1 << 31) | 123]:
-				print(f'test_state_make_offsets_array_and_request_read: expected (123, (1 << 31) | 123) got {ofs[:2]}')
-				exit(1)
-
-			if request_id != 4382:
-				print(f'test_state_make_offsets_array_and_request_read: expected 4382 got {request_id}')
-		c_void_p.in_dll(lib, 'request_read_dictionary_impl').value = cast(request_read_dictionary, c_void_p).value
-
-		self.test_state_try_add_word_result()
-		lib.state_make_offsets_array_and_request_read(4382)
-
 	def test_sort_results(self):
 		lib.sort_results.argtypes = [pWordResult, c_size_t]
 		lib.sort_results.restype = None
@@ -914,8 +919,7 @@ class T(unittest.TestCase):
 		self.assertTrue(it[0].is_name)
 
 	def test_sort_and_limit_word_results(self):
-		lib.sort_and_limit_word_results.argtypes = [pBuffer, pWordResult]
-		lib.sort_and_limit_word_results.restype = None
+		lib.state_sort_and_limit_word_results.restype = None
 
 		self.init_state()
 
@@ -935,7 +939,7 @@ class T(unittest.TestCase):
 		for i in range(40):
 			it[i].dentry = pointer(make_dentry())
 
-		lib.sort_and_limit_word_results(buf, it)
+		lib.state_sort_and_limit_word_results()
 		self.assertEqual(lib.vardata_array_num_elements(lib.state_get_word_result_buffer()), 32)
 
 	def test_word_result_get_inflection_name(self):
@@ -943,7 +947,7 @@ class T(unittest.TestCase):
 		lib.word_result_get_inflection_name_length.restype = c_size_t
 
 		lib.word_result_get_inflection_name.argtypes = [c_void_p]
-		lib.word_result_get_inflection_name.restype = c_char_p
+		lib.word_result_get_inflection_name.restype = pChar
 
 		self.test_state_try_add_word_result()
 
@@ -963,9 +967,9 @@ class T(unittest.TestCase):
 	def test_word_search(self):
 		lib.word_search.argtypes = [
 			c_uint, c_size_t,
-			c_char_p, c_size_t,
+			pChar, c_size_t,
 			c_uint,
-			c_char_p, c_size_t
+			pChar, c_size_t
 		]
 		lib.word_search.restype = c_bool
 		self.init_state()
@@ -1018,47 +1022,55 @@ class T(unittest.TestCase):
 		res = lib.input_search(byref(input), 0x1)
 		self.assertEqual(res, 0)
 
-	def test_word_search_finish(self):
-		lib.word_search_finish.argtypes = [pBuffer]
-		lib.word_search_finish.restype = c_bool
-
-		self.test_state_try_add_word_result()
-
-		memory, buf = make_buffer(1024)
-
-		s1 = dictionary_line.encode()
-		memory[0] = len(s1)
-		memory[2:2 + len(s1)] = s1
-
-		s2 = names_line.encode()
-		memory[2 + len(s1)] = len(s2)
-		memory[2 + len(s1) + 2:2 + len(s1) + 2 + len(s2)] = s2
-
-		buf.size = 2 + len(s2) + 2 + len(s2)
-
-		self.assertTrue(lib.word_search_finish(byref(buf)))
-
-	def test_search_start(self):
-		lib.search_start.argtypes = [c_size_t]
-		lib.search_start.restype = c_size_t
+	def test_get_dentry_at(self):
+		lib.get_dentry_at.argtypes = [pBuffer, pCompressedFile, c_size_t]
+		lib.get_dentry_at.restype = POINTER(c_char)
 
 		self.init_state()
 
-		offsets = T.get_offsets('かける')
-		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, POINTER(c_ubyte), c_void_p)
-		def request_read_dictionary(ofs, num_ofs, data, handle):
-			ofs = set(ofs[:num_ofs])
-			if offsets.issuperset(ofs):
-				print(f'expected {offsets} got {ofs}')
-				exit(1)
-		c_void_p.in_dll(lib, 'request_read_dictionary_impl').value = cast(request_read_dictionary, c_void_p).value
+		with open('generated/dictionary-sample.csv') as f:
+			offset, line = f.readline().split(';', 1)
+			offset = int(offset)
+			line = line.encode()
+
+		words_dictionary = CompressedFile.in_dll(lib, 'words_dictionary')
+		raw_dentry_buffer = lib.state_get_raw_dentry_buffer()
+		for i in range(3):
+			raw_dentry_start = lib.get_dentry_at(raw_dentry_buffer, byref(words_dictionary), offset)
+			raw_dentry_length = (
+				raw_dentry_buffer.contents.size - (pointer_to_address(raw_dentry_start) - raw_dentry_buffer.contents.data)
+			)
+			self.assertEqual(raw_dentry_length, len(line))
+			self.assertEqual(bytes(raw_dentry_start[:raw_dentry_length]), line)
+		self.assertEqual(raw_dentry_buffer.contents.size, 3 * raw_dentry_length)
+
+	def test_search(self):
+		lib.search.argtypes = [c_size_t]
+		lib.search.restype = c_size_t
+
+		self.init_state()
 
 		for i, c in enumerate('かける'):
 			self.state.contents.input.data[i] = ord(c)
-		self.assertEqual(lib.search_start(3), 3)
+		self.assertEqual(lib.search(3), 3)
+
+		gold_offsets = T.get_offsets('かける')
+
+		num_word_results = lib.vardata_array_num_elements(lib.state_get_word_result_buffer())
+		self.assertGreaterEqual(num_word_results, len(gold_offsets))
+
+		it = cast(lib.vardata_array_elements_start(lib.state_get_word_result_buffer()), pWordResult)
+		offsets = {wr.offset for wr in it[:num_word_results]}
+		self.assertTrue(offsets.issuperset(gold_offsets))
+
+		lib.make_html()
+		html_buffer = lib.state_get_html_buffer()
+		pData = c_void_p(html_buffer.contents.data)
+		# testing if html is unicode-valid
+		self.assertIsNotNone(pChar2str(pData, html_buffer.contents.size))
 
 	def test_append(self):
-		lib.append.argtypes = [pBuffer, c_char_p, c_size_t]
+		lib.append.argtypes = [pBuffer, pChar, c_size_t]
 		lib.append.restype = None
 
 		memory, buf = make_buffer(256)
@@ -1100,7 +1112,7 @@ class T(unittest.TestCase):
 		lib.render_reading.restype = None
 
 		memory, buf = make_buffer(256)
-		reading = Reading(b'123', 3, True)
+		reading = Reading(makePChar('123'), 3, True)
 		for a, b in [(False, False), (False, True), (True, False), (True, True)]:
 			lib.render_reading(byref(buf), byref(reading), a, b)
 			self.assertTrue(memory[:buf.size].strip())
@@ -1198,77 +1210,3 @@ class T(unittest.TestCase):
 		memory, buf = make_buffer(2048)
 		lib.render_entries(byref(buf))
 		self.assertTrue(memory[:buf.size].strip())
-
-	@unittest.skip('long')
-	def test_endure(self):
-		self.init_state(size=(1 << 20), initial_size=(1 << 16) * 2)
-
-		keys = set()
-		for filename in ['dict', 'names']:
-			with open(f'../data/{filename}.dat') as f:
-				for l in f:
-					l = l.split('\t')
-					surfaces = l[0]
-					if len(l) == 4:
-						surfaces = f'{surfaces};{l[1]}'
-
-					for group in surfaces.split(';'):
-						if '#' in group:
-							group = group[0:group.index('#')]
-						for key in group.split(','):
-							keys.add(key.strip('U'))
-
-		keys = list(keys)
-		random.shuffle(keys)
-
-		requested_offsets = []
-		out_buffer_handle = [None]
-
-		@CFUNCTYPE(None, POINTER(c_uint), c_size_t, c_void_p, c_uint)
-		def request_read_dictionary(offsets, num_offsets, buffer_handle, request_id):
-			for i in range(num_offsets):
-				requested_offsets.append((bool(offsets[i] & (1 << 31)), offsets[i] & 0x7FFFFFFF))
-			out_buffer_handle[0] = buffer_handle
-		c_void_p.in_dll(lib, 'request_read_dictionary_impl').value = cast(request_read_dictionary, c_void_p).value
-
-		lib.buffer_allocate.argtypes = [c_void_p, c_size_t]
-		lib.buffer_allocate.restype = POINTER(c_ubyte)
-
-		lib.rikaigu_search_start.argtypes = [c_size_t, c_uint]
-		lib.rikaigu_search_start.restype = c_size_t
-
-		lib.rikaigu_search_finish.argtypes = [c_void_p]
-		lib.rikaigu_search_finish.restype = c_double
-
-		words = open('../data/dict.dat')
-		names = open('../data/names.dat')
-
-		for key_index, key in enumerate(keys):
-			if (key_index + 1) % 10000 == 0:
-				print(f'\n{key_index + 1} / {len(keys)}', end='')
-
-			utf16 = key.encode('utf-16le')
-			if len(utf16) > 32:
-				continue
-
-			for i in range(len(utf16) // 2):
-				self.state.contents.input.data[i] = (utf16[i*2 + 1] << 8) | utf16[i*2 + 0]
-
-			requested_offsets.clear()
-			lib.rikaigu_search_start(len(utf16) // 2, 1)
-			self.assertTrue(requested_offsets)
-
-			for name, offset in requested_offsets:
-				f = names if name else words
-				f.seek(offset)
-				utf8 = f.readline().strip().encode('utf8')
-				ptr = lib.buffer_allocate(out_buffer_handle[0], len(utf8) + 2)
-				ptr[0] = len(utf8) & 0xff
-				ptr[1] = len(utf8) >> 8
-				for i, b in enumerate(utf8):
-					ptr[i + 2] = b
-
-			lib.rikaigu_search_finish(out_buffer_handle[0])
-
-		words.close()
-		names.close()

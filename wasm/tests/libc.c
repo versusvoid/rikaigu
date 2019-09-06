@@ -63,10 +63,20 @@ void test_memzero()
 	assert(memcmp(a, expected2, sizeof(a)) == 0);
 }
 
+void test_find_char()
+{
+	const char s1[] = "some string";
+	assert(find_char(s1, s1 + strlen(s1), ' ') == s1 + 4);
+	assert(find_char(s1, s1 + strlen(s1), 'g') == s1 + 10);
+	assert(find_char(s1, s1 + strlen(s1), 's') == s1);
+	assert(find_char(s1, s1 + strlen(s1), '1') == s1 + strlen(s1));
+}
+
 int main()
 {
 	test_memcpy(memcpy);
 	test_memcpy(memcpy_backward);
 	test_memmove();
 	test_memzero();
+	test_find_char();
 }

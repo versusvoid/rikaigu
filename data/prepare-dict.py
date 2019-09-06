@@ -7,7 +7,7 @@ from collections import defaultdict
 
 import dictionary
 import wasm_generator
-from utils import kata_to_hira, print_lengths_stats
+from utils import kata_to_hira
 from index import index_keys
 from romaji import is_romajination
 
@@ -169,68 +169,57 @@ def prepare_names():
 	index = defaultdict(set)
 	offset = 0
 	combined_entries = {}
-	line_lengths = []
-	with open(f'data/names.dat', 'wb') as of:
-		for entry in dictionary.dictionary_reader('JMnedict.xml.gz'):
-			if len(entry.readings) == 1 and len(entry.transes) == 1 and len(entry.transes[0].glosses) == 1:
-				key = entry.readings[0].text + ' - ' + ','.join(entry.transes[0].types)
-				combined_entry = combined_entries.get(key)
-				if combined_entry is None:
-					combined_entries[key] = entry
-				else:
-					combined_entry.kanjis.extend(entry.kanjis)
-				continue
+	dictionary_lines = []
+	for entry in dictionary.dictionary_reader('JMnedict.xml.gz'):
+		if len(entry.readings) == 1 and len(entry.transes) == 1 and len(entry.transes[0].glosses) == 1:
+			key = entry.readings[0].text + ' - ' + ','.join(entry.transes[0].types)
+			combined_entry = combined_entries.get(key)
+			if combined_entry is None:
+				combined_entries[key] = entry
+			else:
+				combined_entry.kanjis.extend(entry.kanjis)
+			continue
 
-			entry_index_keys = index_keys(entry, variate=False)
-			for key in entry_index_keys:
-				index[key].add(offset)
+		entry_index_keys = index_keys(entry, variate=False)
+		for key in entry_index_keys:
+			index[key].add(offset)
 
-			l = format_entry(entry).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
-			of.write(b'\n')
-			offset += len(l) + 1
+		line = format_entry(entry).encode('utf-8')
+		dictionary_lines.append(line)
+		offset += len(line) + 1
 
-		for combined_entry in combined_entries.values():
-			entry_index_keys = index_keys(combined_entry, variate=False)
-			for key in entry_index_keys:
-				index[key].add(offset)
+	for combined_entry in combined_entries.values():
+		entry_index_keys = index_keys(combined_entry, variate=False)
+		for key in entry_index_keys:
+			index[key].add(offset)
 
-			l = format_entry(combined_entry).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
-			of.write(b'\n')
-			offset += len(l) + 1
+		line = format_entry(combined_entry).encode('utf-8')
+		dictionary_lines.append(line)
+		offset += len(line) + 1
 
-	print_lengths_stats('names', line_lengths)
-	return index
+	return dictionary_lines, index
 
-def prepare_dict():
-	pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+def prepare_words(pos_flags_map):
 	min_entry_id = 2**63
 	for entry in dictionary.dictionary_reader('JMdict_e.gz'):
 		min_entry_id = min(entry.id, min_entry_id)
 
 	index = defaultdict(set)
 	offset = 0
-	line_lengths = []
-	with open(f'data/dict.dat', 'wb') as of:
-		for entry in dictionary.dictionary_reader('JMdict_e.gz'):
-			all_pos = set(itertools.chain.from_iterable(sg.pos for sg in entry.sense_groups))
-			pos_flags = sum(pos_flags_map.get(pos, 0) for pos in all_pos)
-			index_entry = offset if pos_flags == 0 else wasm_generator.TypedOffset(type=pos_flags, offset=offset)
+	dictionary_lines = []
+	for entry in dictionary.dictionary_reader('JMdict_e.gz'):
+		all_pos = set(itertools.chain.from_iterable(sg.pos for sg in entry.sense_groups))
+		pos_flags = sum(pos_flags_map.get(pos, 0) for pos in all_pos)
+		index_entry = offset if pos_flags == 0 else wasm_generator.TypedOffset(type=pos_flags, offset=offset)
 
-			for key in index_keys(entry, variate=True):
-				index[key].add(index_entry)
+		for key in index_keys(entry, variate=True):
+			index[key].add(index_entry)
 
-			l = format_entry(entry, min_entry_id).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
-			of.write(b'\n')
-			offset += len(l) + 1
+		line = format_entry(entry, min_entry_id).encode('utf-8')
+		dictionary_lines.append(line)
+		offset += len(line) + 1
 
-	print_lengths_stats('dict', line_lengths)
-	return index, min_entry_id
+	return dictionary_lines, index, min_entry_id
 
 def index_kanji():
 	index = []
@@ -250,10 +239,12 @@ def index_kanji():
 		for kanji_code_point, offset in index:
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
-dict_index, min_entry_id = prepare_dict()
-names_index = prepare_names()
+pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+words_dictionary, words_index, min_entry_id = prepare_words(pos_flags_map)
+names_dictionary, names_index = prepare_names()
 
-wasm_generator.write_utf16_indexies(dict_index, names_index)
+wasm_generator.write_dictionaries(words_dictionary, names_dictionary)
+wasm_generator.write_utf16_indexies(words_index, names_index)
 wasm_generator.generate_config_header(max_readings_index, min_entry_id)
 wasm_generator.get_lz4_source()
 

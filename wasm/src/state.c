@@ -108,7 +108,7 @@ void enlarge_your_buffer(buffer_t* buffer, size_t required_place_bytes)
 	buffer->capacity += offset;
 }
 
-export void* buffer_allocate(buffer_t* buffer, size_t num_bytes)
+void* buffer_allocate(buffer_t* buffer, size_t num_bytes)
 {
 	char local = 'a';
 	if ((size_t)&local < 256) {

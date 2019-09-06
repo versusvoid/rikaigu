@@ -2,19 +2,14 @@
 #include "dictionaries.h"
 #include "html_render.h"
 
-export size_t rikaigu_search_start(size_t utf16_input_length, uint32_t request_id)
+export uint32_t rikaigu_search(size_t utf16_input_length)
 {
 	state_clear();
-	return search_start(utf16_input_length, request_id);
+	return (uint32_t)search(utf16_input_length);
 }
 
-export double rikaigu_search_finish(buffer_t* raw_dentry_buffer)
+export double get_html()
 {
-	bool no_errors = search_finish(raw_dentry_buffer);
-	if (!no_errors)
-	{
-		return -1;
-	}
 	make_html();
 	buffer_t* buffer = state_get_html_buffer();
 	uint64_t res = (size_t)buffer->data;

@@ -17,15 +17,6 @@ void test_parse_base62_uint()
 	assert(parse_base62_uint(number, number + 3) == 62*62 + 2 * 62 + 3);
 }
 
-void test_find()
-{
-	const char s1[] = "some string";
-	assert(find(s1, s1 + strlen(s1), ' ') == s1 + 4);
-	assert(find(s1, s1 + strlen(s1), 'g') == s1 + 10);
-	assert(find(s1, s1 + strlen(s1), 's') == s1);
-	assert(find(s1, s1 + strlen(s1), '1') == s1 + strlen(s1));
-}
-
 void test_dentry_make()
 {
 	setup_memory();
@@ -376,7 +367,6 @@ void test_dentry_parse_whole()
 int main()
 {
 	test_parse_base62_uint();
-	test_find();
 	test_dentry_make();
 	test_count_parts();
 	test_kanji_group_parse_reading_indicies();

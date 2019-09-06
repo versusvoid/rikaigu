@@ -42,16 +42,18 @@
 */
 var rikaiguEnabled = false;
 var rikaiguError = false;
+const decoder = new TextDecoder('utf-8');
+
 function onLoaded() {
 	rikaiguEnabled = true;
 
-	chrome.windows.getAll({
+	browser.windows.getAll({
 			"populate": true
 		},
 		function(windows) {
 			for (var browserWindow of windows) {
 				for (var tab of browserWindow.tabs) {
-					chrome.tabs.sendMessage(tab.id, {
+					browser.tabs.sendMessage(tab.id, {
 						"type": "enable"
 					});
 				}
@@ -59,23 +61,23 @@ function onLoaded() {
 		});
 
 
-	chrome.browserAction.setBadgeBackgroundColor({
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [255, 0, 0, 255]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": "On"
 	});
-	chrome.browserAction.setPopup({
+	browser.browserAction.setPopup({
 		"popup": "/html/popup.html"
 	});
 }
 
 function onError(err) {
 	console.error('onError(', err, ')');
-	chrome.browserAction.setBadgeBackgroundColor({
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [0, 0, 0, 255]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": "Err"
 	});
 	rikaiguError = true;
@@ -83,13 +85,13 @@ function onError(err) {
 
 function clearState() {
 	rikaiguEnabled = false;
-	chrome.browserAction.setBadgeBackgroundColor({
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [0, 0, 0, 0]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": ""
 	});
-	chrome.browserAction.setPopup({
+	browser.browserAction.setPopup({
 		"popup": ""
 	});
 }
@@ -123,7 +125,6 @@ async function rikaiguEnable(tab) {
 			fetch('/wasm/rikai.wasm'),
 			{ env: {
 				take_a_trip: takeATrip,
-				request_read_dictionary: requestReadDictionary,
 				print: print,
 			}}
 		);
@@ -141,126 +142,21 @@ async function rikaiguEnable(tab) {
 
 function rikaiguDisable() {
 	// Send a disable message to all browsers
-	var windows = chrome.windows.getAll({
+	browser.windows.getAll({
 			"populate": true
 		},
 		function(windows) {
 			for (var i = 0; i < windows.length; ++i) {
 				var tabs = windows[i].tabs;
 				for (var j = 0; j < tabs.length; ++j) {
-					chrome.tabs.sendMessage(tabs[j].id, {
+					browser.tabs.sendMessage(tabs[j].id, {
 						"type": "disable"
 					});
 				}
 			}
 		});
-	chrome.storage.local.set({'reload': true});
+	browser.storage.local.set({'reload': true});
 	location.reload();
-}
-
-async function getRoot() {
-	return new Promise(function(resolve, reject) {
-		chrome.runtime.getPackageDirectoryEntry(resolve);
-	});
-}
-
-async function getFileEntry(root, path) {
-	return new Promise(function(resolve, reject) {
-		root.getFile(path, {}, resolve, reject);
-	});
-}
-
-async function getFile(path) {
-	const root = await getRoot();
-	const entry = await getFileEntry(root, path);
-	return new Promise(function(resolve, reject) {
-		entry.file(resolve, reject);
-	});
-}
-
-var namesFile = null;
-var dictFile = null;
-
-getFile('data/names.dat').then(function(f){namesFile = f;});
-getFile('data/dict.dat').then(function(f){dictFile = f;});
-
-async function getLines(file, offsets) {
-	return Promise.all(offsets.map(offset => getLine(file, offset)));
-};
-
-async function getLine(file, offset) {
-	return new Promise(function(resolve, reject) {
-		var len = 75; // median line length
-		var blob = file.slice(offset, offset + len);
-
-		var reader = new FileReader();
-
-		reader.addEventListener("loadend", function() {
-			const view = new Uint8Array(reader.result);
-			const end = view.indexOf('\n'.charCodeAt(0));
-			if (end !== -1) {
-				resolve(reader.result.slice(0, end));
-			} else if (len > 7000) {
-				reject(`There is no end: ${file.name}, ${offset}, ${len}, ${reader.result}`);
-			} else {
-				len = len * 2;
-				blob = file.slice(offset, offset + len);
-				reader.readAsArrayBuffer(blob);
-			}
-		});
-		reader.readAsArrayBuffer(blob);
-	});
-}
-
-function readLines(offsetsPtr, numOffsets) {
-	const offsetsView = new Uint32Array(Module.instance.exports.memory.buffer, offsetsPtr, numOffsets);
-	const promises = [];
-	for (let i = 0; i < offsetsView.length; ++i) {
-		// see word_results.c : state_make_offsets_array_and_request_read()
-		const isName = !!(offsetsView[i] & (1 << 31));
-		const offset = offsetsView[i] & 0x7FFFFFFF;
-		promises.push(getLine(isName ? namesFile : dictFile, offset));
-	}
-	return Promise.all(promises);
-}
-
-var nextRequestId = 0;
-var lastRequest = null;
-
-const decoder = new TextDecoder('utf-8');
-async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, requestId) {
-	const lines = await readLines(offsetsPtr, numOffsets);
-
-	if (lastRequest.id !== requestId) {
-		return;
-	}
-
-	for (const line of lines) {
-		const lineView = new Uint8Array(line);
-		const bufPtr = Module.instance.exports.buffer_allocate(bufferHandle, lineView.length + 2);
-		const bufView = new Uint8Array(Module.instance.exports.memory.buffer, bufPtr, lineView.length + 2);
-		bufView[0] = lineView.length & 0xff;
-		bufView[1] = (lineView.length >> 8) & 0xff;
-		bufView.set(lineView, 2);
-	}
-
-	let res = Module.instance.exports.rikaigu_search_finish(bufferHandle);
-	if (res === -1) {
-		console.error('wut');
-		return;
-	}
-	const htmlPtr = res % Math.pow(2, 32);
-	const htmlLength = (res - htmlPtr) / Math.pow(2, 32);
-
-	const htmlView = new Uint8Array(Module.instance.exports.memory.buffer, htmlPtr, htmlLength);
-	const html = decoder.decode(htmlView);
-
-	chrome.tabs.sendMessage(lastRequest.tabId, {
-		"type": "show",
-		"html": html,
-		"match": lastRequest.text.substring(0, lastRequest.matchLength),
-		"renderParams": lastRequest.renderParams,
-	});
 }
 
 function writeInputText(text) {
@@ -270,19 +166,29 @@ function writeInputText(text) {
 	}
 }
 
-function startSearch(request, tabId) {
-	lastRequest = {
-		tabId: tabId,
-		id: nextRequestId,
-		...request,
-	};
-	nextRequestId += 1;
+function sendHtmlToTab(tabId, request, matchLength) {
+	let res = Module.instance.exports.get_html();
+	const htmlPtr = res % Math.pow(2, 32);
+	const htmlLength = (res - htmlPtr) / Math.pow(2, 32);
 
+	const htmlView = new Uint8Array(Module.instance.exports.memory.buffer, htmlPtr, htmlLength);
+	const html = decoder.decode(htmlView);
+
+	browser.tabs.sendMessage(tabId, {
+		"type": "show",
+		"html": html,
+		"match": request.text.substring(0, matchLength),
+		"renderParams": request.renderParams,
+	});
+}
+
+function search(request, tabId) {
 	writeInputText(request.text);
-	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, lastRequest.id);
-	if (matchLength) {
-		lastRequest.matchLength = matchLength;
+	const matchLength = Module.instance.exports.rikaigu_search(request.text.length);
+	if (matchLength > 0) {
+		sendHtmlToTab(tabId, request, matchLength);
 	}
+
 	return matchLength;
 }
 
@@ -294,7 +200,7 @@ function onMessage(request, sender, response) {
 
 		case 'xsearch':
 			if (rikaiguError) return;
-			const matchLength = startSearch(request, sender.tab.id);
+			const matchLength = search(request, sender.tab.id);
 			response({matchLength, type: request.type});
 
 			break;
@@ -302,9 +208,9 @@ function onMessage(request, sender, response) {
 		case 'relay':
 			request.type = request.targetType;
 			if ('frameId' in request) {
-				chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
+				browser.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
 			} else {
-				chrome.tabs.sendMessage(sender.tab.id, request);
+				browser.tabs.sendMessage(sender.tab.id, request);
 			}
 			break;
 
@@ -315,7 +221,7 @@ function onMessage(request, sender, response) {
 
 function onConfigReady() {
 	if (config.reload) {
-		chrome.storage.local.remove('reload');
+		browser.storage.local.remove('reload');
 		return;
 	}
 	if (config.autostart && !rikaiguEnabled) {
@@ -324,5 +230,5 @@ function onConfigReady() {
 }
 
 clearState();
-chrome.browserAction.onClicked.addListener(rikaiguEnable);
-chrome.runtime.onMessage.addListener(onMessage);
+browser.browserAction.onClicked.addListener(rikaiguEnable);
+browser.runtime.onMessage.addListener(onMessage);

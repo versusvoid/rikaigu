@@ -46,7 +46,7 @@ var rikaigu = null;
 var frameId = null;
 
 function updateConfig() {
-	chrome.storage.local.get(null, function(config) {
+	browser.storage.local.get(null, function(config) {
 		if (rikaigu !== null) {
 			rikaigu.config = config;
 		}
@@ -118,7 +118,7 @@ function makePopup() {
 	var css = document.createElementNS('http://www.w3.org/1999/xhtml', 'link');
 	css.setAttribute('rel', 'stylesheet');
 	css.setAttribute('type', 'text/css');
-	css.setAttribute('href', chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css'));
+	css.setAttribute('href', browser.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css'));
 	css.setAttribute('id', 'rikaigu-css');
 	document.getElementsByTagName('head')[0].appendChild(css);
 
@@ -138,7 +138,7 @@ async function showPopup(text, renderParams) {
 	if (!popup) {
 		popup = makePopup();
 	} else {
-		var href = chrome.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css');
+		var href = browser.extension.getURL('css/popup-' + rikaigu.config.popupColor + '.css');
 		var css = document.getElementById('rikaigu-css');
 		if (css.getAttribute('href') !== href) {
 			css.setAttribute('href', href);
@@ -242,7 +242,7 @@ function onClick(ev) {
 	}
 	wordNode.classList.toggle('reviewed');
 
-	chrome.storage.local.set({reviewList: rikaigu.config.reviewList});
+	browser.storage.local.set({reviewList: rikaigu.config.reviewList});
 }
 
 function rightmostRangeRect(range) {
@@ -438,7 +438,6 @@ class PopupDimPosComputer {
 		await this._popupReady();
 
 		const [x, y] = this._computeFinalPosition();
-		console.log('finalPosition:', x, y);
 		this._placeExpandButton(y);
 
 		this.popup.style.setProperty('left', `${x}px`, 'important');
@@ -456,7 +455,7 @@ function _getPopupAndUpdateItsPosition() {
 }
 
 function requestHidePopup() {
-	chrome.runtime.sendMessage({
+	browser.runtime.sendMessage({
 		'type': 'relay',
 		'targetType': 'close'
 	});
@@ -498,7 +497,7 @@ function onKeyDown(ev) {
 				fakeEvent.type = 'relay';
 				fakeEvent.targetType = 'keyboardEventForActiveFrame';
 				fakeEvent.frameId = rikaigu.activeFrame;
-				chrome.runtime.sendMessage(fakeEvent);
+				browser.runtime.sendMessage(fakeEvent);
 			} else {
 				onMouseMove(fakeEvent);
 			}
@@ -512,14 +511,14 @@ function onKeyDown(ev) {
 
 	switch (ev.code) {
 		case 'ShiftLeft':
-			chrome.storage.local.set({defaultDict: (rikaigu.config.defaultDict - 1 + 3) % 3}, function() {
+			browser.storage.local.set({defaultDict: (rikaigu.config.defaultDict - 1 + 3) % 3}, function() {
 				rikaigu.shownMatch = null;
 				extractTextAndSearch();
 			});
 			break;
 		case 'ShiftRight':
 		case 'Enter':
-			chrome.storage.local.set({defaultDict: (rikaigu.config.defaultDict + 1) % 3}, function() {
+			browser.storage.local.set({defaultDict: (rikaigu.config.defaultDict + 1) % 3}, function() {
 				rikaigu.shownMatch = null;
 				extractTextAndSearch();
 			});
@@ -528,7 +527,7 @@ function onKeyDown(ev) {
 			reset();
 			break;
 		case 'KeyD':
-			chrome.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings});
+			browser.storage.local.set({onlyReadings: !rikaigu.config.onlyReadings});
 			for (var el of document.getElementsByClassName('rikaigu-pos-and-def')) {
 				el.classList.toggle('rikaigu-hidden');
 			}
@@ -644,7 +643,7 @@ function _updateMousePositionState(ev) {
 	rikaigu.lastTarget = ev.target;
 
 	if (rikaigu.activeFrame !== window.frameId) {
-		chrome.runtime.sendMessage({
+		browser.runtime.sendMessage({
 			'type': 'relay',
 			'targetType': 'changeActiveFrame',
 			'activeFrameId': window.frameId
@@ -688,7 +687,7 @@ async function _getRangeCandidateFromInput(ev) {
 	const fakeInput = makeFake(ev.target);
 	document.body.parentNode.appendChild(fakeInput);
 	await nextTick();
-	const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+	const range = _rangeFromPoint(ev.clientX, ev.clientY);
 
 	if (range.startContainer.parentNode !== fakeInput) {
 		console.error('Failed to fake input', ev.target, range.startContainer, range.startOffset, fakeInput);
@@ -712,8 +711,23 @@ async function _getRangeCandidateFromInput(ev) {
 	return result;
 }
 
+function _rangeFromPoint(x, y) {
+	if (document.caretRangeFromPoint) {
+		// chrome
+		return document.caretRangeFromPoint(x, y);
+	}
+
+	// firefox
+	const caretPosition = document.caretPositionFromPoint(x, y);
+
+	const range = new Range();
+	range.setStart(caretPosition.offsetNode, caretPosition.offset);
+	range.setEnd(caretPosition.offsetNode, caretPosition.offset);
+	return range;
+}
+
 function _getRangeCandidateFromPlainElement(ev) {
-	const range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+	const range = _rangeFromPoint(ev.clientX, ev.clientY);
 	const rect = range && rightmostRangeRect(range);
 	if (!rect || _tooFar(rect, ev.clientX, ev.clientY)) {
 		return null;
@@ -816,7 +830,9 @@ async function onMouseMove(ev) {
 
 	_updateMousePositionState(ev);
 
-	if (!_shouldDoAnythingOnMouseMove(ev)) return;
+	if (!_shouldDoAnythingOnMouseMove(ev)) {
+		return;
+	}
 
 	const rangeCandidate = await _getNewRangeCandidate(ev);
 	if (_checkRangeHaveNotChanged(rangeCandidate)) {
@@ -879,11 +895,11 @@ function processReviewResult(result) {
 }
 
 //Event Listeners
-chrome.runtime.onMessage.addListener(
+browser.runtime.onMessage.addListener(
 	function(request, sender, response) {
 		switch (request.type) {
 			case 'enable':
-				chrome.storage.local.get(null, config => enableTab(config));
+				browser.storage.local.get(null, enableTab);
 				break;
 			case 'disable':
 				disableTab();
@@ -936,13 +952,13 @@ chrome.runtime.onMessage.addListener(
  * When a frame loads, it asks background for config (if rikaigu is currently enabled)
  * and own frameId (always).
  */
-chrome.runtime.sendMessage({
+browser.runtime.sendMessage({
 	'type': 'enable?'
 }, function(response) {
 	window.frameId = response.frameId;
 	if (response.enabled) {
-		chrome.storage.local.get(null, enableTab);
+		browser.storage.local.get(null, enableTab);
 	}
 });
 
-chrome.storage.onChanged.addListener(updateConfig);
+browser.storage.onChanged.addListener(updateConfig);

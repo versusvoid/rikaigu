@@ -1,7 +1,7 @@
 var kanjiInfoKeys = ["H", "L", "E", "DK", "N", "V", "Y", "P", "IN", "I", "U"];
 
 function loadValues() {
-	chrome.storage.local.get(null, function(config) {
+	browser.storage.local.get(null, function(config) {
 		for (var input of document.querySelectorAll('[bind]')) {
 			if (input.getAttribute('type') === 'checkbox') {
 				input.checked = config[input.id];
@@ -43,7 +43,7 @@ function saveValues() {
 	}
 	newConfig['kanjiInfo'] = kanjiinfoarray.join(' ');
 
-	chrome.storage.local.set(newConfig);
+	browser.storage.local.set(newConfig);
 }
 
 window.onload = loadValues;
@@ -55,4 +55,4 @@ for (var i = 0; i < inputs.length; ++i) {
 		inputs[i].addEventListener('input', saveValues);
 	}
 }
-chrome.storage.onChanged.addListener(loadValues);
+browser.storage.onChanged.addListener(loadValues);

@@ -39,26 +39,13 @@ uint32_t parse_base62_uint(const char* s, const char* const end)
 	return res;
 }
 
-const char* find(const char* start, const char* end, const char c)
-{
-	while (start < end)
-	{
-		if (*start == c)
-		{
-			return start;
-		}
-		start += 1;
-	}
-	return start;
-}
-
 dentry_t* dentry_make(const char* raw, size_t length, bool is_name)
 {
 	const char* parts_start[] = {raw, NULL, NULL, NULL};
 	size_t num_parts = 1;
 	while (num_parts < 4)
 	{
-		const char* next = find(parts_start[num_parts - 1], raw + length, '\t');
+		const char* next = find_char(parts_start[num_parts - 1], raw + length, '\t');
 		if (next == raw + length)
 		{
 			break;
@@ -141,7 +128,7 @@ void parse_surfaces(surface_t* surfaces, const char* start, const char* end, con
 	while (start < end)
 	{
 		surfaces[surface_index].text = start;
-		const char* surface_end = find(start, end, sep);
+		const char* surface_end = find_char(start, end, sep);
 		if (*(surface_end - 1) == 'U')
 		{
 			surfaces[surface_index].common = false;
@@ -168,7 +155,7 @@ void kanji_group_parse_kanjis(kanji_group_t* kanji_group, const char* start, con
 
 void kanji_group_parse(kanji_group_t* kanji_group, const char* start, const char* end, buffer_t* dentry_buffer)
 {
-	const char* specification = find(start, end, '#');
+	const char* specification = find_char(start, end, '#');
 	if (specification != end)
 	{
 		kanji_group_parse_reading_indicies(kanji_group, specification + 1, end, dentry_buffer);
@@ -190,7 +177,7 @@ void dentry_parse_kanjis(dentry_t* dentry, buffer_t* dentry_buffer)
 	const char* cur = dentry->kanjis_start;
 	while (group_index != dentry->num_kanji_groups)
 	{
-		const char* end = find(cur, dentry->readings_start - 1, ';');
+		const char* end = find_char(cur, dentry->readings_start - 1, ';');
 		kanji_group_parse(dentry->kanji_groups + group_index, cur, end, dentry_buffer);
 		group_index += 1;
 		cur = end + 1;
@@ -222,7 +209,7 @@ void parse_i_promise_i_wont_overwrite_it_strings(
 	do
 	{
 		(*arr)[str_index].text = start;
-		const char* str_end = find(start, end, sep);
+		const char* str_end = find_char(start, end, sep);
 		(*arr)[str_index].length = (str_end - start);
 		start = str_end + 1;
 		str_index += 1;
@@ -232,7 +219,7 @@ void parse_i_promise_i_wont_overwrite_it_strings(
 
 void sense_group_parse(sense_group_t* sense_group, const char* start, const char* end, buffer_t* dentry_buffer)
 {
-	const char* sep = find(start, end, ';');
+	const char* sep = find_char(start, end, ';');
 
 	parse_i_promise_i_wont_overwrite_it_strings(&sense_group->num_types, &sense_group->types, start, sep, ',', dentry_buffer);
 
@@ -255,7 +242,7 @@ void dentry_parse_definition(dentry_t* dentry, buffer_t* dentry_buffer)
 	const char* cur = dentry->definition_start;
 	while (group_index != dentry->num_sense_groups)
 	{
-		const char* end = find(cur, dentry->definition_end, '\\');
+		const char* end = find_char(cur, dentry->definition_end, '\\');
 		sense_group_parse(dentry->sense_groups + group_index, cur, end, dentry_buffer);
 		group_index += 1;
 		cur = end + 1;

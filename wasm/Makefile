@@ -19,13 +19,13 @@ SOURCES := \
 	src/vardata_array.c \
 	src/utf.c \
 	src/names_types_mapping.c \
-	src/review_list.c
-BITCODE_OBJECTS := $(SOURCES:src/%.c=build/%.bc) generated/index.bc
+	src/review_list.c \
+	src/decompress.c
+BITCODE_OBJECTS := $(SOURCES:src/%.c=build/%.bc) generated/index.bc generated/dictionary.bc
 EXPORTS := \
-	rikaigu_search_start \
-	rikaigu_search_finish \
+	rikaigu_search \
 	rikaigu_set_config \
-	buffer_allocate \
+	get_html \
 	review_list_add_entry \
 	review_list_remove_entry
 EXPORTS := $(EXPORTS:%=--export=%)
@@ -65,10 +65,11 @@ build/%.bc.d : src/%.c | build
 
 
 TEST_SOURCES := \
-	tests/libc.c \
-	tests/state.c \
+	tests/decompress.c \
 	tests/dentry.c \
 	tests/index.c \
+	tests/libc.c \
+	tests/state.c \
 	tests/utf.c
 
 test: c-test py-test
@@ -84,8 +85,8 @@ build/%.test : tests/%.c build/index.polyfill.o | build
 build/index.polyfill.o: tests/index.polyfill.c
 	$(CC) -c tests/index.polyfill.c -o build/index.polyfill.o
 
-build/generated.index.o: generated/index.bc
-	llc -O3 -filetype=obj -mtriple=$$(llc --version | grep -F 'Default target' | sed 's/.*: \(\w\+\)/\1/g') generated/index.bc -o build/generated.index.o
+build/generated.%.o: generated/%.bc
+	llc -O3 -filetype=obj -mtriple=$$(llc --version | grep -F 'Default target' | sed 's/.*: \(\w\+\)/\1/g') $< -o $@
 
 build/%.test.d : tests/%.c | build
 	$(CC) $(COMMON_CFLAGS) -MM $< -MT "$(@:%.test.d=%.test)" -o $@
@@ -104,8 +105,8 @@ build/bindings.py: build/test.so | build
 	LD_PRELOAD=$(COMPILER_RT)/libclang_rt.asan-x86_64.so ASAN_OPTIONS=detect_leaks=false python build/bindings.py
 
 SHARED_TEST_CFLAGS := $(TEST_CFLAGS) -fPIC -fdata-sections -ffunction-sections -shared-libsan
-build/test.so: $(SOURCES) tests/polyfill.c generated/index.test.c build/generated.index.o | build
-	$(CC) $(SOURCES:src/index.c=generated/index.test.c) tests/polyfill.c build/generated.index.o \
+build/test.so: $(SOURCES) tests/polyfill.c generated/index.test.c build/generated.index.o build/generated.dictionary.o | build
+	$(CC) $^ \
 		$(SHARED_TEST_CFLAGS) \
 		-D dictionary_index_max_entry_length=2048 \
 		-shared -Wl,--gc-sections,--print-gc-sections \

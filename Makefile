@@ -1,5 +1,5 @@
 CSS = css/options.css css/popup-common.css css/popup-black.css css/popup-blue.css css/popup-lightblue.css css/popup-yellow.css
-DICT_DYNAMIC = data/dict.dat data/names.dat
+DICT_DYNAMIC = wasm/generated/dictionary.bc wasm/generated/index.bc
 IMG = images/ba.png images/icon128.png images/icon48.png
 HTML = html/background.html html/options.html html/scratchpad.html html/popup.html
 JS = js/background.js js/config.js js/options.js js/rikaicontent.js js/selection.js js/highlight.js js/scratchpad.js js/popup.js
@@ -24,6 +24,7 @@ dist/rikaigu.zip: manifest.json $(CSS) $(IMG) $(HTML) $(JS) $(DICT_DYNAMIC) $(WA
 	ln -sfr $(JS) dist/rikaigu/js
 	ln -sfr $(WASM) dist/rikaigu/wasm
 	ln -sfr $(DICT_DYNAMIC) dist/rikaigu/data
+	head -n 33 wasm/generated/lz4.c > dist/rikaigu/lz4.license
 	cp manifest.json dist/rikaigu/
 	sed -i 's/rikaigu (devel)/rikaigu/g' dist/rikaigu/manifest.json
 	cd dist; zip rikaigu.zip -r rikaigu

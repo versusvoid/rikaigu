@@ -11,8 +11,7 @@ bool state_try_add_word_result(
 	const char* inflection_name, const size_t inflection_name_length,
 	const uint32_t offset);
 
-void state_make_offsets_array_and_request_read(uint32_t request_id);
-
+size_t state_sort_and_limit_word_results(void);
 
 typedef struct word_result_iterator {
 	word_result_t* current;
@@ -23,6 +22,8 @@ word_result_iterator_t state_get_word_result_iterator(void);
 
 void word_result_iterator_next(word_result_iterator_t* it);
 
+
+uint32_t word_result_get_offset(word_result_t* wr);
 
 size_t word_result_get_match_length(word_result_t* wr);
 

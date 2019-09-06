@@ -201,10 +201,23 @@ bool binary_locate_bounds(
 	return true;
 }
 
-size_t print_uint(char* out, size_t max_length, uint32_t v)
+const char* find_char(const char* start, const char* end, const char c)
+{
+	while (start < end)
+	{
+		if (*start == c)
+		{
+			return start;
+		}
+		start += 1;
+	}
+	return start;
+}
+
+static size_t print_uint(char* out, size_t max_length, uint64_t v)
 {
 	size_t digits = 1;
-	for (uint32_t v2 = v / 10; v2 != 0; v2 /= 10)
+	for (uint64_t v2 = v / 10; v2 != 0; v2 /= 10)
 	{
 		digits += 1;
 	}
@@ -221,7 +234,7 @@ size_t print_uint(char* out, size_t max_length, uint32_t v)
 	return digits;
 }
 
-char* print_utf16(const char16_t* s, const size_t length, char* out, size_t available)
+static char* print_utf16(const char16_t* s, const size_t length, char* out, size_t available)
 {
 	const char16_t* const end = s + length;
 	while (s < end)
@@ -292,6 +305,10 @@ int consolef(const char* format, ...)
 		if (spec == 'u')
 		{
 			out += print_uint(out, buf + sizeof(buf) - 1 - out, va_arg(args, uint32_t));
+		}
+		else if (spec == 'U')
+		{
+			out += print_uint(out, buf + sizeof(buf) - 1 - out, va_arg(args, uint64_t));
 		}
 		else if (spec == 's')
 		{
