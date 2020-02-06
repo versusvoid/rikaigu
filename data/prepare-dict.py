@@ -185,28 +185,27 @@ def prepare_names():
 			for key in entry_index_keys:
 				index[key].add(offset)
 
-			l = format_entry(entry).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
+			line = format_entry(entry).encode('utf-8')
+			line_lengths.append(len(line))
+			of.write(line)
 			of.write(b'\n')
-			offset += len(l) + 1
+			offset += len(line) + 1
 
 		for combined_entry in combined_entries.values():
 			entry_index_keys = index_keys(combined_entry, variate=False)
 			for key in entry_index_keys:
 				index[key].add(offset)
 
-			l = format_entry(combined_entry).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
+			line = format_entry(combined_entry).encode('utf-8')
+			line_lengths.append(len(line))
+			of.write(line)
 			of.write(b'\n')
-			offset += len(l) + 1
+			offset += len(line) + 1
 
 	print_lengths_stats('names', line_lengths)
 	return index
 
-def prepare_dict():
-	pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+def prepare_words(pos_flags_map):
 	min_entry_id = 2**63
 	for entry in dictionary.dictionary_reader('JMdict_e.gz'):
 		min_entry_id = min(entry.id, min_entry_id)
@@ -214,7 +213,7 @@ def prepare_dict():
 	index = defaultdict(set)
 	offset = 0
 	line_lengths = []
-	with open(f'data/dict.dat', 'wb') as of:
+	with open(f'data/words.dat', 'wb') as of:
 		for entry in dictionary.dictionary_reader('JMdict_e.gz'):
 			all_pos = set(itertools.chain.from_iterable(sg.pos for sg in entry.sense_groups))
 			pos_flags = sum(pos_flags_map.get(pos, 0) for pos in all_pos)
@@ -223,13 +222,13 @@ def prepare_dict():
 			for key in index_keys(entry, variate=True):
 				index[key].add(index_entry)
 
-			l = format_entry(entry, min_entry_id).encode('utf-8')
-			line_lengths.append(len(l))
-			of.write(l)
+			line = format_entry(entry, min_entry_id).encode('utf-8')
+			line_lengths.append(len(line))
+			of.write(line)
 			of.write(b'\n')
-			offset += len(l) + 1
+			offset += len(line) + 1
 
-	print_lengths_stats('dict', line_lengths)
+	print_lengths_stats('words', line_lengths)
 	return index, min_entry_id
 
 def index_kanji():
@@ -250,12 +249,12 @@ def index_kanji():
 		for kanji_code_point, offset in index:
 			of.write(struct.pack('<II', kanji_code_point, offset))
 
-dict_index, min_entry_id = prepare_dict()
+pos_flags_map = wasm_generator.generate_deinflection_rules_header()
+words_index, min_entry_id = prepare_words(pos_flags_map)
 names_index = prepare_names()
 
-wasm_generator.write_utf16_indexies(dict_index, names_index)
+wasm_generator.write_utf16_indexies(words_index, names_index)
 wasm_generator.generate_config_header(max_readings_index, min_entry_id)
-wasm_generator.get_lz4_source()
 
 # TODO generate kanji.dat
 index_kanji()

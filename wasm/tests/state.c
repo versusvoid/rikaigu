@@ -15,7 +15,7 @@ void test_init()
 {
 	setup_memory();
 	uint8_t* heap_base = wasm_memory + 31419;
-	init((size_t)heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
+	init(heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
 
 	assert((uint8_t*)state == heap_base);
 	assert(wasm_memory_size_pages == 2);
@@ -33,7 +33,7 @@ void test_enlarge_your_buffer()
 {
 	setup_memory();
 	uint8_t* heap_base = wasm_memory + 31419;
-	init((size_t)heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
+	init(heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
 
 	const uint8_t buf0_content[] = {1,2,3,4,5,6,7,8,9,10,11};
 	assert(state->buffers[0].capacity >= sizeof(buf0_content));
@@ -106,7 +106,7 @@ void test_buffer_allocate()
 	setup_memory();
 
 	uint8_t* heap_base = wasm_memory + 31419;
-	init((size_t)heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
+	init(heap_base, wasm_memory_size_pages * (1<<16) - ((size_t)heap_base - (size_t)wasm_memory));
 
 	const uint8_t buf1_content[] = {12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28};
 	assert(state->buffers[1].capacity >= sizeof(buf1_content));

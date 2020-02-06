@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <uchar.h>
+
+#include "libc.h"
 
 typedef struct {
 	const char* text;

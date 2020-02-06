@@ -1,8 +1,5 @@
 #include "deinflect.h"
 
-#include <assert.h>
-#include <uchar.h>
-
 #include "state.h"
 #include "libc.h"
 #include "utf.h"

@@ -1,7 +1,6 @@
 #include "utf.h"
 
 #include <stdint.h>
-#include <assert.h>
 
 wchar_t decode_utf16_wchar(const char16_t** pText)
 {

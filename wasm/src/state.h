@@ -3,11 +3,11 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <uchar.h>
 #ifndef NDEBUG
 #include <stdio.h>
 #endif
 
+#include "libc.h"
 #include "dentry.h"
 
 typedef enum {

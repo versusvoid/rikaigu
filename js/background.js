@@ -1,3 +1,4 @@
+import { getDictionaryFiles } from '/js/idb.js';
 /*
 	Rikaigu
 	Extended by Versus Void
@@ -40,18 +41,20 @@
 	Please do not change or remove any of the copyrights or links to web pages
 	when modifying any of the files. - Jon
 */
+
 var rikaiguEnabled = false;
 var rikaiguError = false;
+
 function onLoaded() {
 	rikaiguEnabled = true;
 
-	chrome.windows.getAll({
+	browser.windows.getAll({
 			"populate": true
 		},
 		function(windows) {
 			for (var browserWindow of windows) {
 				for (var tab of browserWindow.tabs) {
-					chrome.tabs.sendMessage(tab.id, {
+					browser.tabs.sendMessage(tab.id, {
 						"type": "enable"
 					});
 				}
@@ -59,23 +62,31 @@ function onLoaded() {
 		});
 
 
-	chrome.browserAction.setBadgeBackgroundColor({
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [255, 0, 0, 255]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": "On"
 	});
-	chrome.browserAction.setPopup({
+	browser.browserAction.setPopup({
 		"popup": "/html/popup.html"
+	});
+}
+
+function openDictionaryUploadPage() {
+	browser.tabs.create({
+		active: true,
+		url: '/html/upload.html',
 	});
 }
 
 function onError(err) {
 	console.error('onError(', err, ')');
-	chrome.browserAction.setBadgeBackgroundColor({
+
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [0, 0, 0, 255]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": "Err"
 	});
 	rikaiguError = true;
@@ -83,13 +94,13 @@ function onError(err) {
 
 function clearState() {
 	rikaiguEnabled = false;
-	chrome.browserAction.setBadgeBackgroundColor({
+	browser.browserAction.setBadgeBackgroundColor({
 		"color": [0, 0, 0, 0]
 	});
-	chrome.browserAction.setBadgeText({
+	browser.browserAction.setBadgeText({
 		"text": ""
 	});
-	chrome.browserAction.setPopup({
+	browser.browserAction.setPopup({
 		"popup": ""
 	});
 }
@@ -119,6 +130,11 @@ async function rikaiguEnable(tab) {
 		return;
 	}
 	try {
+		[window.namesDictionary, window.wordsDictionary] = await getDictionaryFiles();
+		if (!window.namesDictionary || !window.wordsDictionary) {
+			return openDictionaryUploadPage();
+		}
+
 		window.Module = await WebAssembly.instantiateStreaming(
 			fetch('/wasm/rikai.wasm'),
 			{ env: {
@@ -128,61 +144,32 @@ async function rikaiguEnable(tab) {
 			}}
 		);
 	} catch(err) {
-		onError(err);
+		return onError(err);
 	}
 
-	Module.inputDataOffset = Module.instance.exports.rikaigu_set_config(
-		Module.instance.exports.__heap_base,
-		Module.instance.exports.memory.buffer.byteLength,
-	);
+	Module.inputDataOffset = Module.instance.exports.rikaigu_set_config();
 
 	onLoaded(tab);
 }
 
 function rikaiguDisable() {
 	// Send a disable message to all browsers
-	var windows = chrome.windows.getAll({
+	browser.windows.getAll({
 			"populate": true
 		},
 		function(windows) {
 			for (var i = 0; i < windows.length; ++i) {
 				var tabs = windows[i].tabs;
 				for (var j = 0; j < tabs.length; ++j) {
-					chrome.tabs.sendMessage(tabs[j].id, {
+					browser.tabs.sendMessage(tabs[j].id, {
 						"type": "disable"
 					});
 				}
 			}
 		});
-	chrome.storage.local.set({'reload': true});
+	browser.storage.local.set({'reload': true});
 	location.reload();
 }
-
-async function getRoot() {
-	return new Promise(function(resolve, reject) {
-		chrome.runtime.getPackageDirectoryEntry(resolve);
-	});
-}
-
-async function getFileEntry(root, path) {
-	return new Promise(function(resolve, reject) {
-		root.getFile(path, {}, resolve, reject);
-	});
-}
-
-async function getFile(path) {
-	const root = await getRoot();
-	const entry = await getFileEntry(root, path);
-	return new Promise(function(resolve, reject) {
-		entry.file(resolve, reject);
-	});
-}
-
-var namesFile = null;
-var dictFile = null;
-
-getFile('data/names.dat').then(function(f){namesFile = f;});
-getFile('data/dict.dat').then(function(f){dictFile = f;});
 
 async function getLines(file, offsets) {
 	return Promise.all(offsets.map(offset => getLine(file, offset)));
@@ -219,8 +206,9 @@ function readLines(offsetsPtr, numOffsets) {
 		// see word_results.c : state_make_offsets_array_and_request_read()
 		const isName = !!(offsetsView[i] & (1 << 31));
 		const offset = offsetsView[i] & 0x7FFFFFFF;
-		promises.push(getLine(isName ? namesFile : dictFile, offset));
+		promises.push(getLine(isName ? namesDictionary : wordsDictionary, offset));
 	}
+
 	return Promise.all(promises);
 }
 
@@ -255,7 +243,7 @@ async function requestReadDictionary(offsetsPtr, numOffsets, bufferHandle, reque
 	const htmlView = new Uint8Array(Module.instance.exports.memory.buffer, htmlPtr, htmlLength);
 	const html = decoder.decode(htmlView);
 
-	chrome.tabs.sendMessage(lastRequest.tabId, {
+	browser.tabs.sendMessage(lastRequest.tabId, {
 		"type": "show",
 		"html": html,
 		"match": lastRequest.text.substring(0, lastRequest.matchLength),
@@ -279,10 +267,18 @@ function startSearch(request, tabId) {
 	nextRequestId += 1;
 
 	writeInputText(request.text);
-	const matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, lastRequest.id);
-	if (matchLength) {
+	let matchLength = 0;
+	try {
+		matchLength = Module.instance.exports.rikaigu_search_start(request.text.length, lastRequest.id);
+	} catch (err) {
+		onError(err);
+		return 0;
+	}
+
+	if (matchLength > 0) {
 		lastRequest.matchLength = matchLength;
 	}
+
 	return matchLength;
 }
 
@@ -302,9 +298,9 @@ function onMessage(request, sender, response) {
 		case 'relay':
 			request.type = request.targetType;
 			if ('frameId' in request) {
-				chrome.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
+				browser.tabs.sendMessage(sender.tab.id, request, {frameId: request.frameId});
 			} else {
-				chrome.tabs.sendMessage(sender.tab.id, request);
+				browser.tabs.sendMessage(sender.tab.id, request);
 			}
 			break;
 
@@ -315,7 +311,7 @@ function onMessage(request, sender, response) {
 
 function onConfigReady() {
 	if (config.reload) {
-		chrome.storage.local.remove('reload');
+		browser.storage.local.remove('reload');
 		return;
 	}
 	if (config.autostart && !rikaiguEnabled) {
@@ -324,5 +320,5 @@ function onConfigReady() {
 }
 
 clearState();
-chrome.browserAction.onClicked.addListener(rikaiguEnable);
-chrome.runtime.onMessage.addListener(onMessage);
+browser.browserAction.onClicked.addListener(rikaiguEnable);
+browser.runtime.onMessage.addListener(onMessage);

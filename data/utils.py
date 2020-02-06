@@ -2,6 +2,7 @@ import os
 import subprocess
 import builtins
 import itertools
+import math
 
 def all(function_or_iterable, *args):
 	if len(args) == 0:
@@ -142,3 +143,6 @@ def print_lengths_stats(label, line_lengths):
 		min={line_lengths[0]} max={line_lengths[-1]}
 		mean={sum(line_lengths)/len(line_lengths)} med={line_lengths[len(line_lengths) // 2]}
 	''')
+
+def ceil_power_of_2(n):
+	return 2**math.ceil(math.log2(n))

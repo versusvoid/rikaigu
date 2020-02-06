@@ -1,7 +1,6 @@
 #include "html_render.h"
 
 #include <stdbool.h>
-#include <assert.h>
 
 #include "state.h"
 #include "libc.h"

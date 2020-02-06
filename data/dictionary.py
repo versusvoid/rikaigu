@@ -7,7 +7,6 @@ import gzip
 import pickle
 import os
 
-from utils import download
 from index import index_keys
 
 class Kanji(namedtuple('Kanji', 'text, inf, common')):
@@ -190,15 +189,17 @@ def make_entry(elem, entities):
 	return entry
 
 def dictionary_reader(dictionary='JMdict_e.gz'):
-	dictionary_path = download('http://ftp.monash.edu.au/pub/nihongo/' + dictionary, dictionary)
+	dictionary_path = os.path.join('tmp', dictionary)
 	entities = {}
 	with gzip.open(dictionary_path, 'rt') as f:
 		for l in f:
-			if l.startswith('<JMdict>') or l.startswith('<JMnedict>'): break
+			if l.startswith('<JMdict>') or l.startswith('<JMnedict>'):
+				break
+
 			if l.startswith('<!ENTITY'):
 				parts = l.strip().split(maxsplit=2)
 				assert parts[2].startswith('"') and parts[2].endswith('">')
-				assert parts[2][1:-2] not in entities
+				#assert parts[2][1:-2] not in entities
 				entities[parts[2][1:-2]] = parts[1]
 
 	entry_no = 0
@@ -224,7 +225,8 @@ def make_indexed_dictionary(
 	print('indexing dictionary')
 	res = {}
 	for e in entries:
-		keys = index_keys(e,
+		keys = index_keys(
+			e,
 			variate=variate,
 			convert_to_hiragana=convert_to_hiragana_for_index,
 			agressive_conversion=agressive_conversion

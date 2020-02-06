@@ -8,6 +8,8 @@ uint8_t* wasm_memory = NULL;
 size_t wasm_memory_size_pages = 0;
 size_t wasm_memory_max_size_pages = 0;
 
+unsigned char __heap_base;
+
 size_t __builtin_wasm_memory_size(int memory_index)
 {
 	if (wasm_memory == NULL)

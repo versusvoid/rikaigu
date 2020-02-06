@@ -48,12 +48,12 @@ function initConfig(config) {
 		}
 	}
 	if (needUpdate) {
-		chrome.storage.local.set(config);
+		browser.storage.local.set(config);
 	}
 
 	window.config = config;
-	chrome.storage.onChanged.addListener(onConfigChange);
+	browser.storage.onChanged.addListener(onConfigChange);
 
 	onConfigReady();
 }
-chrome.storage.local.get(null, initConfig);
+browser.storage.local.get(null, initConfig);

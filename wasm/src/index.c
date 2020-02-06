@@ -6,34 +6,21 @@
 #include "libc.h"
 #include "vardata_array.h"
 #include "utf.h"
+#include "decompress.h"
+
+#include "../generated/config.h"
 #include "../generated/index.h"
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Weverything"
-#define LZ4LIB_VISIBILITY __attribute__((visibility("hidden")))
-#include "../generated/lz4.c"
-#pragma clang diagnostic pop
-
-
-typedef struct {
-	size_t last_chunk_index;
-	size_t last_chunk_size;
-	size_t original_size;
-	const int32_t* chunks_offsets;
-	const uint8_t* data;
-	size_t currently_decompressed_chunk_index;
-} dictionary_index_t;
-
-dictionary_index_t dict_index = {
-	.last_chunk_index = dict_dictionary_index_last_chunk_index,
-	.last_chunk_size = dict_dictionary_index_last_chunk_size,
-	.original_size = dict_dictionary_index_original_size,
-	.chunks_offsets = dict_dictionary_index_chunks_offsets,
-	.data = dict_dictionary_index_data,
+compressed_file_t words_index = {
+	.last_chunk_index = words_dictionary_index_last_chunk_index,
+	.last_chunk_size = words_dictionary_index_last_chunk_size,
+	.original_size = words_dictionary_index_original_size,
+	.chunks_offsets = words_dictionary_index_chunks_offsets,
+	.data = words_dictionary_index_data,
 	.currently_decompressed_chunk_index = SIZE_MAX,
 };
 
-dictionary_index_t names_index = {
+compressed_file_t names_index = {
 	.last_chunk_index = names_dictionary_index_last_chunk_index,
 	.last_chunk_size = names_dictionary_index_last_chunk_size,
 	.original_size = names_dictionary_index_original_size,
@@ -59,51 +46,7 @@ struct {
 	uint32_t* offsets;
 } current_index_entry = {0};
 
-uint8_t decompressed_chunk[dictionary_index_chunk_size];
 uint8_t index_entry_buffer[dictionary_index_max_entry_length];
-dictionary_index_t* currently_decompressed_index = NULL;
-
-inline size_t get_real_chunk_size(const dictionary_index_t* index, size_t chunk_index)
-{
-	if (chunk_index == index->last_chunk_index)
-	{
-		return index->last_chunk_size;
-	}
-	else
-	{
-		return dictionary_index_chunk_size;
-	}
-}
-
-void do_decompress_chunk(dictionary_index_t* index, size_t chunk_index)
-{
-	// NOTE there is place for further optimization:
-	// when we have following/previous chunk decompressed, we want to
-	// cache entry end/start, so in case after decompressing current chunk
-	// we find part of required entry is in following/previous chunk we
-	// won't decompress it again
-	if (index == currently_decompressed_index && chunk_index == index->currently_decompressed_chunk_index)
-	{
-		return;
-	}
-
-	const int32_t chunk_start = index->chunks_offsets[chunk_index];
-	const int num_decompressed_bytes = LZ4_decompress_safe(
-		(const char*)(index->data + chunk_start),
-		(char*)decompressed_chunk,
-		// chunks_offsets have additional element at the end
-		// so this expression is valid for every valid `chunk_index`
-		index->chunks_offsets[chunk_index + 1] - chunk_start,
-		sizeof(decompressed_chunk)
-	);
-	if (num_decompressed_bytes < 0)
-	{
-		take_a_trip("Error during decompression");
-	}
-
-	index->currently_decompressed_chunk_index = chunk_index;
-	currently_decompressed_index = index;
-}
 
 inline bool is_offset_or_type(char16_t v)
 {
@@ -128,17 +71,17 @@ ptrdiff_t find_index_entry_start_offset(size_t position_in_chunk)
 
 ptrdiff_t find_index_entry_start_offset_in_previous_chunk(char16_t index_entry_second_part_first_char16)
 {
-	// previous chunk is always of dictionary_index_chunk_size
-	const char16_t last_char16 = *(char16_t*)(decompressed_chunk + dictionary_index_chunk_size - 2);
+	// previous chunk is always of CHUNK_SIZE
+	const char16_t last_char16 = *(char16_t*)(decompressed_chunk + CHUNK_SIZE - 2);
 	if (!is_offset_or_type(index_entry_second_part_first_char16) && is_offset_or_type(last_char16))
 	{
 		// edge case when previous entry ended on chunk boundary
-		return dictionary_index_chunk_size;
+		return CHUNK_SIZE;
 	}
 
 	// -2 because find_index_entry_start_offset(pos) iterates backward and start reading
 	// at `decompressed_chunk[pos]`
-	return find_index_entry_start_offset(dictionary_index_chunk_size - 2);
+	return find_index_entry_start_offset(CHUNK_SIZE - 2);
 }
 
 ptrdiff_t find_index_entry_end_offset(size_t real_chunk_size, size_t position_in_chunk)
@@ -198,16 +141,16 @@ void current_index_entry_fill(uint8_t* index_entry_start, const size_t index_ent
 	current_index_entry.offsets = (uint32_t*)(index_entry_start + offsets_start_pos);
 }
 
-void get_index_entry_at(dictionary_index_t* index, size_t position)
+void get_index_entry_at(compressed_file_t* index, size_t position)
 {
 	// All data in index (utf16 character or 4-bytes offset) is at least 2-aligned
 	// so we can always start at 2-aligned position
 	position -= (position % 2);
 
-	const size_t chunk_index = position / dictionary_index_chunk_size;
-	do_decompress_chunk(index, chunk_index);
+	const size_t chunk_index = position / CHUNK_SIZE;
+	decompress_chunk(index, chunk_index);
 
-	const size_t position_in_chunk = position % dictionary_index_chunk_size;
+	const size_t position_in_chunk = position % CHUNK_SIZE;
 	ptrdiff_t entry_start_offset = find_index_entry_start_offset(position_in_chunk);
 
 	size_t real_chunk_size = get_real_chunk_size(index, chunk_index);
@@ -228,29 +171,33 @@ void get_index_entry_at(dictionary_index_t* index, size_t position)
 	size_t start_position_in_index = 0;
 	if (entry_start_offset == -1)
 	{
+		// Searching for index entry start in previous chunk
+
 		memcpy(index_entry_buffer + sizeof(index_entry_buffer) - entry_end_offset, decompressed_chunk, entry_end_offset);
 
-		do_decompress_chunk(index, chunk_index - 1);
+		decompress_chunk(index, chunk_index - 1);
 
 		const char16_t index_entry_second_part_first_char16 = *(char16_t*)(index_entry_buffer + sizeof(index_entry_buffer) - entry_end_offset);
 		entry_start_offset = find_index_entry_start_offset_in_previous_chunk(index_entry_second_part_first_char16);
 		assert(entry_start_offset != -1);
 
-		// Previous chunk is always of dictionary_index_chunk_size
-		size_t prefix_length = dictionary_index_chunk_size - entry_start_offset;
+		// Previous chunk is always of CHUNK_SIZE
+		size_t prefix_length = CHUNK_SIZE - entry_start_offset;
 
 		index_entry_start = index_entry_buffer + sizeof(index_entry_buffer) - entry_end_offset - prefix_length;
 		index_entry_length = prefix_length + entry_end_offset;
-		start_position_in_index = (chunk_index - 1)*dictionary_index_chunk_size + entry_start_offset;
+		start_position_in_index = (chunk_index - 1)*CHUNK_SIZE + entry_start_offset;
 
 		memcpy(index_entry_start, decompressed_chunk + entry_start_offset, prefix_length);
 	}
 	else if (entry_end_offset == -1)
 	{
+		// Searching for index entry end in next chunk
+
 		size_t prefix_length = real_chunk_size - entry_start_offset;
 		memcpy(index_entry_buffer, decompressed_chunk + entry_start_offset, prefix_length);
 
-		do_decompress_chunk(index, chunk_index + 1);
+		decompress_chunk(index, chunk_index + 1);
 
 		real_chunk_size = get_real_chunk_size(index, chunk_index + 1);
 		const char16_t index_entry_first_part_last_char16 = *(char16_t*)(index_entry_buffer + prefix_length - 2);
@@ -259,7 +206,7 @@ void get_index_entry_at(dictionary_index_t* index, size_t position)
 
 		index_entry_start = index_entry_buffer;
 		index_entry_length = prefix_length + entry_end_offset;
-		start_position_in_index = chunk_index*dictionary_index_chunk_size + entry_start_offset;
+		start_position_in_index = chunk_index*CHUNK_SIZE + entry_start_offset;
 
 		memcpy(index_entry_buffer + prefix_length, decompressed_chunk, entry_end_offset);
 	}
@@ -267,7 +214,7 @@ void get_index_entry_at(dictionary_index_t* index, size_t position)
 	{
 		index_entry_start = index_entry_buffer;
 		index_entry_length = entry_end_offset - entry_start_offset;
-		start_position_in_index = chunk_index*dictionary_index_chunk_size + entry_start_offset;
+		start_position_in_index = chunk_index*CHUNK_SIZE + entry_start_offset;
 
 		memcpy(index_entry_buffer, decompressed_chunk + entry_start_offset, index_entry_length);
 	}
@@ -295,7 +242,7 @@ void current_index_entry_decode_offsets()
 }
 
 bool dictionary_index_search_for_offsets(
-	dictionary_index_t* index, const char16_t* needle, size_t search_length,
+	compressed_file_t* index, const char16_t* needle, size_t search_length,
 	size_t low, size_t high
 	)
 {
@@ -411,15 +358,19 @@ void index_entries_cache_add_current(buffer_t* b, dictionary_index_entry_t* it)
 	it->vardata_start_offset = vardata_start_offset;
 }
 
-dictionary_index_entry_t* dictionary_index_get_entry(dictionary_index_t* d, const char16_t* needle, size_t needle_length)
+dictionary_index_entry_t* dictionary_index_get_entry(compressed_file_t* d, const char16_t* needle, size_t needle_length)
 {
 	buffer_t* buf = state_get_index_entry_buffer();
 
 	size_t low = 0;
 	dictionary_index_entry_t* it = NULL;
 	size_t high = d->original_size;
-	if (d != currently_decompressed_index)
+	if (d != currently_decompressed_file)
 	{
+		// we search indices separately (only words, then only names)
+		// and assume cache contains only words OR only names
+		// if d != currently_decompressed_file, then we switched index
+		// and need to clear cache
 		it = index_entries_cache_clear(buf);
 	}
 	else
@@ -448,7 +399,7 @@ dictionary_index_entry_t* get_index_entry(Dictionary d, const char16_t* needle, 
 {
 	if (d == WORDS)
 	{
-		return dictionary_index_get_entry(&dict_index, needle, needle_length);
+		return dictionary_index_get_entry(&words_index, needle, needle_length);
 	}
 	else
 	{

@@ -1,7 +1,5 @@
 #include "word_results.h"
 
-#include <assert.h>
-
 #include "state.h"
 #include "libc.h"
 #include "vardata_array.h"
@@ -214,6 +212,11 @@ void word_result_iterator_next(word_result_iterator_t* it)
 {
 	assert(it->current != it->end);
 	it->current += 1;
+}
+
+uint32_t word_result_get_offset(word_result_t* wr)
+{
+	return wr->offset;
 }
 
 size_t word_result_get_match_length(word_result_t* wr)

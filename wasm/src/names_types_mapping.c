@@ -1,7 +1,6 @@
 #include "names_types_mapping.h"
 
 #include <stddef.h>
-#include <assert.h>
 
 #include "libc.h"
 

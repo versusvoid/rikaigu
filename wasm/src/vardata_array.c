@@ -1,8 +1,6 @@
 #include "vardata_array.h"
 
 #include <stddef.h>
-#include <assert.h>
-#include <stdio.h>
 
 #include "state.h"
 #include "libc.h"

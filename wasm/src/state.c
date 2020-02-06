@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <assert.h>
-
 #include "builtins.h"
 #include "imports.h"
 #include "libc.h"
@@ -56,8 +54,9 @@ void split_memory_into_buffers(void* start, size_t capacity_left)
 	state->buffers[HTML_BUFFER].data = start;
 }
 
+
 #define PAGE_SIZE_BYTES (1<<16)
-void init(size_t heap_base, size_t free_size)
+void init(void* const heap_base, size_t free_size)
 {
 	size_t required_size = sizeof(state_t);
 	for (size_t i = 0; i < NUM_BUFFER_TOKENS; ++i)
@@ -124,11 +123,15 @@ export void* buffer_allocate(buffer_t* buffer, size_t num_bytes)
 	return res;
 }
 
-export void* rikaigu_set_config(uint32_t heap_base, uint32_t current_memory_size)
+// Magic variable defined by clang
+extern unsigned char __heap_base;
+
+export void* rikaigu_set_config()
 {
 	if (state == NULL)
 	{
-		init(heap_base, current_memory_size - heap_base);
+		const size_t current_memory_size = __builtin_wasm_memory_size(0) * PAGE_SIZE_BYTES;
+		init(&__heap_base, current_memory_size - (size_t)&__heap_base);
 	}
 
 	return &state->input;

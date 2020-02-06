@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+unsigned char __heap_base;
+
 void (*request_read_dictionary_impl)(const uint32_t*, const size_t, const size_t, void*, uint32_t) = NULL;
 void request_read_dictionary(const uint32_t* a, const size_t b, const size_t c, void* d, uint32_t e)
 {
@@ -31,5 +33,5 @@ size_t __builtin_wasm_memory_grow(int i, size_t n)
 
 void print(const char* p)
 {
-	printf("print('%s')\n", p);
+	printf("\nprint('%s')\n", p);
 }

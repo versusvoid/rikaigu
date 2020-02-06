@@ -1,7 +1,6 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
-#include <uchar.h>
 #include <stdnoreturn.h>
 
 #include "dentry.h"

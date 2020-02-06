@@ -24,6 +24,8 @@ word_result_iterator_t state_get_word_result_iterator(void);
 void word_result_iterator_next(word_result_iterator_t* it);
 
 
+uint32_t word_result_get_offset(word_result_t* wr);
+
 size_t word_result_get_match_length(word_result_t* wr);
 
 bool word_result_is_name(word_result_t* wr);

@@ -1,5 +1,4 @@
 #include <stddef.h>
-#include <uchar.h>
 
 #include "state.h"
 

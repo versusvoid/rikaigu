@@ -1,7 +1,9 @@
 #pragma once
 
-#include <uchar.h>
 #include <stdint.h>
+#include <stddef.h>
+
+#include "libc.h"
 
 typedef struct {
 	size_t word_length;

@@ -1,20 +1,18 @@
-import math
 import random
 import subprocess
 from collections import namedtuple
 
 import lz4.block
 
-from utils import print_lengths_stats, download
+from utils import print_lengths_stats, download, ceil_power_of_2
 
+CHUNK_SIZE = 2048
 
 def generate_config_header(max_reading_index, min_entry_id):
 	with open('wasm/generated/config.h', 'w') as of:
 		print('#define MAX_READING_INDEX', max_reading_index, file=of)
 		print('#define MIN_ENTRY_ID', min_entry_id, file=of)
-
-def get_lz4_source():
-	download('https://github.com/lz4/lz4/raw/master/lib/lz4.c', 'wasm/generated/lz4.c', temp=False)
+		print('#define CHUNK_SIZE', CHUNK_SIZE, file=of)
 
 def generate_deinflection_rules_header():
 	max_in_suffix_len = 0
@@ -23,26 +21,26 @@ def generate_deinflection_rules_header():
 	pos_flags_map = {}
 	rules = []
 	with open('data/deinflect.dat') as f:
-		for l in f:
-			if l[0] == '#':
+		for line in f:
+			if line[0] == '#':
 				continue
-			l = l.strip().split('\t')
-			max_in_suffix_len = max(max_in_suffix_len, len(l[0].encode('utf-16le'))//2)
-			max_out_suffix_len = max(max_out_suffix_len, len(l[1].encode('utf-16le'))//2)
+			line = line.strip().split('\t')
+			max_in_suffix_len = max(max_in_suffix_len, len(line[0].encode('utf-16le'))//2)
+			max_out_suffix_len = max(max_out_suffix_len, len(line[1].encode('utf-16le'))//2)
 
 			source_pos = []
-			for pos in l[2].split('|'):
+			for pos in line[2].split('|'):
 				pos_flags_map.setdefault(pos, 1 << len(pos_flags_map))
 				source_pos.append(pos.upper().replace('-', '_'))
 
 			target_pos = []
-			for pos in l[3].split('|'):
+			for pos in line[3].split('|'):
 				pos_flags_map.setdefault(pos, 1 << len(pos_flags_map))
 				target_pos.append(pos.upper().replace('-', '_'))
 
-			maxinflection_name_length = max(maxinflection_name_length, len(l[4].encode('utf8')))
+			maxinflection_name_length = max(maxinflection_name_length, len(line[4].encode('utf8')))
 
-			rules.append((l[0], l[1], source_pos, target_pos, l[4]))
+			rules.append((line[0], line[1], source_pos, target_pos, line[4]))
 
 	rules.sort(key=lambda r: (-len(r[0]), r[0]))
 
@@ -110,24 +108,34 @@ def generate_deinflection_rules_header():
 	return pos_flags_map
 
 
+# This prefix is not seen in all the utf16 characters in index
 # Fun fact: this is the only possible prefix
-offset_prefix_len = 3
-type_bit_shift = 32 - (2*offset_prefix_len + 1)
 offset_prefix = int('1010,0000,0000,0000'.replace(',', ''), 2)
 prefix_mask   = int('1110,0000,0000,0000'.replace(',', ''), 2)  # noqa: E221
 suffix_mask   = int('0001,1111,1111,1111'.replace(',', ''), 2)  # noqa: E221
-
-chunk_size = 2048
+offset_prefix_len = 3
+type_bit_shift = 32 - (2*offset_prefix_len + 1)
 
 def encode_int(i, is_type=False):
+	'''
+	Encodes single int < 2**25 as pair of 16-bit words distinguished from
+	utf16 by unique prefix `offset_prefix` not seen in index keys
+
+	In fact we encode two types (offsets or "word types") of ints < 2**24
+	'''
 	assert i < 2**(32 - (2*offset_prefix_len + 1))  # +1 for `type` bit
 
+	# first word
 	h1 = (i & suffix_mask) | offset_prefix
+	# second word
 	h2 = (i >> (16 - offset_prefix_len))
+
+	# checking that second word prefix bits are empty
 	assert (h2 & (prefix_mask | (1 << (15 - offset_prefix_len)))) == 0
 	h2 |= offset_prefix
 
 	if is_type:
+		# flagging "word type" int
 		h2 |= (1 << (15 - offset_prefix_len))
 
 	assert h1 < 2**16
@@ -176,40 +184,41 @@ def encode_index(label, index, line_lengths):
 	return buf
 
 
-def write_utf16_index_to_clang(label, buf, clang):
+def write_blobs_to_clang(label, buf, clang):
 	# len(chunk_offsets) would be number of chunks + 1, so for all `i`
 	# can compute compressed chunk length with single expression:
 	# `chunk_offsets[i + 1] - chunk_offsets[i]`
 	chunk_offsets = [0]
-	print(f'const uint8_t {label}_dictionary_index_data[] = {{', file=clang)
-	for chunk_start in range(0, len(buf), chunk_size):
-		chunk = buf[chunk_start:chunk_start + chunk_size]
+	print(f'const uint8_t {label}_data[] = {{', file=clang)
+	for chunk_start in range(0, len(buf), CHUNK_SIZE):
+		chunk = buf[chunk_start:chunk_start + CHUNK_SIZE]
 
 		compressed = lz4.block.compress(chunk, store_size=False)
 		chunk_offsets.append(chunk_offsets[-1] + len(compressed))
 		print(*compressed, sep=',', end=',', file=clang)
 
 	print('};', file=clang)
-	print(f'const int32_t {label}_dictionary_index_chunks_offsets[] = {{', file=clang)
+	print(f'const int32_t {label}_chunks_offsets[] = {{', file=clang)
 	print(*chunk_offsets, sep=',', end='};', file=clang)
 
 	return chunk_offsets[-1], len(chunk_offsets), len(chunk)
 
-def write_index_header(label, original_size, compressed_len, num_chunk_offsets, last_chunk_size, of):
-	print(f'const size_t {label}_dictionary_index_original_size = {original_size};', file=of)
-	print(f'extern const uint8_t {label}_dictionary_index_data[{compressed_len}];', file=of)
-	print(f'extern const int32_t {label}_dictionary_index_chunks_offsets[{num_chunk_offsets}];', file=of)
-	print(f'const size_t {label}_dictionary_index_last_chunk_size = {last_chunk_size};', file=of)
-	print(f'const size_t {label}_dictionary_index_last_chunk_index = {num_chunk_offsets - 2};', file=of)
+def write_blob_header(label, original_size, compressed_len, num_chunk_offsets, last_chunk_size, of):
+	print(f'const size_t {label}_original_size = {original_size};', file=of)
+	print(f'extern const uint8_t {label}_data[{compressed_len}];', file=of)
+	print(f'extern const int32_t {label}_chunks_offsets[{num_chunk_offsets}];', file=of)
+	print(f'const size_t {label}_last_chunk_size = {last_chunk_size};', file=of)
+	print(f'const size_t {label}_last_chunk_index = {num_chunk_offsets - 2};', file=of)
 
-def write_utf16_index(label, index, line_lengths, of, clang):
+def write_utf16_index(label, index, line_lengths, header, clang):
 	buf = encode_index(label, index, line_lengths)
-	compressed_len, num_chunk_offsets, last_chunk_size = write_utf16_index_to_clang(label, buf, clang)
-	write_index_header(label, len(buf), compressed_len, num_chunk_offsets, last_chunk_size, of)
-	print(f'{label} utf16 index lz4-chunked is of size {compressed_len / 2**20:.2f}MiB')
+	label = f'{label}_dictionary_index'
+	compressed_len, num_chunk_offsets, last_chunk_size = write_blobs_to_clang(label, buf, clang)
+	write_blob_header(label, len(buf), compressed_len, num_chunk_offsets, last_chunk_size, header)
+	print(f'{label} utf16 lz4-chunked is of size {compressed_len / 2**20:.2f}MiB')
 	return buf
 
-def write_utf16_indexies(dict_index, names_index):
+def write_utf16_indexies(words_index, names_index):
 	with open('wasm/cflags') as f:
 		flags = f.read().strip().split()
 	flags.insert(0, 'clang')
@@ -221,7 +230,6 @@ def write_utf16_indexies(dict_index, names_index):
 	print('#include <stdint.h>', file=clang.stdin)
 
 	with open('wasm/generated/index.h', 'w') as of:
-		print(f'#define dictionary_index_chunk_size {chunk_size}', file=of)
 		print(f'const uint32_t dictionary_index_type_bit = 0x{1<<type_bit_shift:08X};', file=of)
 		print(f'const uint16_t dictionary_index_offset_prefix = 0x{offset_prefix:04X};', file=of)
 		print(f'const size_t dictionary_index_offset_prefix_len = 3;', file=of)
@@ -229,13 +237,13 @@ def write_utf16_indexies(dict_index, names_index):
 		print(f'const uint16_t dictionary_index_offset_suffix_mask = 0x{suffix_mask:04X};', file=of)
 
 		line_lengths = []
-		for label, index in zip(('dict', 'names'), (dict_index, names_index)):
+		for label, index in zip(('words', 'names'), (words_index, names_index)):
 			write_utf16_index(label, index, line_lengths, of, clang.stdin)
 
 		print_lengths_stats('utf16 index', line_lengths)
 		print(f'''
 			#ifndef dictionary_index_max_entry_length
-			#define dictionary_index_max_entry_length {2**math.ceil(math.log2(max(line_lengths)))}
+			#define dictionary_index_max_entry_length {ceil_power_of_2(max(line_lengths))}
 			#endif
 		''', file=of)
 
@@ -245,7 +253,7 @@ def write_utf16_indexies(dict_index, names_index):
 
 	with open('wasm/generated/index-samples.csv', 'w') as of:
 		print(
-			'かける', *map(lambda o: f'{o[0]};{o[1]}' if type(o) == TypedOffset else o, dict_index['かける']),
+			'かける', *map(lambda o: f'{o[0]};{o[1]}' if type(o) == TypedOffset else o, words_index['かける']),
 			sep=',', file=of
 		)
 
@@ -324,14 +332,20 @@ if __name__ == '__main__':
 
 	line_lengths = []
 	with open('wasm/generated/index.test.c', 'w') as of:
-		print('#include "../src/index.c"', file=of)
+		print('#include <stddef.h>', file=of)
+		print('#include <stdint.h>', file=of)
 		buf = write_utf16_index('test', test_index, line_lengths, of, of)
 		print('const uint8_t test_dictionary_index_original_data[] = {', ','.join(map(str, buf)), '};', file=of)
 		test_entries_offsets = [0]
 		for l in line_lengths:
 			test_entries_offsets.append(test_entries_offsets[-1] + l)
-		print('const size_t test_dictionary_index_entries_offsets[] = {', ','.join(map(str, test_entries_offsets)), '};', file=of)
+		print(
+			'const size_t test_dictionary_index_entries_offsets[] = {',
+			','.join(map(str, test_entries_offsets)),
+			'};',
+			file=of,
+		)
 	assert line_lengths == gold_line_length, f'{line_lengths}\n{gold_line_length}'
-	assert sum(line_lengths[:2]) < chunk_size and sum(line_lengths[:3]) > chunk_size
-	assert sum(line_lengths[:5]) == chunk_size * 2 - 4
-	assert sum(line_lengths[:8]) == chunk_size * 3
+	assert sum(line_lengths[:2]) < CHUNK_SIZE and sum(line_lengths[:3]) > CHUNK_SIZE
+	assert sum(line_lengths[:5]) == CHUNK_SIZE * 2 - 4
+	assert sum(line_lengths[:8]) == CHUNK_SIZE * 3

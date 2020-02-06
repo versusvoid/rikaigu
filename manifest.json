@@ -4,6 +4,12 @@
 	"name": "rikaigu (devel)",
 	"version": "1.0.1",
 
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "rikaigu@versusvoid"
+		}
+	},
+
 	"description": "Rikaikun enhanced. Translate Japanese by hovering over words.",
 	"icons": {
 		"48": "images/icon48.png",
@@ -45,6 +51,7 @@
 		"css/popup-yellow.css",
 		"css/popup-common.css",
 		"html/scratchpad.html",
+		"html/upload.html",
 		"js/scratchpad.js"
 	]
 

@@ -17,19 +17,10 @@ void test_parse_base62_uint()
 	assert(parse_base62_uint(number, number + 3) == 62*62 + 2 * 62 + 3);
 }
 
-void test_find()
-{
-	const char s1[] = "some string";
-	assert(find(s1, s1 + strlen(s1), ' ') == s1 + 4);
-	assert(find(s1, s1 + strlen(s1), 'g') == s1 + 10);
-	assert(find(s1, s1 + strlen(s1), 's') == s1);
-	assert(find(s1, s1 + strlen(s1), '1') == s1 + strlen(s1));
-}
-
 void test_dentry_make()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char case1[] = "kanji\tkana\tdefinition\t123";
 	const dentry_t* d = dentry_make(case1, strlen(case1), false);
@@ -89,7 +80,7 @@ void test_count_parts()
 void test_kanji_group_parse_reading_indicies()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	kanji_group_t kg;
 	memset(&kg, 0, sizeof(kg));
@@ -149,7 +140,7 @@ void test_parse_surfaces()
 void test_kanji_group_parse()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	kanji_group_t kg;
 	const char case1[] = "a,bU,c#3,2,5,6";
@@ -181,7 +172,7 @@ void test_kanji_group_parse()
 void test_dentry_parse_kanjis()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char test[] = u8"いっその事#0;一層のことU,一層の事U;いっそうの事U#1";
 	dentry_t d;
@@ -220,7 +211,7 @@ void test_dentry_parse_kanjis()
 void test_dentry_parse_readings()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char test[] = u8"うとうと;ウトウトU;うとっとU;ウトッとU;ウトっとU";
 	dentry_t d;
@@ -256,7 +247,7 @@ void test_dentry_parse_readings()
 void test_parse_i_promise_i_wont_overwrite_it_strings()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	size_t num;
 	i_promise_i_wont_overwrite_it_string_t* arr;
@@ -284,7 +275,7 @@ void test_parse_i_promise_i_wont_overwrite_it_strings()
 void test_sense_group_parse()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char s[] = "n;pitch (i.e. pace, speed, angle, space, field, sound, etc.)`pitch (from distilling petroleum, tar, etc.)`pitch (football, rugby); playing field`PHS portable phone";
 	sense_group_t sg;
@@ -324,7 +315,7 @@ void test_sense_group_parse()
 void test_dentry_parse_definition()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char s[] = "n-suf;depending on`as soon as; immediately`in accordance with\\n;order; program`circumstances; reason\\p";
 	dentry_t d;
@@ -353,7 +344,7 @@ void test_dentry_parse_definition()
 void test_dentry_parse_whole()
 {
 	setup_memory();
-	init((size_t)wasm_memory, wasm_memory_size_pages * (1<<16));
+	init(wasm_memory, wasm_memory_size_pages * (1<<16));
 
 	const char s[] = u8"我;吾U#0,1,2,3,4;吾れU,我れU#0,2	われ;わU;あれU;あU;わぬU;わろU	pn;I; me`(only われ,わ) oneself`(only われ,わ) you\\pref;(only わ) (also 和) prefix indicating familiarity or contempt	77";
 	dentry_t* d = dentry_make(s, strlen(s), false);
@@ -376,7 +367,6 @@ void test_dentry_parse_whole()
 int main()
 {
 	test_parse_base62_uint();
-	test_find();
 	test_dentry_make();
 	test_count_parts();
 	test_kanji_group_parse_reading_indicies();

@@ -1,7 +1,5 @@
 #include <stddef.h>
-#include <uchar.h>
 #include <stdbool.h>
-#include <assert.h>
 
 #include "state.h"
 #include "dentry.h"
